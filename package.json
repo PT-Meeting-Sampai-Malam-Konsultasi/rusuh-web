@@ -6,9 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "npx --yes serve out",
-    "lint": "eslint",
-    "prepare": "husky",
-    "format": "prettier --write ."
+    "lint": "eslint && stylelint \"src/**/*.css\"",
+    "format": "prettier --write .",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage",
+    "typecheck": "tsc --noEmit",
+    "check:bundle": "next build && node scripts/check-bundle-size.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@hookform/resolvers": "6.0.2",
