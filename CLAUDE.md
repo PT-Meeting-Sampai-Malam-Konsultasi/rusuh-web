@@ -79,6 +79,8 @@ npx tsc --noEmit
 - NIKs are shown masked after entry and never logged.
 - Static export: no Server Actions, cookies, rewrites, Route Handlers that read the request, or dynamic routes without
   `generateStaticParams` — pass runtime ids (event, booking) as search params.
+- Routes, folders and file names are English (`/queue`, `/login`, `/order`, `/payment`, `/tickets`, `/account`);
+  only the UI copy is Indonesian/English through i18n. Route table: `.claude/rules/presentation.md`.
 - Git: branch `type/FR-xx-short-name` from `main`, never commit to `main`. Commits and PR titles:
   `feat(login): [FR-06] add otp code step` — feature scope, ticket in the subject (chore/ci/docs/style/revert may
   omit it); squash-merge PRs. No `Co-Authored-By` or "Generated with" attribution lines. Full rules:

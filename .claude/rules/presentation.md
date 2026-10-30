@@ -15,12 +15,26 @@ Presentation is the thinnest layer: props in, JSX out. No business logic.
 - If the screen's controller reads search params, wrap it: `<Suspense fallback={<ScreenSkeleton />}><Screen /></Suspense>`.
   Without it the whole tree falls back to client rendering.
 - No data fetching, no logic, no hooks.
-- Route names are Indonesian, as in the App Flow: `/` (home), `/antrian`, `/masuk`, `/pesan`, `/bayar`, `/tiket`,
-  `/tiket/detail`, `/akun`. Ids are search params (`/antrian?event=…`, `/bayar?booking=…`).
+- Routes, folders and file names are **English**, lower-case kebab-case; only the UI copy is Indonesian/English via
+  i18n. Route names match the commit scopes:
+
+  | Route | Screen | Search params |
+  | --- | --- | --- |
+  | `/` | Home | — |
+  | `/queue` | Waiting room | `event` |
+  | `/login` | Sign in / sign up | `next` (where to return) |
+  | `/order` | Detail ticket (categories, holders) | `event` |
+  | `/payment` | Payment (Snap) | `booking` |
+  | `/tickets` | My tickets | — |
+  | `/tickets/detail` | E-ticket | `booking` |
+  | `/account` | Account | — |
+
+  Ids are search params because the static export has no dynamic routes (`/queue?event=…`, `/payment?booking=…`).
+  Keep the paths in `src/utils/constants/routes.ts`; never hard-code them in controllers.
 - Every flow segment has an `error.tsx` (see the error-handling rule).
 
 ```tsx
-// src/app/antrian/page.tsx
+// src/app/queue/page.tsx
 import { Suspense } from 'react';
 import WaitingRoomScreen from '@presentation/pages/Queue/WaitingRoom';
 import WaitingRoomSkeleton from '@presentation/pages/Queue/WaitingRoom/components/WaitingRoomSkeleton';

@@ -19,7 +19,7 @@ app/global-error.tsx      ← replaces the root layout on a crash; defines its o
 app/layout.tsx
   Providers (NetworkStatusProvider → …)
     app/error.tsx         ← app-level fallback inside the layout
-      app/{segment}/error.tsx   ← one per flow segment (antrian, masuk, pesan, bayar, tiket, akun)
+      app/{segment}/error.tsx   ← one per flow segment (queue, login, order, payment, tickets, account)
         page.tsx → Screen → sections
 app/not-found.tsx         ← 404
 ```
@@ -47,8 +47,8 @@ app/not-found.tsx         ← 404
 onError: (error: HttpError) => {
   toggleLoading();
   if (error.code === 'NETWORK_ERROR') return openPopupError({ message: t('error_network') });
-  if (error.status === 401) return router.push('/masuk');
-  if (error.code === 'ADMISSION_INVALID') return router.push(`/antrian?event=${eventId}`);
+  if (error.status === 401) return router.push('/login');
+  if (error.code === 'ADMISSION_INVALID') return router.push(`/queue?event=${eventId}`);
   openPopupError({ message: t(ERROR_CODE_MAP[error.code] ?? 'error_unknown') });
 }
 ```

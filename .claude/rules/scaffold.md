@@ -22,7 +22,7 @@ Every rule here is mandatory. Check imports and layer direction before writing a
 - `turbopack.root: __dirname` and the `@tailwindcss/turbopack` CSS loader stay as generated.
 - Not available in export mode: Server Actions, `cookies()`, `headers()`, rewrites/redirects/headers in config, Proxy
   (middleware), ISR, Route Handlers that read the request, dynamic routes without `generateStaticParams`.
-- Runtime ids (event, booking) travel as **search params**, e.g. `/antrian?event=evt_2026_samudra`.
+- Runtime ids (event, booking) travel as **search params**, e.g. `/queue?event=evt_2026_samudra`.
 
 ## Path aliases (tsconfig `paths`)
 

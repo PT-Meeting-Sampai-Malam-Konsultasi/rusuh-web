@@ -21,7 +21,7 @@ The spec, `.claude/rules/controller.md`, `.claude/rules/error-handling.md`,
 - All async work through `useQueryTanstack` / `useMutationTanstack`; one per operation; no `.then/.catch`, no
   `useEffect` + service call, no service call inside another mutation's callbacks.
 - `toggleLoading()` in `mutationFn`, `onSuccess` and `onError`.
-- Errors: `ERROR_CODE_MAP[error.code]` → `t()` → popup or field error; `401` → `/masuk`; `NETWORK_ERROR` → offline message.
+- Errors: `ERROR_CODE_MAP[error.code]` → `t()` → popup or field error; `401` → `/login`; `NETWORK_ERROR` → offline message.
 - Countdowns from `expiresAt − serverNow`; polling via `refetchInterval`.
 - `useWatch`, never `watch()`. `trackPageView` in `useEffect(…, [])`.
 - No business logic or helper functions in the body.

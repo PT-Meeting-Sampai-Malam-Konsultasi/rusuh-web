@@ -46,7 +46,7 @@ Checked by `npm run check:bundle` (`scripts/check-bundle-size.mjs` over `out/_ne
 
 ```bash
 npm run build && npx serve out    # serve the static export
-npx lighthouse http://localhost:3000/antrian?event=demo --only-categories=performance --form-factor=mobile
+npx lighthouse http://localhost:3000/queue?event=demo --only-categories=performance --form-factor=mobile
 ```
 
 Mobile emulation, 4G throttling. Optional CI gate: Lighthouse CI with `categories:performance ≥ 0.9` and the CWV

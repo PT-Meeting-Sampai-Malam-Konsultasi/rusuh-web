@@ -24,7 +24,7 @@ src/presentation/pages/{Domain}/{Page}/
 ## Route file
 
 ```tsx
-// src/app/masuk/page.tsx
+// src/app/login/page.tsx
 import SignInScreen from '@presentation/pages/Auth/SignIn';
 
 export const metadata = { title: 'Masuk' };
