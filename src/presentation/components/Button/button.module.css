@@ -7,17 +7,17 @@
     transform 90ms linear,
     box-shadow 90ms linear;
 
+  &:disabled {
+    @apply cursor-not-allowed border-ink-3 bg-paper-2 text-ink-3;
+    box-shadow: none;
+  }
+
   &:hover:not(:disabled) {
     transform: translate(-1px, -1px);
   }
 
   &:active:not(:disabled) {
     transform: translate(4px, 4px);
-    box-shadow: none;
-  }
-
-  &:disabled {
-    @apply cursor-not-allowed border-ink-3 bg-paper-2 text-ink-3;
     box-shadow: none;
   }
 }

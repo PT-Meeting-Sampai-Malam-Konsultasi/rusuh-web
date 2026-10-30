@@ -1,0 +1,60 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "reference",
+          "apply",
+          "theme",
+          "variant",
+          "custom-variant",
+          "utility",
+          "layer",
+          "config",
+          "plugin",
+          "source"
+        ]
+      }
+    ],
+    "at-rule-no-deprecated": [
+      true,
+      {
+        "ignoreAtRules": ["apply"]
+      }
+    ],
+    "import-notation": "string",
+    "selector-class-pattern": [
+      "^[a-z][a-zA-Z0-9]*$",
+      {
+        "message": "CSS module classes are camelCase"
+      }
+    ],
+    "function-no-unknown": [
+      true,
+      {
+        "ignoreFunctions": ["theme", "--alpha", "--spacing"]
+      }
+    ],
+    "declaration-property-value-no-unknown": null,
+    "custom-property-pattern": null,
+    "value-keyword-case": [
+      "lower",
+      {
+        "ignoreKeywords": ["Arial", "Narrow"]
+      }
+    ],
+    "font-family-name-quotes": null,
+    "media-feature-range-notation": "context",
+    "at-rule-prelude-no-invalid": null,
+    "declaration-empty-line-before": null,
+    "custom-property-empty-line-before": null,
+    "property-no-vendor-prefix": [
+      true,
+      {
+        "ignoreProperties": ["/text-size-adjust$/"]
+      }
+    ]
+  }
+}

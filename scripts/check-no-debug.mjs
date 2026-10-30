@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 
 const PATTERNS = [
   { re: /console\.(log|debug|info|warn|error|trace|dir|table|group|groupEnd|time|timeEnd)\s*\(/, label: 'console.*()' },
-  { re: /\bdebugger\b/, label: 'debugger' },
+  { re: /(^|[;{}]\s*)debugger\s*(;|}|$)/, label: 'debugger' }, // the statement, not the word
   { re: /\bconsole\.assert\s*\(/, label: 'console.assert()' },
 ];
 const staged = execSync('git diff --cached --name-only --diff-filter=ACM')

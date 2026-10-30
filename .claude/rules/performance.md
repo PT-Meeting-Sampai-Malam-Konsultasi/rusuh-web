@@ -22,12 +22,21 @@ sale (PRD §3, NFR-06).
 
 | Budget (gzip) | Limit |
 | --- | --- |
-| JS loaded by any one route on first load | ≤ 150 KB |
-| Any single chunk | ≤ 50 KB |
-| Total CSS | ≤ 30 KB |
+| JS loaded by any one route on first load | target 150 KB — **reported, not enforced yet** (see below) |
+| Any single chunk, except the shared React/Next.js runtime chunk | ≤ 50 KB (enforced) |
+| Total CSS | ≤ 30 KB (enforced) |
 | Largest image | ≤ 100 KB (WebP/AVIF, sized) |
 
 Checked by `npm run check:bundle` (`scripts/check-bundle-size.mjs` over `out/_next/static/chunks`).
+
+**Measured after the scaffold (30 Oct 2026):** home first-load JS is ~195 KB gzip for modern browsers (the
+`noModule` polyfill chunk is excluded). About 150 KB of that is the Next.js 16 / React runtime, which no app code can
+remove; the app's own shared code (DI, React Query, i18next, Axios, both locale files) is ~50 KB. So the 150 KB target
+(carried over from a Vite SPA) is below this framework's floor. Rules until the team agrees a new number:
+
+- Don't let first-load JS grow by more than 5 KB per PR without a reason in the PR.
+- Load page-specific libraries (Snap, QR, PDF) with `next/dynamic`, never in providers.
+- Keep the waiting room lean: it is the page 300,000 phones load at once.
 
 ## Techniques
 

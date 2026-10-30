@@ -4,7 +4,7 @@ const EXEMPT = ['chore', 'ci', 'docs', 'style', 'revert'];
 // Ticket = TOR code, or a sub-issue code: platform W (web) / M (mobile) / B (backend) + sequence.
 const TICKETS = /^((\[(FR|NFR|BR)-\d{2}(-(W|M|B)\d+)?\])+) \S/;
 
-export default {
+const config = {
   extends: ['@commitlint/config-conventional'],
   plugins: [
     {
@@ -51,3 +51,5 @@ export default {
     'subject-ticket': [2, 'always'],
   },
 };
+
+export default config;
