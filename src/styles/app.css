@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+/* Poster Sablon tokens — source: rusuh-documentation/product/design-brief.md and the HiFi (rusuh.css). */
+@theme {
+  --color-paper: #f2eee3;
+  --color-card: #fbf9f3;
+  --color-paper-2: #e8e2d2;
+  --color-ink: #141414;
+  --color-ink-2: #4a4740;
+  --color-ink-3: #6b665e;
+  --color-hair: #cfc8b6;
+  --color-pink: #d81f72;
+  --color-pink-ink: #b8125c;
+  --color-pink-tint: #f8d3e2;
+  --color-blue: #2f5bea;
+  --color-blue-ink: #1f3fb8;
+  --color-blue-tint: #d6dffb;
+  --color-red: #c21f1f;
+  --color-red-tint: #f6d9d4;
+  --color-green: #16784a;
+
+  --font-display: var(--font-bricolage), 'Arial Narrow', sans-serif; /* pair with font-stretch 75% / 85% */
+  --font-sans: var(--font-space-grotesk), system-ui, sans-serif;
+
+  --radius-*: initial; /* square corners everywhere */
+  --shadow-off: 6px 6px 0 var(--color-ink);
+  --shadow-off-s: 4px 4px 0 var(--color-ink);
+  --shadow-off-pink: 4px 4px 0 var(--color-pink);
+  --shadow-off-blue: 4px 4px 0 var(--color-blue);
+
+  --ease-click: cubic-bezier(0.3, 1.5, 0.5, 1);
+  --ease-print: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --breakpoint-md: 45rem; /* 720px: phone / app chrome below */
+  --breakpoint-lg: 73.75rem; /* 1180px */
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font: 400 16px/1.5 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Paper grain: one fixed layer over the whole page. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0.32;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.07 0 0 0 0 0.05 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-blue);
+    outline-offset: 3px;
+  }
+
+  @media (width < 45rem) {
+    body {
+      font-size: 15px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
