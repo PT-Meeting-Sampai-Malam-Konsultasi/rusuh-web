@@ -81,7 +81,7 @@ npx tsc --noEmit
   `generateStaticParams` — pass runtime ids (event, booking) as search params.
 - Routes, folders and file names are English (`/queue`, `/login`, `/order`, `/payment`, `/tickets`, `/account`);
   only the UI copy is Indonesian/English through i18n. Route table: `.claude/rules/presentation.md`.
-- Git: branch `type/FR-xx-short-name` from `main`, never commit to `main`. Commits and PR titles:
-  `feat(login): [FR-06] add otp code step` — feature scope, ticket in the subject (chore/ci/docs/style/revert may
-  omit it); squash-merge PRs. No `Co-Authored-By` or "Generated with" attribution lines. Full rules:
-  `.claude/rules/git-conventions.md`.
+- Git: branch `type/FR-xx-W1-short-name` from `main`; never commit to `main`. Commits and PR titles:
+  `feat(login): [FR-06-W1] add otp code step` — feature scope, ticket in the subject (sub-issue code = parent +
+  W/M/B + number; chore/ci/docs/style/revert may omit it); PR body `Closes #n`; squash merge. No `Co-Authored-By` or
+  "Generated with" lines. Full rules: `.claude/rules/git-conventions.md`.

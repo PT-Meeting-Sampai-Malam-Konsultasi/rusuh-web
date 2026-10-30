@@ -69,21 +69,23 @@ set it up.
 ## Contributing
 
 Work is tracked on the GitHub project board **Rusuh Booking Tiket**; every card is a TOR requirement code
-(`FR-01`…`FR-25`, `NFR-01`…`NFR-10`, `BR-01`…`BR-08`).
+(`FR-01`…`FR-25`, `NFR-01`…`NFR-10`, `BR-01`…`BR-08`), kept as parent issues in `rusuh-documentation`. Each platform's
+work is a sub-issue in its own repo, coded parent + platform + number: `FR-06-W1` (web), `FR-06-M1` (mobile),
+`FR-06-B1` (backend). Numbers are always present, never reused.
 
 **Branches** — from `main`, short-lived, named after the type and ticket:
 
 ```
-feat/FR-06-otp-code-step
-fix/FR-21-payment-timer
+feat/FR-06-W1-otp-code-step
+fix/FR-21-W1-payment-timer
 chore/update-eslint          ← tooling work has no ticket
 ```
 
 **Commits** — conventional commits with a feature scope and the ticket in the subject:
 
 ```
-feat(login): [FR-06] add otp code step
-fix(queue): [FR-07][FR-09] stop eta jumping up after a pause
+feat(login): [FR-06-W1] add otp code step
+fix(queue): [FR-07-W1][FR-09-W1] stop eta jumping up after a pause
 chore(deps): bump next to 16.4.3
 ```
 
@@ -91,7 +93,8 @@ chore(deps): bump next to 16.4.3
   `i18n`, `style`, `docs`.
 - A ticket is required for `feat`, `fix`, `refactor`, `perf` and `test`; optional for `chore`, `ci`, `docs`, `style`
   and `revert`.
-- Mind the spaces: `feat(login): [FR-06] add…` — after the colon and after the bracket.
+- Mind the spaces: `feat(login): [FR-06-W1] add…` — after the colon and after the bracket.
+- The PR body closes the sub-issue by number: `Closes #4`.
 
 **Pull requests** — open against `main`, one review, green checks, then **squash merge**. The PR title becomes the
 commit on `main`, so write it in the commit format above.

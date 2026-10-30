@@ -6,19 +6,45 @@ no-debug check.
 
 ## Tickets
 
-Work is tracked on the GitHub org project board **"Rusuh Booking Tiket"**. Each card is one TOR requirement, identified
-by its code: `FR-01`…`FR-25`, `NFR-01`…`NFR-10`, `BR-01`…`BR-08`. The code is the link between code and board.
+Work is tracked on the GitHub org project board **"Rusuh Booking Tiket"**.
 
-- Every branch, commit and PR for product work names the ticket code(s) it serves.
-- Find the code in the PRD (`../rusuh-documentation/product/prd.md` §6 and §9) or on the board. If the work maps to no
-  code and isn't tooling (see exemptions), ask the user which ticket it belongs to — never invent a code.
+- **Parent tickets** are the TOR requirements, issues in `rusuh-documentation`, coded `FR-01`…`FR-25`, `NFR-01`…`NFR-10`,
+  `BR-01`…`BR-08`.
+- **Sub-issues** are the platform work, issues in each platform's repo, linked to their parent. Their code is the parent
+  code + platform letter + sequence number:
+
+  | Letter | Platform | Repo |
+  | --- | --- | --- |
+  | `W` | Web | `rusuh-web` |
+  | `M` | Mobile | `rusuh-app` |
+  | `B` | Backend | `rusuh-queue`, `rusuh-core` |
+
+  ```
+  FR-06              parent requirement            rusuh-documentation#6
+  ├── FR-06-W1       Web: position + ETA           rusuh-web#3
+  ├── FR-06-W2       Web: pause / sold-out states  rusuh-web#4
+  ├── FR-06-M1       Mobile: position + ETA        rusuh-app#5
+  └── FR-06-B1       BE: frontier + position API   rusuh-queue#2
+  ```
+
+- Sub-issue titles start with their code: `FR-06-W2 · Web: pause / sold-out states`. The board's Ticket Code field holds
+  the same code.
+- **Always number**, even when a platform has only one sub-issue (`FR-06-W1`, never `FR-06-W`), so codes never change
+  when a second one is added.
+- **Next free number** within that parent and platform (the parent's sub-issue list shows what's taken). **Never reuse or
+  renumber**: a dropped `W2` stays retired and the next one is `W3`.
+- Every branch, commit and PR for product work names the code it serves — normally the **sub-issue code**; the bare
+  parent code only for work that belongs to the requirement as a whole.
+- Find the code on the board or in the parent issue. If the work has no sub-issue yet, ask the user to create one (or
+  which one it belongs to) — never invent a code.
+- The PR body also closes the sub-issue by number (`Closes #4`): GitHub links and closes issues by number, not by code.
 
 ## Branches
 
 | Topic | Rule |
 | --- | --- |
 | Base | `main` is always deployable to staging. Protected: no direct pushes; merge by PR with 1 review and green CI. |
-| Name | `<type>/<ticket>-<short-description>`, kebab-case: `feat/FR-06-otp-code-step`, `fix/FR-21-payment-timer`. Exempt types drop the ticket: `chore/claude-steering`, `ci/build-cache`. |
+| Name | `<type>/<ticket>-<short-description>`, kebab-case: `feat/FR-06-W2-pause-states`, `fix/FR-21-W1-payment-timer`. Exempt types drop the ticket: `chore/claude-steering`, `ci/build-cache`. |
 | Lifetime | One feature slice per branch, merged within 1–2 days. Rebase on `main` before opening the PR. |
 | Merge | **Squash merge.** The PR title becomes the commit on `main`, so it follows the commit format below, ticket included. Delete the branch after merge. |
 | Release | Tag `main` (`v1.0.0` on 13 Nov 2026). Hotfix: `fix/<ticket>-…` from the tag, PR back to `main`. |
@@ -41,8 +67,9 @@ BREAKING CHANGE: …                       ← when applicable
 ```
 
 - The whole subject (from `[` on) is at most 72 characters.
-- Several tickets: back to back, no spaces between them: `[FR-13][FR-15]`.
-- Ticket codes match `(FR|NFR|BR)-\d{2}` exactly: `[FR-06]`, not `[FR-6]` or `[fr-06]`.
+- Several tickets: back to back, no spaces between them: `[FR-13-W1][FR-15-W1]`.
+- Codes match `(FR|NFR|BR)-\d{2}(-(W|M|B)\d+)?` exactly: `[FR-06-W2]` or `[FR-06]`; not `[FR-6]`, `[FR-06-W]`,
+  `[FR-06-w1]` or `[FR-06.1]`.
 
 ### Types
 
@@ -59,7 +86,7 @@ BREAKING CHANGE: …                       ← when applicable
 | `style` | Formatting only | optional |
 | `revert` | Reverting a commit | optional |
 
-For the optional ones, add the ticket when the change is for one (`docs(login): [FR-06] document otp rules`).
+For the optional ones, add the ticket when the change is for one (`docs(login): [FR-06-W1] document otp rules`).
 
 **Commits without a ticket are allowed — but only for `chore`, `ci`, `docs`, `style` and `revert`.** The board holds only
 the TOR requirements, so tooling work (dependency bumps, CI, steering, formatting) has no card to point to, and nobody
@@ -96,16 +123,16 @@ in `commitlint.config.mjs`) when the App Flow gains a screen.
 ### Examples
 
 ```
-feat(login): [FR-06] add otp code step
-fix(queue): [FR-07][FR-09] stop eta jumping up after a pause
-refactor(order): [FR-15] move nik validation into a use case
-test(payment): [FR-25] cover duplicate midtrans notifications
+feat(login): [FR-06-W1] add otp code step
+fix(queue): [FR-07-W1][FR-09-W1] stop eta jumping up after a pause
+refactor(order): [FR-15-W1] move nik validation into a use case
+test(payment): [FR-25-W1] cover duplicate midtrans notifications
 chore(deps): bump next to 16.4.3
 docs(steering): add git conventions
 ```
 
 ```
-feat(order): [FR-13][FR-15] add holder name and nik per ticket
+feat(order): [FR-13-W1][FR-15-W1] add holder name and nik per ticket
 
 Each ticket asks "Saya sendiri / Orang lain"; only one ticket can use the
 profile NIK, since one NIK holds one seat per event.
@@ -134,8 +161,8 @@ profile NIK, since one NIK holds one seat per event.
 
 ## Anti-patterns
 
-- ❌ `feat(login):[FR-06] …` — no space after the colon: commitlint can't parse the header
+- ❌ `feat(login):[FR-06-W1] …` — no space after the colon: commitlint can't parse the header
 - ❌ `feat(login): add otp` — product work without a ticket
 - ❌ `feat(controller): …` — layer as scope; use the feature
-- ❌ Made-up ticket codes, `[FR-6]`, `[FR-06,FR-07]`
+- ❌ Made-up codes or sub-issues that don't exist; `[FR-6]`, `[FR-06-W]`, `[FR-06,FR-07]`; renumbering sub-issues
 - ❌ `git commit -m "update"`; commits straight to `main`; long-lived branches; merge commits on `main`
