@@ -1,0 +1,88 @@
+import axios, { type AxiosAdapter, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+
+import type { HttpError, HttpProtocol, HttpResponse, RequestConfig } from '@core/protocols/http.protocol';
+
+export interface HttpAdapterOptions {
+  baseUrl: string;
+  timeoutMs: number;
+  /** Current access token, read per request (bearer auth on core). */
+  getAccessToken?: () => string | null;
+  /** Current UI locale, read per request (Accept-Language). */
+  getLocale?: () => string;
+  /** Called once on a 401; resolves true when a new access token is available. */
+  refreshSession?: () => Promise<boolean>;
+  /** Test seam: replaces the network transport. */
+  transport?: AxiosAdapter;
+}
+
+interface Problem {
+  code?: string;
+  title?: string;
+  detail?: string;
+  traceId?: string;
+}
+
+type RetryConfig = InternalAxiosRequestConfig & { _retried?: boolean };
+
+export function toHttpError(error: unknown): HttpError {
+  if (axios.isAxiosError(error)) {
+    const e = error as AxiosError<Problem>;
+    if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT') {
+      return { status: 0, code: 'TIMEOUT', message: e.message };
+    }
+    if (!e.response) return { status: 0, code: 'NETWORK_ERROR', message: e.message };
+    const body = e.response.data;
+    return {
+      status: e.response.status,
+      code: body?.code ?? `HTTP_${e.response.status}`,
+      message: body?.title ?? e.message,
+      data: body,
+      traceId: body?.traceId,
+    };
+  }
+  return { status: 0, code: 'UNKNOWN_ERROR', message: error instanceof Error ? error.message : String(error) };
+}
+
+export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
+  const client = axios.create({
+    baseURL: options.baseUrl,
+    timeout: options.timeoutMs,
+    headers: { Accept: 'application/json' },
+    ...(options.transport ? { adapter: options.transport } : {}),
+  });
+
+  client.interceptors.request.use((config) => {
+    const locale = options.getLocale?.();
+    if (locale) config.headers.set('Accept-Language', locale);
+    const token = options.getAccessToken?.();
+    if (token && !config.headers.has('Authorization')) config.headers.set('Authorization', `Bearer ${token}`);
+    return config;
+  });
+
+  client.interceptors.response.use(undefined, async (error: unknown) => {
+    const config = axios.isAxiosError(error) ? (error.config as RetryConfig | undefined) : undefined;
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (status === 401 && config && !config._retried && options.refreshSession) {
+      config._retried = true;
+      if (await options.refreshSession()) {
+        config.headers.delete('Authorization');
+        return client.request(config);
+      }
+    }
+    return Promise.reject(toHttpError(error));
+  });
+
+  const wrap = async <T>(promise: Promise<{ data: T; status: number }>): Promise<HttpResponse<T>> => {
+    const res = await promise;
+    return { data: res.data, status: res.status };
+  };
+  const opts = (c?: RequestConfig) => ({ headers: c?.headers, signal: c?.signal });
+
+  return {
+    get: (path, c) => wrap(client.get(path, opts(c))),
+    post: (path, body, c) => wrap(client.post(path, body, opts(c))),
+    put: (path, body, c) => wrap(client.put(path, body, opts(c))),
+    patch: (path, body, c) => wrap(client.patch(path, body, opts(c))),
+    delete: (path, c) => wrap(client.delete(path, opts(c))),
+  };
+}
