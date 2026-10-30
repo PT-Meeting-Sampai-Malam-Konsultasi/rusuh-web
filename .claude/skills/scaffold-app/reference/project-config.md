@@ -40,7 +40,8 @@ Keep the generated options; add the aliases from the scaffold rule:
 
 ## `next.config.ts`
 
-Already set: `output: "export"`, `images.unoptimized`, `turbopack.root`, the Tailwind loader. Do not add
+Already set: `output: "export"`, `images.unoptimized`, `turbopack.root`, and the Tailwind loader split into a
+CSS Modules rule and a global CSS rule (see the scaffold rule). Do not add
 `cacheComponents` or `partialPrefetching` (they break export mode).
 
 ## Scripts (`package.json`)

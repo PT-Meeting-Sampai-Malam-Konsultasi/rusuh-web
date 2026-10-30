@@ -19,7 +19,10 @@ Every rule here is mandatory. Check imports and layer direction before writing a
 - Keep `cacheComponents` and `partialPrefetching` **off**: they fail the build in export mode
   ("PPR cannot be enabled in export mode").
 - `images: { unoptimized: true }` — there is no image optimizer in export mode.
-- `turbopack.root: __dirname` and the `@tailwindcss/turbopack` CSS loader stay as generated.
+- `turbopack.root: __dirname`. The `@tailwindcss/turbopack` loader runs through **two** rules under `'*.css'`: one for
+  `/\.module\.css$/` with `as: '*.module.css'`, one for everything else with `as: '*.css'`. The generator's single
+  `'*.css' → as: '*.css'` rule turns CSS Modules into global CSS: imports return `{}` and no class reaches the HTML.
+  After any change here, check that `out/index.html` has scoped class names (`class="xxxx_name"`).
 - Not available in export mode: Server Actions, `cookies()`, `headers()`, rewrites/redirects/headers in config, Proxy
   (middleware), ISR, Route Handlers that read the request, dynamic routes without `generateStaticParams`.
 - Runtime ids (event, booking) travel as **search params**, e.g. `/queue?event=evt_2026_samudra`.
