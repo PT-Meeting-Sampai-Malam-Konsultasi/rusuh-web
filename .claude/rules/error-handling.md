@@ -46,10 +46,10 @@ app/not-found.tsx         ← 404
 ```ts
 onError: (error: HttpError) => {
   toggleLoading();
-  if (error.code === 'NETWORK_ERROR') return openPopupError({ message: t('error_network') });
+  if (error.code === 'NETWORK_ERROR') return openPopupError({ message: t('error_network_error') });
   if (error.status === 401) return router.push('/login');
   if (error.code === 'ADMISSION_INVALID') return router.push(`/queue?event=${eventId}`);
-  openPopupError({ message: t(ERROR_CODE_MAP[error.code] ?? 'error_unknown') });
+  openPopupError({ message: t(ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) });
 }
 ```
 

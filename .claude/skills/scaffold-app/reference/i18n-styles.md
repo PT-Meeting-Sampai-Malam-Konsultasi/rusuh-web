@@ -5,7 +5,7 @@
 | File | Content |
 | --- | --- |
 | `src/infrastructure/i18n/index.ts` | i18next init with local resources; `lng: 'id'`, `fallbackLng: 'id'`, `interpolation.escapeValue: false`, `react.useSuspense: false`; export the instance |
-| `src/translation/locale/id.json` | Base keys: common actions, errors (`error_network`, `error_unknown`, one per API `code`), not-found, offline banner |
+| `src/translation/locale/id.json` | Base keys: common actions, errors (`error_<code>` for every API code and the transport codes `NETWORK_ERROR`, `TIMEOUT`, `UNKNOWN_ERROR`), not-found, offline banner |
 | `src/translation/locale/en.json` | Same keys, full English |
 | `src/utils/constants/storage-keys.ts` | `STORAGE_KEYS.LANGUAGE`, etc. |
 

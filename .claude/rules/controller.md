@@ -61,7 +61,7 @@ the top of its render**, so the hooks inside the factory keep a stable order.
   overlay stuck.
 - One query or mutation per async operation. Never call a service inside another mutation's `onSuccess`/`onError`.
 - Never `.then()/.catch()`; never `useEffect` + service call (use `useQueryTanstack`, with `refetchInterval` for polling).
-- Error display: `ERROR_CODE_MAP[error.code] ?? 'error_unknown'` → `t(key)` → `openPopupError()` or a field error.
+- Error display (fallback through the same DI map, no extra import): `ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR` → `t(key)` → `openPopupError()` or a field error.
   `401` goes to sign-in; `NETWORK_ERROR` shows the offline message.
 - Countdowns: compute from `expiresAt − serverNow` (plus elapsed client time since the response), never `Date.now()`
   against a deadline alone.

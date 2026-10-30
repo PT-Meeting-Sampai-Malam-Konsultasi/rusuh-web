@@ -63,7 +63,7 @@ const SignInController = ({
     },
     onError: (error: HttpError) => {
       toggleLoading();
-      openPopupError({ message: t(ERROR_CODE_MAP[error.code] ?? 'error_unknown') });
+      openPopupError({ message: t(ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) });
     },
   });
 
