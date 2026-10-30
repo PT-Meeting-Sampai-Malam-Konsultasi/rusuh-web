@@ -108,6 +108,25 @@ commit on `main`, so write it in the commit format above.
 
 Full conventions: [`.claude/rules/git-conventions.md`](.claude/rules/git-conventions.md).
 
+## Workflow for a new feature
+
+One sub-issue on the board (e.g. `FR-06-W1`, rusuh-web #6) from start to done:
+
+1. **Pick** a Todo card in the Web view, assign yourself, move it to In Progress. Check it is ready: parent requirement
+   clear, Figma links in the description, API operations known, nothing blocking.
+2. **Branch** from a fresh main: `git checkout main && git pull`, then `git checkout -b feat/FR-06-W1-queue-position`
+   (or "Create a branch" in the issue sidebar with the same name).
+3. **Understand** the parent issue, the App Flow screen and its states, the Figma frames (1440 and 390) and the
+   operations in `openapi.yaml`.
+4. **Build** layer by layer — entity + service → use case → controller → page — with tests. With Claude Code: start it
+   in this folder and run `/add-feature`. Check it in the browser with `npm run dev`.
+5. **Commit** small, per layer: `feat(queue): [FR-06-W1] add waiting room controller`.
+6. **Verify** with `/verify` (or typecheck, lint, tests, build) and by hand: 390 and 1440, ID and EN, every state.
+7. **Open a PR** to main using the template: title in the commit format, body `Closes #6`, screenshots, test notes.
+8. **Review**: fix comments with more commits on the branch; CI must be green.
+9. **Squash merge** and delete the branch. The sub-issue closes, the card moves to Done, the parent's progress updates.
+10. **QA** checks it on staging against the Definition of Done; problems come back as a new sub-issue or a `fix` PR.
+
 ## Working with Claude Code
 
 Start Claude Code inside this folder so it loads `CLAUDE.md`, the rules, the skills and the Playwright browser tools
