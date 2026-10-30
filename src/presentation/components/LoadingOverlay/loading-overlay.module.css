@@ -1,0 +1,13 @@
+@reference "../../../styles/app.css";
+
+.overlay {
+  @apply fixed inset-0 z-[90] grid place-content-center justify-items-center gap-4 bg-paper/80;
+}
+
+.spinner {
+  @apply size-[72px] animate-spin rounded-full border-[6px] border-ink border-r-pink;
+}
+
+.label {
+  @apply font-semibold;
+}

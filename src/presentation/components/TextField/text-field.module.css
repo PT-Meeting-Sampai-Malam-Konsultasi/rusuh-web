@@ -1,0 +1,58 @@
+@reference "../../../styles/app.css";
+
+.field {
+  @apply grid gap-1.5;
+}
+
+.label {
+  @apply text-sm font-semibold;
+}
+
+.input {
+  @apply h-[54px] w-full border-[2.5px] border-ink bg-card px-3.5 text-lg font-medium tracking-[0.02em] tabular-nums;
+  transition: box-shadow 120ms;
+
+  &::placeholder {
+    @apply text-ink-3;
+  }
+
+  &:focus {
+    @apply shadow-off-blue outline-none;
+  }
+
+  &:disabled {
+    @apply cursor-not-allowed bg-paper-2 text-ink-3;
+  }
+}
+
+.hasError .input {
+  @apply border-red bg-[#fff7f5];
+}
+
+.hint {
+  @apply text-[13px] text-ink-2;
+}
+
+.message {
+  @apply flex items-start gap-1.5 text-[13px] leading-snug font-semibold;
+
+  b {
+    @apply size-4 flex-none rounded-full text-center text-[11px] leading-4 font-extrabold text-white;
+  }
+}
+
+.error {
+  @apply text-red;
+
+  b {
+    @apply bg-red;
+  }
+}
+
+.valid {
+  @apply text-green;
+
+  b {
+    @apply bg-green;
+  }
+}

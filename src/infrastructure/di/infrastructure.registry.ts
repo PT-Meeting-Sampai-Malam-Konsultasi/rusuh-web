@@ -3,6 +3,9 @@ import { asFunction, asValue } from 'awilix';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
+import { useLoading } from '@contexts/loading.context';
+import { useNetworkStatus } from '@contexts/network-status.context';
+import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
 import { createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
@@ -50,9 +53,8 @@ export function registerInfrastructure() {
     useSearchParamsNext: asValue(useSearchParams),
     useParamsNext: asValue(useParams),
 
-    // TODO: replace in scaffold step 5 with the real context hooks.
-    useLoading: asValue(() => ({ isLoading: false, toggleLoading: () => undefined })),
-    usePopupError: asValue(() => ({ openPopupError: () => undefined, closePopupError: () => undefined })),
-    useNetworkStatus: asValue(() => ({ isOnline: true })),
+    useLoading: asValue(useLoading),
+    usePopupError: asValue(usePopupError),
+    useNetworkStatus: asValue(useNetworkStatus),
   });
 }

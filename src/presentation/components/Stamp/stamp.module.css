@@ -1,0 +1,30 @@
+@reference "../../../styles/app.css";
+
+.stamp {
+  @apply inline-flex items-center gap-1.5 border-2 border-current px-2.5 pt-[7px] pb-1.5 text-[13px] leading-none font-bold tracking-[0.05em] whitespace-nowrap uppercase;
+  transform: rotate(-2deg);
+}
+
+.on {
+  @apply border-pink bg-pink text-white;
+}
+
+.soon {
+  @apply bg-card text-blue-ink;
+}
+
+.full {
+  @apply border-dashed bg-card text-ink;
+}
+
+.sold {
+  @apply border-ink bg-ink text-paper;
+}
+
+.ended {
+  @apply bg-paper-2 text-ink-2;
+}
+
+.paid {
+  @apply border-[3px] text-[15px] text-blue-ink;
+}

@@ -1,0 +1,46 @@
+@reference "../../../styles/app.css";
+
+.button {
+  @apply inline-flex min-h-14 items-center justify-center gap-2.5 border-[2.5px] border-ink px-7 font-display text-xl font-bold;
+  font-stretch: 85%;
+  transition:
+    transform 90ms linear,
+    box-shadow 90ms linear;
+
+  &:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translate(4px, 4px);
+    box-shadow: none;
+  }
+
+  &:disabled {
+    @apply cursor-not-allowed border-ink-3 bg-paper-2 text-ink-3;
+    box-shadow: none;
+  }
+}
+
+.primary {
+  @apply bg-ink text-paper shadow-off-pink;
+}
+
+.secondary {
+  @apply bg-card text-ink shadow-off-s;
+}
+
+.full {
+  @apply w-full;
+}
+
+.busy::after {
+  @apply size-4 animate-spin rounded-full border-[2.5px] border-current border-r-transparent;
+  content: '';
+}
+
+@media (width < 45rem) {
+  .button {
+    @apply min-h-[54px] text-[19px];
+  }
+}
