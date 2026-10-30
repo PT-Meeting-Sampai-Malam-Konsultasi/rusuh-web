@@ -11,11 +11,21 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     root: __dirname,
+    // Tailwind runs on every CSS file. CSS Modules must stay modules (scoped class names), so they get their own
+    // rule; the generator's single '*.css' → '*.css' rule turned them into plain global CSS.
     rules: {
-      '*.css': {
-        loaders: ['@tailwindcss/turbopack'],
-        as: '*.css',
-      },
+      '*.css': [
+        {
+          condition: { path: /\.module\.css$/ },
+          loaders: ['@tailwindcss/turbopack'],
+          as: '*.module.css',
+        },
+        {
+          condition: { not: { path: /\.module\.css$/ } },
+          loaders: ['@tailwindcss/turbopack'],
+          as: '*.css',
+        },
+      ],
     },
   },
 };

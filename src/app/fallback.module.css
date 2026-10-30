@@ -1,0 +1,5 @@
+@reference "../styles/app.css";
+
+.link {
+  @apply inline-flex min-h-14 items-center font-semibold underline decoration-2 underline-offset-4;
+}

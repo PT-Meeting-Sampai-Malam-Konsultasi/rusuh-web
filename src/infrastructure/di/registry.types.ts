@@ -7,6 +7,7 @@ import type { HttpProtocol } from '@core/protocols/http.protocol';
 import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
+import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { AppConfig } from '@infrastructure/config';
 
 /** Shapes of the context hooks (implemented in src/contexts, scaffold step 5). */
@@ -61,5 +62,8 @@ export interface AwilixRegistry {
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
 
-  // services, use cases and controllers are added here by /add-feature
+  // controllers
+  notFoundController: NotFoundControllerInterface;
+
+  // services, use cases and more controllers are added here by /add-feature
 }

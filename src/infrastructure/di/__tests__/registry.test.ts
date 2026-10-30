@@ -26,6 +26,7 @@ const KEYS = {
   usePopupError: true,
   useNetworkStatus: true,
   ERROR_CODE_MAP: true,
+  notFoundController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 
 describe('DI registries', () => {
