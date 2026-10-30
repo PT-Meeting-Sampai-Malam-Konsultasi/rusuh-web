@@ -34,15 +34,19 @@ in `src/infrastructure/config.ts` and frozen at build time, so each environment 
 
 ## Scripts
 
-| Command          | What it does                                           |
-| ---------------- | ------------------------------------------------------ |
-| `npm run dev`    | Development server                                     |
-| `npm run build`  | Static export to `out/`                                |
-| `npm run start`  | Serves `out/` locally, for checking a production build |
-| `npm run lint`   | ESLint                                                 |
-| `npm run format` | Prettier on the whole repo                             |
+| Command                 | What it does                                           |
+| ----------------------- | ------------------------------------------------------ |
+| `npm run dev`           | Development server                                     |
+| `npm run build`         | Static export to `out/`                                |
+| `npm run start`         | Serves `out/` locally, for checking a production build |
+| `npm run lint`          | ESLint and Stylelint                                   |
+| `npm run format`        | Prettier on the whole repo                             |
+| `npm run typecheck`     | TypeScript, no emit                                    |
+| `npm run test`          | Vitest once (`test:watch` to keep it running)          |
+| `npm run test:coverage` | Tests with the 85% coverage gate                       |
+| `npm run check:bundle`  | Build, then check the bundle budgets                   |
 
-Type checking: `npx tsc --noEmit`. Test, coverage and bundle-size scripts arrive with the scaffold (see below).
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, coverage, build and the bundle check on every PR.
 
 ## Project structure
 
@@ -63,8 +67,8 @@ Dependencies point one way: `app → presentation → controllers → core`, wit
 Routes, folders and file names are in English; the UI text is translated. The full rules are in [`CLAUDE.md`](CLAUDE.md)
 and [`.claude/rules/`](.claude/rules).
 
-The architecture base (DI, adapters, providers, i18n, tests) is not built yet: run `/scaffold-app` in Claude Code to
-set it up.
+The architecture base (DI, adapters, providers, i18n, shared components, tests) is in place; the 404 page is the
+reference example of route → screen → controller. Build features with `/add-feature`.
 
 ## Contributing
 

@@ -55,7 +55,7 @@ Rules in `.claude/rules/` load automatically when you touch matching files. Work
 
 | Need | Use |
 | --- | --- |
-| Set up the architecture base (deps, DI, adapters, providers, i18n, tooling) | `/scaffold-app` |
+| Set up the architecture base (done on 30 Oct; re-run a step only if it is missing) | `/scaffold-app` |
 | Build a feature or page end to end (spec → entity → service → use case → controller → page) | `/add-feature` |
 | Gate check before marking work done | `/verify` |
 | Layer writers (delegated by the skills) | agents `spec-writer`, `scaffold-writer`, `service-writer`, `use-case-writer`, `controller-writer`, `presentation-writer` |
@@ -63,11 +63,12 @@ Rules in `.claude/rules/` load automatically when you touch matching files. Work
 ## Commands
 
 ```bash
-npm run dev          # local dev server
-npm run build        # static export to out/
-npm run lint
-npm run test         # once Vitest is scaffolded
-npx tsc --noEmit
+npm run dev            # local dev server
+npm run build          # static export to out/
+npm run lint           # ESLint + Stylelint
+npm run typecheck
+npm run test           # Vitest (test:watch, test:coverage)
+npm run check:bundle   # build + bundle budgets
 ```
 
 ## Non-negotiables
