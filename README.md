@@ -75,7 +75,7 @@ reference example of route → screen → controller. Build features with `/add-
 Work is tracked on the GitHub project board **Rusuh Booking Tiket**; every card is a TOR requirement code
 (`FR-01`…`FR-25`, `NFR-01`…`NFR-10`, `BR-01`…`BR-08`), kept as parent issues in `rusuh-documentation`. Each platform's
 work is a sub-issue in its own repo, coded parent + platform + number: `FR-06-W1` (web), `FR-06-M1` (mobile),
-`FR-06-B1` (backend). Numbers are always present, never reused.
+`FR-06-Q1` (rusuh-queue), `FR-06-C1` (rusuh-core). Numbers are always present, never reused.
 
 **Branches** — from `main`, short-lived, named after the type and ticket:
 

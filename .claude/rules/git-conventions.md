@@ -17,14 +17,16 @@ Work is tracked on the GitHub org project board **"Rusuh Booking Tiket"**.
   | --- | --- | --- |
   | `W` | Web | `rusuh-web` |
   | `M` | Mobile | `rusuh-app` |
-  | `B` | Backend | `rusuh-queue`, `rusuh-core` |
+  | `Q` | Backend: queue | `rusuh-queue` |
+  | `C` | Backend: core | `rusuh-core` |
 
   ```
   FR-06              parent requirement            rusuh-documentation#6
   ├── FR-06-W1       Web: position + ETA           rusuh-web#3
   ├── FR-06-W2       Web: pause / sold-out states  rusuh-web#4
   ├── FR-06-M1       Mobile: position + ETA        rusuh-app#5
-  └── FR-06-B1       BE: frontier + position API   rusuh-queue#2
+  ├── FR-06-Q1       Queue: seq + served           rusuh-queue#4
+  └── FR-06-C1       Core: (if core has a piece)   rusuh-core#n
   ```
 
 - Sub-issue titles start with their code: `FR-06-W2 · Web: pause / sold-out states`. The board's Ticket Code field holds
@@ -68,7 +70,7 @@ BREAKING CHANGE: …                       ← when applicable
 
 - The whole subject (from `[` on) is at most 72 characters.
 - Several tickets: back to back, no spaces between them: `[FR-13-W1][FR-15-W1]`.
-- Codes match `(FR|NFR|BR)-\d{2}(-(W|M|B)\d+)?` exactly: `[FR-06-W2]` or `[FR-06]`; not `[FR-6]`, `[FR-06-W]`,
+- Codes match `(FR|NFR|BR)-\d{2}(-(W|M|Q|C)\d+)?` exactly: `[FR-06-W2]` or `[FR-06]`; not `[FR-6]`, `[FR-06-W]`,
   `[FR-06-w1]` or `[FR-06.1]`.
 
 ### Types

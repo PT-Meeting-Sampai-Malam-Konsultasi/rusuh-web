@@ -84,5 +84,5 @@ npm run check:bundle   # build + bundle budgets
   only the UI copy is Indonesian/English through i18n. Route table: `.claude/rules/presentation.md`.
 - Git: branch `type/FR-xx-W1-short-name` from `main`; never commit to `main`. Commits and PR titles:
   `feat(login): [FR-06-W1] add otp code step` — feature scope, ticket in the subject (sub-issue code = parent +
-  W/M/B + number; chore/ci/docs/style/revert may omit it); PR body `Closes #n`; squash merge. No `Co-Authored-By` or
+  W/M/Q/C + number; chore/ci/docs/style/revert may omit it); PR body `Closes #n`; squash merge. No `Co-Authored-By` or
   "Generated with" lines. Full rules: `.claude/rules/git-conventions.md`.
