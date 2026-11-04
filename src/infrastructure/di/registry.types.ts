@@ -7,6 +7,7 @@ import type { HttpProtocol } from '@core/protocols/http.protocol';
 import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
+import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { AppConfig } from '@infrastructure/config';
 
@@ -58,6 +59,9 @@ export interface AwilixRegistry {
   useLoading: () => LoadingApi;
   usePopupError: () => PopupErrorApi;
   useNetworkStatus: () => NetworkStatusApi;
+
+  // services
+  catalogService: CatalogServiceInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;

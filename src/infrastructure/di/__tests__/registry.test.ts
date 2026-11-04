@@ -25,6 +25,7 @@ const KEYS = {
   useLoading: true,
   usePopupError: true,
   useNetworkStatus: true,
+  catalogService: true,
   ERROR_CODE_MAP: true,
   notFoundController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
