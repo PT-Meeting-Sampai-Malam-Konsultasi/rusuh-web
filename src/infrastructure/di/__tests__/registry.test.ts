@@ -28,6 +28,7 @@ const KEYS = {
   catalogService: true,
   getHomeEventsUseCase: true,
   ERROR_CODE_MAP: true,
+  homeController: true,
   notFoundController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 

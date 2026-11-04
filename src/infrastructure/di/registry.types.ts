@@ -9,6 +9,7 @@ import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
+import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { AppConfig } from '@infrastructure/config';
 
@@ -71,6 +72,7 @@ export interface AwilixRegistry {
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
 
   // controllers
+  homeController: HomeControllerInterface;
   notFoundController: NotFoundControllerInterface;
 
   // services, use cases and more controllers are added here by /add-feature
