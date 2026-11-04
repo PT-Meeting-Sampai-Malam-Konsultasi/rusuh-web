@@ -12,6 +12,7 @@ import { registerAll } from '@infrastructure/di';
 import i18n from '@infrastructure/i18n';
 import ErrorPopup from '@presentation/components/ErrorPopup';
 import LoadingOverlay from '@presentation/components/LoadingOverlay';
+import MockBadge from '@presentation/components/MockBadge';
 import OfflineBanner from '@presentation/components/OfflineBanner';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
 
@@ -33,14 +34,38 @@ function LocaleSync() {
   return null;
 }
 
+/**
+ * With NEXT_PUBLIC_API_MOCK=true, starts the MSW worker before anything renders, so the first query is already mocked.
+ * The import is dynamic: without the flag the mock code is never downloaded.
+ */
+function MockApiGate({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(() => !container.resolve('config').apiMock);
+  useEffect(() => {
+    if (ready) return;
+    let active = true;
+    const start = async () => {
+      const { startMockApi } = await import('@infrastructure/mocks/browser');
+      await startMockApi(container.resolve('config'));
+      if (active) setReady(true);
+    };
+    void start();
+    return () => {
+      active = false;
+    };
+  }, [ready]);
+  return ready ? children : null;
+}
+
 /** App-wide overlays driven by the contexts: loading, the error popup and the offline banner. */
 function GlobalOverlays() {
   const { t } = useTranslation();
   const { isLoading } = useLoading();
   const { popup, closePopupError } = useCurrentPopupError();
   const { isOnline } = useNetworkStatus();
+  const { apiMock } = container.resolve('config');
   return (
     <>
+      {apiMock && <MockBadge label={t('mock_badge')} hint={t('mock_badge_hint')} />}
       <OfflineBanner visible={!isOnline} message={t('offline_banner')} />
       <LoadingOverlay visible={isLoading} label={t('state_loading')} />
       <ErrorPopup
@@ -74,7 +99,7 @@ export default function Providers({ children }: { children: ReactNode }) {
           <LoadingProvider>
             <PopupErrorProvider>
               <LocaleSync />
-              {children}
+              <MockApiGate>{children}</MockApiGate>
               <GlobalOverlays />
             </PopupErrorProvider>
           </LoadingProvider>

@@ -10,6 +10,8 @@ export interface AppConfig {
   midtransSnapUrl: string;
   turnstileSiteKey: string;
   defaultLocale: 'id' | 'en';
+  /** Serve the API from MSW sample data (local dev, previews, demos before the backend is up). Never in production. */
+  apiMock: boolean;
 }
 
 export type RawEnv = Record<keyof AppConfig, string | undefined>;
@@ -23,6 +25,7 @@ export const readEnv = (): RawEnv => ({
   midtransSnapUrl: process.env.NEXT_PUBLIC_MIDTRANS_SNAP_URL,
   turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   defaultLocale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,
+  apiMock: process.env.NEXT_PUBLIC_API_MOCK,
 });
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -51,5 +54,6 @@ export function createConfig(env: RawEnv = readEnv()): AppConfig {
     midtransSnapUrl: requireEnv(env.midtransSnapUrl, 'NEXT_PUBLIC_MIDTRANS_SNAP_URL'),
     turnstileSiteKey: requireEnv(env.turnstileSiteKey, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY'),
     defaultLocale: locale === 'en' ? 'en' : 'id',
+    apiMock: boolEnv(env.apiMock),
   };
 }

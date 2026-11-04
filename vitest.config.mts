@@ -15,7 +15,14 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
       // Route files are thin server components (covered by the build); types and test files hold no logic.
-      exclude: ['src/app/**', 'src/**/*.d.ts', 'src/**/__tests__/**', 'src/**/*.types.ts'],
+      // mocks/browser.ts only registers the Service Worker, which jsdom does not have; its handlers are tested in Node.
+      exclude: [
+        'src/app/**',
+        'src/**/*.d.ts',
+        'src/**/__tests__/**',
+        'src/**/*.types.ts',
+        'src/infrastructure/mocks/browser.ts',
+      ],
       thresholds: { branches: 85, functions: 85, lines: 85, statements: 85 },
     },
   },

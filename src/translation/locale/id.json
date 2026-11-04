@@ -5,6 +5,8 @@
   "action_close": "Tutup",
   "state_loading": "Memuat…",
   "offline_banner": "Anda sedang offline. Data terakhir tetap ditampilkan.",
+  "mock_badge": "Data contoh",
+  "mock_badge_hint": "Data ini tiruan dari API contoh (MSW), bukan penjualan sungguhan.",
   "error_page_title": "Ada yang tidak beres.",
   "error_page_body": "Halaman ini gagal dimuat. Coba lagi, atau kembali ke beranda.",
   "error_page_queue_note": "Nomor antrian dan tiket yang ditahan tetap aman.",
