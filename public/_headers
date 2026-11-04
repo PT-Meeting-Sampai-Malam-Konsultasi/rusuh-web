@@ -1,0 +1,14 @@
+# Cloudflare Pages response headers (copied into out/ by the build).
+# The CSP starts as Report-Only: Midtrans Snap loads from more hosts than listed here. Run one sandbox payment on
+# staging, add the hosts the console reports, then rename the header to Content-Security-Policy.
+# 'unsafe-inline' scripts: Next.js puts small inline scripts in every exported page.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://app.sandbox.midtrans.com https://app.midtrans.com https://challenges.cloudflare.com; frame-src https://app.sandbox.midtrans.com https://app.midtrans.com https://challenges.cloudflare.com; connect-src 'self' https://api.staging.rusuh-tiket.web.id https://api.rusuh-tiket.web.id; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; worker-src 'self'
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable

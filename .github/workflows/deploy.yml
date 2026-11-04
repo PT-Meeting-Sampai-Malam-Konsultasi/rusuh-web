@@ -1,0 +1,63 @@
+name: Deploy
+
+# Static export to Cloudflare Pages (Direct Upload):
+#   pull request → preview on rusuh-web-staging (branch pr-<n>, its own *.pages.dev URL)
+#   push to main → staging (rusuh-web-staging, https://rusuh-web-staging.pages.dev)
+#   tag v*.*.*   → production (rusuh-web), after a reviewer approves the `production` environment
+# NEXT_PUBLIC_* values are baked in at build time, so every environment gets its own build.
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write # lets wrangler-action post the deployment link on the PR
+
+jobs:
+  deploy:
+    # Pull requests from forks get no secrets; ours all come from org members.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    env:
+      PROJECT: ${{ startsWith(github.ref, 'refs/tags/v') && 'rusuh-web' || 'rusuh-web-staging' }}
+      # A deploy on the project's production branch (main) becomes the live site; any other name is a preview.
+      BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Public values from the GitHub environment (Settings → Environments); read only in config.ts.
+          NEXT_PUBLIC_APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          NEXT_PUBLIC_QUEUE_API_URL: ${{ vars.QUEUE_API_URL }}
+          NEXT_PUBLIC_CORE_API_URL: ${{ vars.CORE_API_URL }}
+          NEXT_PUBLIC_API_TIMEOUT_MS: ${{ vars.API_TIMEOUT_MS }}
+          NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: ${{ vars.MIDTRANS_CLIENT_KEY }}
+          NEXT_PUBLIC_MIDTRANS_SNAP_URL: ${{ vars.MIDTRANS_SNAP_URL }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.DEFAULT_LOCALE }}
+          NEXT_PUBLIC_API_MOCK: ${{ vars.API_MOCK }}
+
+      - name: Upload to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy out --project-name=${{ env.PROJECT }} --branch=${{ env.BRANCH }} --commit-hash=${{ github.sha }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
