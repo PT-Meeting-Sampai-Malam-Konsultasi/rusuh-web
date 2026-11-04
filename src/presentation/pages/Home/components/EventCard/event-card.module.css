@@ -1,0 +1,105 @@
+@reference "../../../../../styles/app.css";
+
+/* Phone: a row (104px poster left). From 720px: a column card in the grid. */
+.card {
+  @apply flex gap-4 border-b border-hair py-[18px];
+
+  @variant md {
+    @apply flex-col gap-0 border-b-0 py-0;
+  }
+}
+
+.tiltLeft,
+.tiltRight {
+  @apply flex-none self-start;
+
+  @variant md {
+    @apply self-auto;
+  }
+}
+
+@variant md {
+  .tiltLeft {
+    transform: rotate(-0.8deg);
+  }
+
+  .tiltRight {
+    transform: rotate(0.9deg);
+  }
+}
+
+.info {
+  @apply flex min-w-0 flex-1 flex-col items-start gap-[5px];
+
+  @variant md {
+    @apply mt-6 gap-2;
+  }
+}
+
+.title {
+  @apply mt-1 font-display text-lg leading-[1.1] font-bold;
+  font-stretch: 85%;
+  text-wrap: balance;
+
+  @variant md {
+    @apply mt-1.5 text-[22px];
+  }
+}
+
+.when {
+  @apply text-[13px] leading-normal text-ink-2;
+
+  @variant md {
+    @apply text-sm;
+  }
+}
+
+.price {
+  @apply text-sm;
+
+  b {
+    @apply font-bold tabular-nums;
+  }
+
+  @variant md {
+    @apply mt-0.5 text-[15px];
+  }
+}
+
+.outcome {
+  @apply text-sm text-ink-2;
+
+  @variant md {
+    @apply mt-0.5 text-[15px];
+  }
+}
+
+.note {
+  @apply mt-1 w-full border-t border-hair pt-2.5 text-[13px] leading-[1.45] text-ink-2;
+
+  b {
+    @apply text-ink;
+  }
+
+  @variant md {
+    @apply mt-auto pt-3.5 text-sm;
+  }
+}
+
+.detail {
+  @apply block tabular-nums;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    animation: rise 0.45s var(--ease-print) both;
+    animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}

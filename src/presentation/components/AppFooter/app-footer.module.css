@@ -1,0 +1,29 @@
+@reference "../../../styles/app.css";
+
+.footer {
+  @apply hidden;
+
+  @variant md {
+    @apply mt-[72px] block border-t-[2.5px] border-ink;
+  }
+}
+
+.inner {
+  @apply mx-auto flex max-w-[calc(1328px+112px)] justify-between gap-6 px-14 pt-[18px] pb-7 text-[13px] text-ink-2;
+}
+
+.links {
+  @apply flex gap-[18px];
+}
+
+.link {
+  @apply text-ink-2;
+
+  &:hover {
+    @apply text-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+}

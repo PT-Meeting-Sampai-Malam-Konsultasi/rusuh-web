@@ -1,0 +1,95 @@
+@reference "../../../../../styles/app.css";
+
+.skeleton {
+  @apply mx-auto max-w-[calc(1328px+112px)] px-4;
+
+  @variant md {
+    @apply px-14;
+  }
+}
+
+.hero {
+  @apply mt-[22px] grid gap-[26px];
+
+  @variant md {
+    @apply mt-[52px] items-center gap-10;
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  }
+
+  @variant lg {
+    @apply gap-20;
+    grid-template-columns: minmax(0, 500px) minmax(0, 1fr);
+  }
+}
+
+.poster,
+.thumb,
+.stamp,
+.line,
+.lineShort {
+  @apply bg-paper-2;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+}
+
+.poster {
+  @apply h-[330px];
+
+  @variant md {
+    @apply h-auto;
+    aspect-ratio: 4 / 5;
+  }
+}
+
+.lines {
+  @apply flex min-w-0 flex-1 flex-col gap-3;
+}
+
+.stamp {
+  @apply h-7 w-36;
+}
+
+.line {
+  @apply h-4 w-full max-w-[420px];
+}
+
+.lineShort {
+  @apply h-4 w-1/2 max-w-[220px];
+}
+
+.list {
+  @apply mt-12 grid;
+
+  @variant md {
+    @apply mt-[110px] grid-cols-2 gap-9;
+  }
+
+  @variant lg {
+    @apply grid-cols-4;
+  }
+}
+
+.card {
+  @apply flex gap-4 border-b border-hair py-[18px];
+
+  @variant md {
+    @apply flex-col border-b-0 py-0;
+  }
+}
+
+.thumb {
+  @apply w-[104px] flex-none;
+  aspect-ratio: 4 / 5;
+
+  @variant md {
+    @apply w-full;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
