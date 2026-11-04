@@ -11,6 +11,7 @@ const env: RawEnv = {
   midtransSnapUrl: 'https://snap',
   turnstileSiteKey: 'site',
   defaultLocale: undefined,
+  apiMock: undefined,
 };
 
 describe('config', () => {
@@ -24,6 +25,11 @@ describe('config', () => {
       apiTimeoutMs: 5000,
     });
     expect(createConfig({ ...env, apiTimeoutMs: 'abc' }).apiTimeoutMs).toBe(10000);
+  });
+
+  it('turns the API mock on only when asked', () => {
+    expect(createConfig(env).apiMock).toBe(false);
+    expect(createConfig({ ...env, apiMock: 'true' }).apiMock).toBe(true);
   });
 
   it('fails fast on a missing required variable', () => {

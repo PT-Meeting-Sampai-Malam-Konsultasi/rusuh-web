@@ -5,6 +5,8 @@
   "action_close": "Close",
   "state_loading": "Loading…",
   "offline_banner": "You're offline. We're showing the last data we had.",
+  "mock_badge": "Sample data",
+  "mock_badge_hint": "This data comes from the mock API (MSW), not real sales.",
   "error_page_title": "Something went wrong.",
   "error_page_body": "This page didn't load. Try again, or go back home.",
   "error_page_queue_note": "Your queue number and held tickets are safe.",

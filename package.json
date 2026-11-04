@@ -47,11 +47,17 @@
     "husky": "9.1.7",
     "jsdom": "29.1.1",
     "lint-staged": "16.4.0",
+    "msw": "3.0.3",
     "prettier": "3.9.10",
     "stylelint": "17.16.0",
     "stylelint-config-standard": "40.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "5.0.5"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }
