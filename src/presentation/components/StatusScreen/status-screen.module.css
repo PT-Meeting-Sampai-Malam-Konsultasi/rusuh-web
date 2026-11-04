@@ -1,0 +1,31 @@
+@reference "../../../styles/app.css";
+
+.screen {
+  @apply mx-auto flex min-h-screen max-w-[720px] flex-col justify-center gap-5 px-4 py-16;
+}
+
+.logo {
+  @apply font-display text-[34px] leading-none font-extrabold;
+  font-stretch: 75%;
+
+  b {
+    @apply text-pink;
+  }
+}
+
+.title {
+  @apply font-display text-[56px] leading-[0.86] font-extrabold md:text-[96px];
+  font-stretch: 75%;
+}
+
+.body {
+  @apply max-w-[560px] text-lg text-ink-2;
+}
+
+.note {
+  @apply border-l-4 border-pink pl-3 text-sm font-semibold;
+}
+
+.actions {
+  @apply mt-2 flex flex-wrap gap-4;
+}

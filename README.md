@@ -1,36 +1,153 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# rusuh-web
 
-## Getting Started
+Web client of **Rusuh Booking Tiket**: concert tickets sold online during a flash crowd. Fans wait in a fair virtual
+queue that shows their exact number and estimated wait, order up to 3 tickets (one NIK per ticket), pay through
+Midtrans and get their e-tickets.
 
-First, run the development server:
+Product and API documentation live in [`rusuh-documentation`](https://github.com/PT-Meeting-Sampai-Malam-Konsultasi/rusuh-documentation):
+the PRD, App Flow, Design Brief, Backend Schema, Implementation Plan, ADRs and `api/openapi.yaml`. Read the App Flow
+screen before building it.
+
+## Stack
+
+Next.js 16 (App Router, static export) · React 19 · TypeScript · Tailwind CSS 4 + CSS Modules · TanStack Query ·
+React Hook Form + Zod · Awilix DI · i18next (Bahasa Indonesia, English) · Axios · Vitest + Testing Library ·
+Playwright · ESLint, Prettier, Stylelint.
+
+## Requirements
+
+- Node.js **22** and npm (the repo uses `package-lock.json`; don't use yarn, pnpm or bun)
+- Git with SSH access to the `PT-Meeting-Sampai-Malam-Konsultasi` organisation
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone git@github.com:PT-Meeting-Sampai-Malam-Konsultasi/rusuh-web.git
+cd rusuh-web
+npm install                  # also installs the git hooks (husky)
+cp .env.example .env.local   # then fill in the values
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+All variables are `NEXT_PUBLIC_*`, so they end up in the browser bundle: put **no secrets** in them. They are read only
+in `src/infrastructure/config.ts` and frozen at build time, so each environment needs its own build.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command                 | What it does                                           |
+| ----------------------- | ------------------------------------------------------ |
+| `npm run dev`           | Development server                                     |
+| `npm run build`         | Static export to `out/`                                |
+| `npm run start`         | Serves `out/` locally, for checking a production build |
+| `npm run lint`          | ESLint and Stylelint                                   |
+| `npm run format`        | Prettier on the whole repo                             |
+| `npm run typecheck`     | TypeScript, no emit                                    |
+| `npm run test`          | Vitest once (`test:watch` to keep it running)          |
+| `npm run test:coverage` | Tests with the 85% coverage gate                       |
+| `npm run check:bundle`  | Build, then check the bundle budgets                   |
 
-## Learn More
+CI (`.github/workflows/ci.yml`) runs typecheck, lint, coverage, build and the bundle check on every PR.
 
-To learn more about Next.js, take a look at the following resources:
+## Project structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/              Next.js routes (thin server components): /, /queue, /login, /order, /payment, /tickets, /account
+├── presentation/     Client screens: page shells + section components, each with a CSS module
+├── controllers/      Page logic: factories that receive hooks and services from the DI container
+├── core/             Pure TypeScript: protocols, entities, services, use cases
+├── infrastructure/   Config, adapters (HTTP, storage, analytics, queue stream), DI container, i18n
+├── contexts/         Loading, error popup, network status, session
+├── translation/      id.json, en.json
+├── styles/app.css    Tailwind entry and Poster Sablon design tokens
+└── utils/            Constants (error codes, query keys, routes) and pure helpers
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Dependencies point one way: `app → presentation → controllers → core`, with `infrastructure` plugged in through DI.
+Routes, folders and file names are in English; the UI text is translated. The full rules are in [`CLAUDE.md`](CLAUDE.md)
+and [`.claude/rules/`](.claude/rules).
 
-## Deploy on Vercel
+The architecture base (DI, adapters, providers, i18n, shared components, tests) is in place; the 404 page is the
+reference example of route → screen → controller. Build features with `/add-feature`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Contributing
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Work is tracked on the GitHub project board **Rusuh Booking Tiket**; every card is a TOR requirement code
+(`FR-01`…`FR-25`, `NFR-01`…`NFR-10`, `BR-01`…`BR-08`), kept as parent issues in `rusuh-documentation`. Each platform's
+work is a sub-issue in its own repo, coded parent + platform + number: `FR-06-W1` (web), `FR-06-M1` (mobile),
+`FR-06-Q1` (rusuh-queue), `FR-06-C1` (rusuh-core). Numbers are always present, never reused.
+
+**Branches** — from `main`, short-lived, named after the type and ticket:
+
+```
+feat/FR-06-W1-otp-code-step
+fix/FR-21-W1-payment-timer
+chore/update-eslint          ← tooling work has no ticket
+```
+
+**Commits** — conventional commits with a feature scope and the ticket in the subject:
+
+```
+feat(login): [FR-06-W1] add otp code step
+fix(queue): [FR-07-W1][FR-09-W1] stop eta jumping up after a pause
+chore(deps): bump next to 16.4.3
+```
+
+- Scopes: `home`, `queue`, `login`, `order`, `payment`, `ticket`, `account`, plus `scaffold`, `deps`, `ci`, `steering`,
+  `i18n`, `style`, `docs`.
+- A ticket is required for `feat`, `fix`, `refactor`, `perf` and `test`; optional for `chore`, `ci`, `docs`, `style`
+  and `revert`.
+- Mind the spaces: `feat(login): [FR-06-W1] add…` — after the colon and after the bracket.
+- The PR body closes the sub-issue by number: `Closes #4`.
+
+**Pull requests** — open against `main`, one review, green checks, then **squash merge**. The PR title becomes the
+commit on `main`, so write it in the commit format above.
+
+**Git hooks** (installed by `npm install`):
+
+| Hook         | Checks                                                                      |
+| ------------ | --------------------------------------------------------------------------- |
+| `pre-commit` | Blocks `console.*` and `debugger`; runs ESLint and Prettier on staged files |
+| `commit-msg` | Rejects messages that don't follow the format                               |
+
+Full conventions: [`.claude/rules/git-conventions.md`](.claude/rules/git-conventions.md).
+
+## Workflow for a new feature
+
+One sub-issue on the board (e.g. `FR-06-W1`, rusuh-web #6) from start to done:
+
+1. **Pick** a Todo card in the Web view, assign yourself, move it to In Progress. Check it is ready: parent requirement
+   clear, Figma links in the description, API operations known, nothing blocking.
+2. **Branch** from a fresh main: `git checkout main && git pull`, then `git checkout -b feat/FR-06-W1-queue-position`
+   (or "Create a branch" in the issue sidebar with the same name).
+3. **Understand** the parent issue, the App Flow screen and its states, the Figma frames (1440 and 390) and the
+   operations in `openapi.yaml`.
+4. **Build** layer by layer — entity + service → use case → controller → page — with tests. With Claude Code: start it
+   in this folder and run `/add-feature`. Check it in the browser with `npm run dev`.
+5. **Commit** small, per layer: `feat(queue): [FR-06-W1] add waiting room controller`.
+6. **Verify** with `/verify` (or typecheck, lint, tests, build) and by hand: 390 and 1440, ID and EN, every state.
+7. **Open a PR** to main using the template: title in the commit format, body `Closes #6`, screenshots, test notes.
+8. **Review**: fix comments with more commits on the branch; CI must be green.
+9. **Squash merge** and delete the branch. The sub-issue closes, the card moves to Done, the parent's progress updates.
+10. **QA** checks it on staging against the Definition of Done; problems come back as a new sub-issue or a `fix` PR.
+
+## Working with Claude Code
+
+Start Claude Code inside this folder so it loads `CLAUDE.md`, the rules, the skills and the Playwright browser tools
+(approve the `playwright` MCP server the first time).
+
+| Skill           | Use it to                                                            |
+| --------------- | -------------------------------------------------------------------- |
+| `/scaffold-app` | Set up the architecture base, step by step                           |
+| `/add-feature`  | Build a screen end to end: spec, service, use case, controller, page |
+| `/verify`       | Run the checks before calling work done                              |
+
+## Deploy
+
+```bash
+npm run build                # writes the static site to out/
+```
+
+Upload `out/` to S3 and serve it through CloudFront (see the TRD in `rusuh-documentation`). There is no Node.js server:
+Server Actions, cookies, middleware and dynamic routes are not available, so ids travel as search params
+(`/queue?event=…`).

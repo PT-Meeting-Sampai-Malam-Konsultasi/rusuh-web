@@ -1,0 +1,22 @@
+@reference "../../../styles/app.css";
+
+.timer {
+  @apply inline-flex items-baseline gap-2.5 border-[2.5px] border-ink bg-card px-3.5 pt-2 pb-[7px] shadow-off-s;
+}
+
+.time {
+  @apply font-display text-[34px] leading-none font-extrabold tabular-nums;
+  font-stretch: 75%;
+}
+
+.label {
+  @apply text-sm text-ink-2;
+}
+
+.warn {
+  @apply shadow-off-pink;
+
+  .time {
+    @apply text-pink-ink;
+  }
+}

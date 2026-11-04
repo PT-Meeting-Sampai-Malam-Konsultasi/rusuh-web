@@ -1,0 +1,26 @@
+@reference "../styles/app.css";
+
+.body {
+  @apply bg-paper font-sans text-ink;
+}
+
+.screen {
+  @apply mx-auto flex min-h-screen max-w-[720px] flex-col justify-center gap-4 px-4;
+}
+
+.title {
+  @apply font-display text-[56px] leading-[0.86] font-extrabold;
+  font-stretch: 75%;
+}
+
+.en {
+  @apply text-xl font-semibold text-ink-2;
+}
+
+.text {
+  @apply text-ink-2;
+}
+
+.button {
+  @apply mt-2 min-h-14 self-start border-[2.5px] border-ink bg-ink px-7 font-display text-xl font-bold text-paper shadow-off-pink;
+}
