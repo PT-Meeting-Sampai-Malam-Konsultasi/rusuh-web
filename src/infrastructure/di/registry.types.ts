@@ -8,6 +8,7 @@ import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol'
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
+import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { AppConfig } from '@infrastructure/config';
 
@@ -62,6 +63,9 @@ export interface AwilixRegistry {
 
   // services
   catalogService: CatalogServiceInterface;
+
+  // use cases
+  getHomeEventsUseCase: GetHomeEventsUseCaseInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
