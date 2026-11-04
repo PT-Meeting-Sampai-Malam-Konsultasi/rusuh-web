@@ -28,3 +28,14 @@
 .paid {
   @apply border-[3px] text-[15px] text-blue-ink;
 }
+
+.dot {
+  @apply inline-block size-[9px] rounded-full bg-white;
+  animation: blink 1.6s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}

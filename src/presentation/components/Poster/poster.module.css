@@ -1,0 +1,201 @@
+@reference "../../../styles/app.css";
+
+/* Colours per plate: --bg ground, --fg ink, --ht halftone. Blue is the default (the event colour). */
+.poster {
+  --bg: var(--color-blue);
+  --fg: var(--color-paper);
+  --ht: var(--color-pink);
+  --plate: var(--color-paper);
+  --plate-fg: var(--color-pink-ink);
+
+  @apply relative isolate overflow-hidden;
+  background: var(--bg);
+  color: var(--fg);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.9;
+    background: radial-gradient(circle, var(--ht) 34%, transparent 38%) 0 0 / 14px 14px;
+    mask: linear-gradient(160deg, transparent 30%, #000 78%);
+  }
+}
+
+.pink {
+  --bg: var(--color-pink);
+  --fg: #fff;
+  --ht: var(--color-blue);
+  --plate-fg: var(--color-blue);
+}
+
+.ink {
+  --bg: var(--color-ink);
+  --ht: var(--color-pink);
+  --plate-fg: var(--color-ink);
+}
+
+.paper {
+  --bg: var(--color-card);
+  --fg: var(--color-blue);
+  --ht: var(--color-blue);
+  --plate: var(--color-blue);
+  --plate-fg: var(--color-paper);
+
+  &::before {
+    opacity: 0.35;
+  }
+}
+
+.inner {
+  @apply relative flex h-full flex-col;
+}
+
+.kicker {
+  @apply text-xs font-semibold tracking-[0.06em] uppercase;
+}
+
+.title {
+  @apply font-display font-extrabold;
+  font-size: var(--title-size, 64px);
+  font-stretch: 75%;
+  line-height: 0.82;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  @apply inline-block self-start font-display font-bold;
+  font-size: var(--subtitle-size, 20px);
+  font-stretch: 85%;
+  line-height: 1;
+  padding: 5px 8px 3px;
+  background: var(--plate);
+  color: var(--plate-fg);
+  transform: rotate(-2deg);
+}
+
+.image {
+  @apply block h-full w-full object-cover;
+}
+
+.srOnly {
+  @apply sr-only;
+}
+
+/* Card poster: phone thumbnail first, full card from 720px. */
+.card {
+  @apply w-[104px] flex-none self-start;
+  aspect-ratio: 4 / 5;
+  box-shadow: 3px 3px 0 var(--color-ink);
+  --title-size: 26px;
+  --subtitle-size: 11px;
+
+  .inner {
+    @apply justify-end p-2;
+  }
+
+  .kicker {
+    @apply hidden;
+  }
+
+  .subtitle {
+    @apply mt-[5px];
+    padding: 3px 4px 2px;
+  }
+
+  @variant md {
+    @apply w-auto self-auto;
+    box-shadow: 5px 5px 0 var(--color-ink);
+    --title-size: 62px;
+    --subtitle-size: 18px;
+
+    .inner {
+      @apply p-[18px];
+    }
+
+    .kicker {
+      @apply absolute top-4 left-[18px] block;
+    }
+
+    .subtitle {
+      @apply mt-2.5;
+      padding: 5px 8px 3px;
+    }
+  }
+}
+
+/* Hero poster: 330px tall on phones, 4:5 from 720px. */
+.hero {
+  @apply mx-1 h-[330px];
+  box-shadow: 5px 5px 0 var(--color-ink);
+  transform: rotate(-1deg);
+  --title-size: 84px;
+  --subtitle-size: 22px;
+
+  .inner {
+    @apply px-5 pt-5 pb-[18px];
+  }
+
+  .title {
+    @apply mt-auto;
+  }
+
+  .subtitle {
+    @apply mt-2.5;
+  }
+
+  @variant md {
+    @apply mx-0 h-auto;
+    aspect-ratio: 4 / 5;
+    box-shadow: var(--shadow-off);
+    transform: rotate(-1.4deg);
+    --title-size: clamp(84px, 9vw, 124px);
+    --subtitle-size: 32px;
+
+    .inner {
+      @apply px-8 py-[34px];
+    }
+
+    .subtitle {
+      @apply mt-4;
+    }
+  }
+}
+
+.waves {
+  @apply hidden;
+
+  @variant md {
+    @apply mt-9 block;
+    margin-inline: -32px;
+    width: calc(100% + 64px);
+  }
+}
+
+.waveA {
+  stroke: var(--color-paper);
+}
+
+.waveB {
+  stroke: var(--color-pink);
+}
+
+.meta {
+  @apply mt-[18px] flex items-baseline justify-between pt-2.5 text-[13px] font-semibold tracking-[0.04em];
+  border-top: 2px solid var(--color-paper);
+
+  b {
+    @apply font-display text-[26px] leading-none font-extrabold tracking-normal;
+    font-stretch: 75%;
+  }
+
+  @variant md {
+    @apply mt-[26px] pt-3 text-[15px];
+
+    b {
+      @apply text-[34px];
+    }
+  }
+}

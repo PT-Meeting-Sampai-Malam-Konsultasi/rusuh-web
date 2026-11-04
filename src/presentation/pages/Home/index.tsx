@@ -1,6 +1,47 @@
-import StatusScreen from '@presentation/components/StatusScreen';
+'use client';
 
-/** Placeholder until the event list is built (FR-01-W1 … FR-05-W1). */
+import type { HomeControllerInterface } from '@controllers/home.controller';
+import container from '@infrastructure/di/container';
+import AppFooter from '@presentation/components/AppFooter';
+import AppHeader from '@presentation/components/AppHeader';
+import TabBar from '@presentation/components/TabBar';
+
+import EventList from './components/EventList';
+import HomeHero from './components/HomeHero';
+import HomeMessage from './components/HomeMessage';
+import HomeSkeleton from './components/HomeSkeleton';
+import styles from './home.module.css';
+
 export default function HomeScreen() {
-  return <StatusScreen title="Rusuh" body="Daftar event sedang disiapkan. · The event list is on its way." />;
+  const { t, status, featured, events, countLabel, errorMessage, retry, locale, setLocale, nav } =
+    container.resolve<HomeControllerInterface>('homeController');
+
+  return (
+    <div className={styles.page}>
+      <AppHeader
+        nav={nav}
+        locale={locale}
+        onLocaleChange={setLocale}
+        labels={{ home: t('logo_home_label'), nav: t('nav_main_label'), language: t('language_switch_label') }}
+      />
+      <main className={styles.main} aria-busy={status === 'loading'}>
+        {status === 'loading' && <HomeSkeleton label={t('state_loading')} />}
+        {status === 'error' && (
+          <HomeMessage
+            title={t('home_error_title')}
+            body={errorMessage}
+            actionLabel={t('action_retry')}
+            onAction={retry}
+          />
+        )}
+        {status === 'empty' && <HomeMessage title={t('home_empty_title')} body={t('home_empty_body')} />}
+        {status === 'ready' && featured && <HomeHero t={t} event={featured} />}
+        {status === 'ready' && events.length > 0 && (
+          <EventList t={t} events={events} countLabel={countLabel} isMainHeading={!featured} />
+        )}
+      </main>
+      <AppFooter t={t} />
+      <TabBar label={t('nav_app_label')} nav={nav} />
+    </div>
+  );
 }

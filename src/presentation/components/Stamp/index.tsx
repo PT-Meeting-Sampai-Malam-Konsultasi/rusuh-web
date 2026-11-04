@@ -11,5 +11,10 @@ interface StampProps {
 
 /** Status stamp: word first, one style per status so it survives greyscale. */
 export default function Stamp({ tone, children }: StampProps) {
-  return <span className={`${styles.stamp} ${styles[tone]}`}>{children}</span>;
+  return (
+    <span className={`${styles.stamp} ${styles[tone]}`}>
+      {tone === 'on' && <i className={styles.dot} aria-hidden="true" />}
+      {children}
+    </span>
+  );
 }

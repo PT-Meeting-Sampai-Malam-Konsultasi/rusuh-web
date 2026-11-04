@@ -1,0 +1,73 @@
+@reference "../../../styles/app.css";
+
+.header {
+  @apply sticky top-0 z-20 border-b-[2.5px] border-ink bg-paper;
+
+  @variant md {
+    @apply border-b-0;
+  }
+}
+
+.bar {
+  @apply mx-auto flex h-[60px] max-w-[calc(1328px+112px)] items-center justify-between px-4;
+
+  @variant md {
+    @apply h-[84px] px-14;
+  }
+}
+
+.logo {
+  @apply font-display text-[28px] leading-none font-extrabold text-ink no-underline;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+
+  b {
+    @apply text-pink;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  @variant md {
+    @apply text-[34px];
+  }
+}
+
+.nav {
+  @apply hidden;
+
+  @variant md {
+    @apply flex items-center gap-[30px] text-[15px] font-medium;
+  }
+}
+
+.item {
+  @apply flex items-center gap-[30px];
+}
+
+.link {
+  @apply border-b-[2.5px] border-transparent py-1.5 text-ink no-underline;
+
+  &:hover {
+    @apply border-pink;
+  }
+
+  &[aria-current='page'] {
+    @apply border-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+.phoneSwitch {
+  @variant md {
+    @apply hidden;
+  }
+}

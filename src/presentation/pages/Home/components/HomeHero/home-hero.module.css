@@ -1,0 +1,103 @@
+@reference "../../../../../styles/app.css";
+
+.hero {
+  @apply mx-auto mt-[22px] grid max-w-[calc(1328px+112px)] px-4;
+
+  @variant md {
+    @apply mt-[52px] items-center gap-10 px-14;
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  }
+
+  @variant lg {
+    @apply gap-20;
+    grid-template-columns: minmax(0, 500px) minmax(0, 1fr);
+  }
+}
+
+.info {
+  @apply mt-[26px] flex flex-col items-start;
+
+  @variant md {
+    @apply mt-0;
+  }
+}
+
+/* The visible title repeats the poster's h1, so screen readers skip it. Hidden on phones, as in the app. */
+.title {
+  @apply hidden;
+
+  @variant md {
+    @apply mt-[22px] block font-display font-extrabold;
+    font-size: clamp(64px, 6.6vw, 96px);
+    font-stretch: 75%;
+    line-height: 0.92;
+    letter-spacing: -0.01em;
+  }
+}
+
+.sub {
+  @apply mt-2.5 block text-pink-ink;
+  font-size: 0.4em;
+  font-stretch: 85%;
+  line-height: 1.1;
+}
+
+.facts {
+  @apply mt-[18px] grid w-full max-w-[560px] border-t-[2.5px] border-ink;
+
+  @variant md {
+    @apply mt-[30px];
+  }
+}
+
+.fact {
+  @apply grid border-b border-hair py-2.5;
+  grid-template-columns: 84px 1fr;
+
+  dt {
+    @apply pt-[3px] text-[13px] font-semibold tracking-[0.05em] text-ink-2 uppercase;
+  }
+
+  dd {
+    @apply text-[15px];
+  }
+
+  @variant md {
+    @apply py-3;
+    grid-template-columns: 110px 1fr;
+
+    dd {
+      @apply text-[17px];
+    }
+  }
+}
+
+.amount {
+  @apply font-bold tabular-nums;
+}
+
+.note {
+  @apply mt-4 max-w-[560px] text-sm leading-[1.45] text-ink-2;
+
+  b {
+    @apply text-ink;
+  }
+}
+
+.detail {
+  @apply block tabular-nums;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.45s var(--ease-print) both;
+    animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}

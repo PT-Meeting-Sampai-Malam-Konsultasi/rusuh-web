@@ -1,0 +1,14 @@
+@reference "../../../styles/app.css";
+
+/* Leaves room for the phone tab bar; the desktop footer follows the content. */
+.page {
+  @apply flex min-h-screen flex-col pb-[84px];
+
+  @variant md {
+    @apply pb-0;
+  }
+}
+
+.main {
+  @apply flex-1;
+}

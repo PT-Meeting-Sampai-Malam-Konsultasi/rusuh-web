@@ -8,4 +8,11 @@ describe('Stamp', () => {
     render(<Stamp tone="sold">Habis terjual</Stamp>);
     expect(screen.getByText('Habis terjual')).toBeInTheDocument();
   });
+
+  it('adds the live dot only to the open tone', () => {
+    const { container, rerender } = render(<Stamp tone="on">Antrian dibuka</Stamp>);
+    expect(container.querySelector('i')).toHaveAttribute('aria-hidden', 'true');
+    rerender(<Stamp tone="soon">Segera dijual</Stamp>);
+    expect(container.querySelector('i')).toBeNull();
+  });
 });

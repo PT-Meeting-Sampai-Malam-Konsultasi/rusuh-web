@@ -1,6 +1,14 @@
+import { asFunction } from 'awilix';
+
+import { CatalogService } from '@core/services/catalog.service';
+import { GetHomeEventsUseCase } from '@core/use_case/catalog/get-home-events.use-case';
+
 import container from './container';
 
 /** Services and use cases: asFunction(Factory).singleton(). Added per feature by /add-feature. */
 export function registerServices() {
-  container.register({});
+  container.register({
+    catalogService: asFunction(CatalogService).singleton(),
+    getHomeEventsUseCase: asFunction(GetHomeEventsUseCase).singleton(),
+  });
 }
