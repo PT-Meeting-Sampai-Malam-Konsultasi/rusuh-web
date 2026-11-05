@@ -90,6 +90,51 @@
   @apply block tabular-nums;
 }
 
+/* Active card (joinable): the call to action's ::after covers the card, so the whole card is one link. */
+.active {
+  @apply relative;
+
+  &:has(.join:focus-visible) {
+    @apply outline-3 outline-offset-4 outline-blue;
+  }
+
+  .tiltLeft,
+  .tiltRight {
+    transition: translate 150ms var(--ease-print);
+  }
+
+  &:hover .tiltLeft,
+  &:hover .tiltRight {
+    translate: -2px -3px;
+  }
+
+  &:hover .join {
+    @apply decoration-pink;
+  }
+
+  &:active .tiltLeft,
+  &:active .tiltRight {
+    translate: 1px 1px;
+  }
+}
+
+.join {
+  @apply mt-1 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &::after {
+    @apply absolute inset-0 z-10;
+    content: '';
+  }
+
+  &:focus-visible {
+    @apply outline-none;
+  }
+
+  @variant md {
+    @apply mt-auto pt-2;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .card {
     animation: rise 0.45s var(--ease-print) both;

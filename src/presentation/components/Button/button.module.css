@@ -44,3 +44,8 @@
     @apply min-h-[54px] text-[19px];
   }
 }
+
+/* Compact size (cards, secondary actions): stays compact on phones too. */
+.button.sm {
+  @apply min-h-11 px-[18px] text-[17px];
+}

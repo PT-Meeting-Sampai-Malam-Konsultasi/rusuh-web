@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { EventCardView } from '@utils/format/event-card';
 
@@ -7,6 +7,7 @@ import EventList from '../index';
 
 const CARD: EventCardView = {
   id: 'evt_langit',
+  state: 'coming_soon',
   name: 'Langit Sore',
   subtitle: 'Senja Panjang',
   title: 'Langit Sore — Senja Panjang',
@@ -21,6 +22,7 @@ const CARD: EventCardView = {
   outcome: null,
   note: { lead: 'Dibuka', strong: 'Jum, 30 Okt · 10.00 WIB', detail: '7 hari 14 jam lagi' },
   finished: false,
+  join: null,
 };
 
 const t = ((k: string) => k) as never;
@@ -33,6 +35,7 @@ describe('EventList', () => {
         events={[CARD, { ...CARD, id: 'evt_rimba', title: 'Rimba' }]}
         countLabel="5 event"
         isMainHeading={false}
+        onSelect={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('home_all_events');
@@ -41,7 +44,7 @@ describe('EventList', () => {
   });
 
   it('becomes the page heading when there is no featured event', () => {
-    render(<EventList t={t} events={[CARD]} countLabel="1 event" isMainHeading />);
+    render(<EventList t={t} events={[CARD]} countLabel="1 event" isMainHeading onSelect={vi.fn()} />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('home_all_events');
   });
 });

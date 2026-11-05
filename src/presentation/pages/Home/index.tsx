@@ -13,8 +13,20 @@ import HomeSkeleton from './components/HomeSkeleton';
 import styles from './home.module.css';
 
 export default function HomeScreen() {
-  const { t, status, featured, events, countLabel, errorMessage, retry, locale, setLocale, nav } =
-    container.resolve<HomeControllerInterface>('homeController');
+  const {
+    t,
+    status,
+    featured,
+    events,
+    countLabel,
+    errorMessage,
+    retry,
+    locale,
+    setLocale,
+    nav,
+    joinHint,
+    selectEvent,
+  } = container.resolve<HomeControllerInterface>('homeController');
 
   return (
     <div className={styles.page}>
@@ -35,9 +47,11 @@ export default function HomeScreen() {
           />
         )}
         {status === 'empty' && <HomeMessage title={t('home_empty_title')} body={t('home_empty_body')} />}
-        {status === 'ready' && featured && <HomeHero t={t} event={featured} />}
+        {status === 'ready' && featured && (
+          <HomeHero t={t} event={featured} joinHint={joinHint} onSelect={selectEvent} />
+        )}
         {status === 'ready' && events.length > 0 && (
-          <EventList t={t} events={events} countLabel={countLabel} isMainHeading={!featured} />
+          <EventList t={t} events={events} countLabel={countLabel} isMainHeading={!featured} onSelect={selectEvent} />
         )}
       </main>
       <AppFooter t={t} />

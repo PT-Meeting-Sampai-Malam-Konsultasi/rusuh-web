@@ -88,6 +88,31 @@
   @apply block tabular-nums;
 }
 
+/* Phone: full-width button over the hint. From 720px: button and hint side by side. */
+.cta {
+  @apply mt-5 flex w-full flex-col items-stretch gap-2.5;
+
+  @variant md {
+    @apply mt-8 w-auto flex-row items-center gap-6;
+  }
+}
+
+.ctaButton {
+  @apply w-full no-underline;
+
+  @variant md {
+    @apply w-auto;
+  }
+}
+
+.hint {
+  @apply text-[13px] leading-normal text-ink-2;
+
+  @variant md {
+    @apply max-w-[260px] text-sm;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .rise {
     animation: rise 0.45s var(--ease-print) both;
