@@ -32,6 +32,10 @@ export interface HomeControllerInterface {
   locale: FormatLocale;
   setLocale: (locale: FormatLocale) => void;
   nav: NavItem[];
+  /** Under the featured call to action. */
+  joinHint: string;
+  /** Analytics when a join link is followed; position 0 is the featured poster, 1… the list. */
+  selectEvent: (eventId: string, position: number) => void;
 }
 
 /** Home keeps stamps fresh during a sale; the CDN caches `GET /events` for 5–10 s, so this is cheap. */
@@ -104,6 +108,11 @@ const HomeController = ({
       void i18n.changeLanguage(next);
     },
     nav,
+    joinHint: t('home_join_hint'),
+    selectEvent: (eventId, position) => {
+      const state = [view.featured, ...view.events].find((card) => card?.id === eventId)?.state ?? 'unknown';
+      analyticsAdapter.trackEvent('home_event_select', { eventId, state, position });
+    },
   };
 };
 
