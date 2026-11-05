@@ -30,12 +30,13 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe('catalog mock', () => {
-  it('serves the five sample events through the real HTTP adapter and service', async () => {
+  it('serves the six sample events through the real HTTP adapter and service', async () => {
     const { data, status } = await catalog.listEvents();
     expect(status).toBe(200);
     expect(data.serverNow).toBe(NOW.toISOString());
     expect(data.items.map((e) => e.state)).toEqual([
       'waiting_room_open',
+      'almost_gone',
       'coming_soon',
       'temporarily_full',
       'sold_out',
@@ -59,7 +60,7 @@ describe('catalog mock', () => {
   it('sells everything out but keeps ended events ended', async () => {
     scenario = 'sold_out';
     const states = (await catalog.listEvents()).data.items.map((e) => e.state);
-    expect(states).toEqual(['sold_out', 'sold_out', 'sold_out', 'sold_out', 'ended']);
+    expect(states).toEqual(['sold_out', 'sold_out', 'sold_out', 'sold_out', 'sold_out', 'ended']);
   });
 
   it('fails with the API problem code', async () => {
