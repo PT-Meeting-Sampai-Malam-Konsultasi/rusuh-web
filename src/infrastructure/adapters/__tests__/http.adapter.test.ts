@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createHttpAdapter, toHttpError } from '../http.adapter';
+import { createHttpAdapter, HttpRequestError, toHttpError } from '../http.adapter';
 
 const ok = (data: unknown, status = 200): AxiosAdapter =>
   vi.fn(async (config: InternalAxiosRequestConfig) => ({ data, status, statusText: 'OK', headers: {}, config }));
@@ -53,7 +53,10 @@ describe('createHttpAdapter', () => {
       timeoutMs: 1000,
       transport: fail(409, { code: 'NIK_SEAT_TAKEN', title: 'NIK sudah terdaftar', traceId: 't1' }),
     });
-    await expect(http.post('/x')).rejects.toEqual({
+    const error = await http.post('/x').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(HttpRequestError);
+    expect(error).toMatchObject({
+      name: 'HttpError',
       status: 409,
       code: 'NIK_SEAT_TAKEN',
       message: 'NIK sudah terdaftar',
@@ -115,7 +118,21 @@ describe('toHttpError', () => {
   });
 
   it('maps non-HTTP errors to UNKNOWN_ERROR', () => {
-    expect(toHttpError(new Error('boom'))).toEqual({ status: 0, code: 'UNKNOWN_ERROR', message: 'boom' });
-    expect(toHttpError('weird')).toEqual({ status: 0, code: 'UNKNOWN_ERROR', message: 'weird' });
+    expect(toHttpError(new Error('boom'))).toMatchObject({ status: 0, code: 'UNKNOWN_ERROR', message: 'boom' });
+    expect(toHttpError('weird')).toMatchObject({ status: 0, code: 'UNKNOWN_ERROR', message: 'weird' });
+  });
+
+  it('returns a real Error that keeps the original as its cause', () => {
+    const original = new AxiosError('down', 'ERR_NETWORK');
+    const error = toHttpError(original);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe('HttpError');
+    expect(error.stack).toBeDefined();
+    expect(error.cause).toBe(original);
+  });
+
+  it('passes an HttpRequestError through unchanged', () => {
+    const error = new HttpRequestError({ status: 409, code: 'NIK_SEAT_TAKEN', message: 'taken' });
+    expect(toHttpError(error)).toBe(error);
   });
 });

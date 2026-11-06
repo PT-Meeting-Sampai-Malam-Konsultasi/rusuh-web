@@ -24,23 +24,46 @@ interface Problem {
 
 type RetryConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
-export function toHttpError(error: unknown): HttpError {
+/** The `HttpError` contract as a real `Error`, so rejections carry a name and a stack trace. */
+export class HttpRequestError extends Error implements HttpError {
+  readonly status: number;
+  readonly code: string;
+  readonly data?: unknown;
+  readonly traceId?: string;
+
+  constructor({ status, code, message, data, traceId }: HttpError, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'HttpError';
+    this.status = status;
+    this.code = code;
+    if (data !== undefined) this.data = data;
+    if (traceId !== undefined) this.traceId = traceId;
+  }
+}
+
+export function toHttpError(error: unknown): HttpRequestError {
+  if (error instanceof HttpRequestError) return error;
+  const cause = { cause: error };
   if (axios.isAxiosError(error)) {
     const e = error as AxiosError<Problem>;
     if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT') {
-      return { status: 0, code: 'TIMEOUT', message: e.message };
+      return new HttpRequestError({ status: 0, code: 'TIMEOUT', message: e.message }, cause);
     }
-    if (!e.response) return { status: 0, code: 'NETWORK_ERROR', message: e.message };
+    if (!e.response) return new HttpRequestError({ status: 0, code: 'NETWORK_ERROR', message: e.message }, cause);
     const body = e.response.data;
-    return {
-      status: e.response.status,
-      code: body?.code ?? `HTTP_${e.response.status}`,
-      message: body?.title ?? e.message,
-      data: body,
-      traceId: body?.traceId,
-    };
+    return new HttpRequestError(
+      {
+        status: e.response.status,
+        code: body?.code ?? `HTTP_${e.response.status}`,
+        message: body?.title ?? e.message,
+        data: body,
+        traceId: body?.traceId,
+      },
+      cause,
+    );
   }
-  return { status: 0, code: 'UNKNOWN_ERROR', message: error instanceof Error ? error.message : String(error) };
+  const message = error instanceof Error ? error.message : String(error);
+  return new HttpRequestError({ status: 0, code: 'UNKNOWN_ERROR', message }, cause);
 }
 
 export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
