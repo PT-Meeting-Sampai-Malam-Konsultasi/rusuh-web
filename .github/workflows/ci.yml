@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarQube Cloud reads the history to tell new code from old
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -23,6 +25,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:coverage
+      # Reads sonar-project.properties and coverage/lcov.info; results show on the PR and on sonarcloud.io.
+      - name: SonarQube Cloud scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - run: npm run build
       - run: node scripts/check-bundle-size.mjs
       - uses: actions/upload-artifact@v4
