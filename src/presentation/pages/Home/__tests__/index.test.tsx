@@ -8,6 +8,7 @@ import HomeScreen from '../index';
 
 const card = (id: string, name: string): EventCardView => ({
   id,
+  state: 'on_sale',
   name,
   title: name,
   posterTone: 'blue',
@@ -20,6 +21,7 @@ const card = (id: string, name: string): EventCardView => ({
   outcome: null,
   note: null,
   finished: false,
+  join: null,
 });
 
 let controller: HomeControllerInterface;
@@ -36,6 +38,8 @@ const base = (): HomeControllerInterface => ({
   retry: vi.fn(),
   locale: 'id',
   setLocale: vi.fn(),
+  joinHint: 'home_join_hint',
+  selectEvent: vi.fn(),
   nav: [
     { href: '/', label: 'nav_events', icon: 'events', current: true, desktop: true },
     { href: '/queue', label: 'nav_queue', icon: 'queue', current: false, desktop: false },
@@ -63,6 +67,19 @@ describe('HomeScreen', () => {
     controller = { ...base(), events: [] };
     rerender(<HomeScreen />);
     expect(screen.queryByText('home_all_events')).toBeNull();
+  });
+
+  it('passes the join link and hint to the featured poster', () => {
+    controller = {
+      ...base(),
+      featured: {
+        ...card('evt_samudra', 'Samudra'),
+        join: { href: '/queue?event=evt_samudra', label: 'home_join_queue' },
+      },
+    };
+    render(<HomeScreen />);
+    expect(screen.getByRole('link', { name: /home_join_queue/ })).toHaveAttribute('href', '/queue?event=evt_samudra');
+    expect(screen.getByText('home_join_hint')).toBeInTheDocument();
   });
 
   it('shows the skeleton while loading', () => {

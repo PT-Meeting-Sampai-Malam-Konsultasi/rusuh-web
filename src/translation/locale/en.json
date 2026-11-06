@@ -36,6 +36,8 @@
   "home_fact_venue": "Venue",
   "home_fact_price": "Price",
   "home_price_from": "From",
+  "home_join_queue": "Join the queue",
+  "home_join_hint": "One place per device. Your number stays even if you close the page.",
   "home_all_events": "All events",
   "home_count_one": "{{count}} event",
   "home_count_other": "{{count}} events",

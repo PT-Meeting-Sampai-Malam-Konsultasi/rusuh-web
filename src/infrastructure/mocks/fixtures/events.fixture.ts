@@ -3,7 +3,7 @@ import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 const DAY = 86_400_000;
 const WIB_OFFSET_HOURS = 7;
 
-/** The five HiFi events, dated relative to `now` so "coming soon" and "sold in 41 minutes" stay true. */
+/** The five HiFi events plus one more live sale (so the list shows an active card), dated relative to `now` so "coming soon" and "sold in 41 minutes" stay true. */
 export function eventsFixture(now: Date): EventSummary[] {
   /** `days` from today at a fixed local time (WIB unless an offset is given), like a real schedule. */
   const at = (days: number, hour: number, minute = 0, utcOffset = WIB_OFFSET_HOURS) => {
@@ -30,6 +30,22 @@ export function eventsFixture(now: Date): EventSummary[] {
       state: 'waiting_room_open',
       priceFrom: { amount: 450000, currency: 'IDR' },
       capacity: 12000,
+    },
+    {
+      eventId: 'evt_pelita',
+      name: 'Pelita',
+      subtitle: 'Tur Kota Lama',
+      format: 'Live',
+      venue: 'Lapangan Simpang Lima',
+      venueShort: 'Simpang Lima',
+      city: 'Semarang',
+      timezone: 'Asia/Jakarta',
+      startsAt: at(25, 19, 30),
+      saleOpensAt: at(-1, 13),
+      waitingRoomOpensAt: at(-1, 12, 30),
+      state: 'almost_gone',
+      priceFrom: { amount: 350000, currency: 'IDR' },
+      capacity: 9000,
     },
     {
       eventId: 'evt_langit_sore',

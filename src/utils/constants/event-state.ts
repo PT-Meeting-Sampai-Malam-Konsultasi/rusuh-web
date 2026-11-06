@@ -14,5 +14,8 @@ export const EVENT_STAMP: Readonly<Record<EventState, { tone: EventStampTone; la
   ended: { tone: 'ended', labelKey: 'event_state_ended' },
 };
 
+/** States with an open queue and stock left: the card is active and leads to the waiting room (FR-02). */
+export const JOINABLE_STATES: readonly EventState[] = ['waiting_room_open', 'on_sale', 'almost_gone'];
+
 /** States whose sale is over: shown, but nothing left to buy. */
 export const FINISHED_STATES: readonly EventState[] = ['sold_out', 'ended'];

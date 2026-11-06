@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { TFunction } from 'i18next';
 
+import ButtonLink from '@presentation/components/ButtonLink';
 import Poster from '@presentation/components/Poster';
 import Stamp from '@presentation/components/Stamp';
 import type { EventCardView } from '@utils/format/event-card';
@@ -10,10 +11,13 @@ import styles from './home-hero.module.css';
 interface HomeHeroProps {
   t: TFunction;
   event: EventCardView;
+  joinHint: string;
+  /** Called when the buyer follows the join link (analytics). */
+  onSelect: (eventId: string, position: number) => void;
 }
 
 /** The one loud thing on Home: the featured event's poster, its stamp and the facts. */
-export default function HomeHero({ t, event }: HomeHeroProps) {
+export default function HomeHero({ t, event, joinHint, onSelect }: HomeHeroProps) {
   return (
     <section className={styles.hero} aria-labelledby="home-featured">
       <div className={`${styles.art} ${styles.rise}`} style={{ '--i': 0 } as CSSProperties}>
@@ -66,6 +70,14 @@ export default function HomeHero({ t, event }: HomeHeroProps) {
             {event.note.lead} {event.note.strong && <b>{event.note.strong}</b>}
             {event.note.detail && <span className={styles.detail}>{event.note.detail}</span>}
           </p>
+        )}
+        {event.join && (
+          <div className={`${styles.cta} ${styles.rise}`} style={{ '--i': 4 } as CSSProperties}>
+            <ButtonLink href={event.join.href} className={styles.ctaButton} onClick={() => onSelect(event.id, 0)}>
+              {event.join.label} <span aria-hidden="true">→</span>
+            </ButtonLink>
+            <p className={styles.hint}>{joinHint}</p>
+          </div>
         )}
       </div>
     </section>

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { EventCardView } from '@utils/format/event-card';
 
@@ -7,6 +8,7 @@ import EventCard from '../index';
 
 const CARD: EventCardView = {
   id: 'evt_langit',
+  state: 'coming_soon',
   name: 'Langit Sore',
   subtitle: 'Senja Panjang',
   title: 'Langit Sore — Senja Panjang',
@@ -21,12 +23,13 @@ const CARD: EventCardView = {
   outcome: null,
   note: { lead: 'Dibuka', strong: 'Jum, 30 Okt · 10.00 WIB', detail: '7 hari 14 jam lagi' },
   finished: false,
+  join: null,
 };
 
-const renderCard = (event: EventCardView, index = 0) =>
+const renderCard = (event: EventCardView, index = 0, onSelect = vi.fn()) =>
   render(
     <ol>
-      <EventCard event={event} index={index} />
+      <EventCard event={event} index={index} onSelect={onSelect} />
     </ol>,
   );
 
@@ -61,5 +64,33 @@ describe('EventCard', () => {
   it('shows a note without a time', () => {
     renderCard({ ...CARD, note: { lead: 'Sisa tiket sedang dibayar pembeli lain.' } });
     expect(screen.getByText(/Sisa tiket sedang dibayar/)).toBeInTheDocument();
+  });
+
+  it('is a plain card without a link when the event cannot be joined', () => {
+    renderCard(CARD);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByRole('listitem').className).not.toContain('active');
+  });
+
+  it('becomes one link to the waiting room when the event can be joined', async () => {
+    const onSelect = vi.fn();
+    renderCard(
+      {
+        ...CARD,
+        state: 'on_sale',
+        stamp: { tone: 'on', label: 'Antrian dibuka' },
+        note: null,
+        join: { href: '/queue?event=evt_langit', label: 'Masuk antrian' },
+      },
+      2,
+      onSelect,
+    );
+    expect(screen.getByRole('listitem').className).toContain('active');
+    const link = screen.getByRole('link', { name: 'Masuk antrian: Langit Sore — Senja Panjang' });
+    expect(link).toHaveAttribute('href', '/queue?event=evt_langit');
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    link.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(link);
+    expect(onSelect).toHaveBeenCalledWith('evt_langit', 3);
   });
 });

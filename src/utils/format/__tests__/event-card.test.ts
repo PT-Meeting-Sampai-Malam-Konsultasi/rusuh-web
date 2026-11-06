@@ -115,6 +115,25 @@ describe('toEventCardView', () => {
   });
 });
 
+describe('join target', () => {
+  it('leads live events to their waiting room', () => {
+    for (const state of ['waiting_room_open', 'on_sale', 'almost_gone'] as const) {
+      expect(view(state).join).toEqual({ href: '/queue?event=evt_samudra', label: 'Masuk antrian' });
+    }
+    expect(view('on_sale', {}, 'en').join?.label).toBe('Join the queue');
+  });
+
+  it('has no join target before the queue opens, while full, or once the sale is over', () => {
+    for (const state of ['coming_soon', 'temporarily_full', 'sold_out', 'ended'] as const) {
+      expect(view(state).join).toBeNull();
+    }
+  });
+
+  it('keeps the state for analytics', () => {
+    expect(view('almost_gone').state).toBe('almost_gone');
+  });
+});
+
 describe('posterToneFor', () => {
   it('is stable per event and uses every tone', () => {
     expect(posterToneFor('evt_deru')).toBe(posterToneFor('evt_deru'));

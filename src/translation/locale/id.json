@@ -36,6 +36,8 @@
   "home_fact_venue": "Tempat",
   "home_fact_price": "Harga",
   "home_price_from": "Mulai",
+  "home_join_queue": "Masuk antrian",
+  "home_join_hint": "Satu tempat antrian per perangkat. Nomor Anda tetap walau halaman ditutup.",
   "home_all_events": "Semua event",
   "home_count_one": "{{count}} event",
   "home_count_other": "{{count}} event",

@@ -1,7 +1,8 @@
 import type { TFunction } from 'i18next';
 
-import type { EventSummary } from '@core/entities/catalog/catalog.entity';
-import { EVENT_STAMP, FINISHED_STATES, type EventStampTone } from '@utils/constants/event-state';
+import type { EventState, EventSummary } from '@core/entities/catalog/catalog.entity';
+import { EVENT_STAMP, FINISHED_STATES, JOINABLE_STATES, type EventStampTone } from '@utils/constants/event-state';
+import { ROUTES, withQuery } from '@utils/constants/routes';
 
 import {
   DEFAULT_TIME_ZONE,
@@ -19,6 +20,7 @@ export type PosterTone = 'blue' | 'pink' | 'paper' | 'ink';
 /** One event, formatted for Home: every string is already translated. */
 export interface EventCardView {
   id: string;
+  state: EventState;
   name: string;
   subtitle?: string;
   /** "Name — Subtitle" for the card heading. */
@@ -38,6 +40,8 @@ export interface EventCardView {
   /** Extra line at the bottom of the card: opening time, or why the event is temporarily full. */
   note: { lead: string; strong?: string; detail?: string } | null;
   finished: boolean;
+  /** Set while the queue is open and stock remains: where the card leads (the waiting room) and its label. */
+  join: { href: string; label: string } | null;
 }
 
 export interface EventCardContext {
@@ -108,6 +112,7 @@ export function toEventCardView(event: EventSummary, context: EventCardContext):
   const stamp = EVENT_STAMP[event.state];
   return {
     id: event.eventId,
+    state: event.state,
     name: event.name,
     subtitle: event.subtitle,
     title: event.subtitle ? `${event.name} — ${event.subtitle}` : event.name,
@@ -126,5 +131,8 @@ export function toEventCardView(event: EventSummary, context: EventCardContext):
     outcome: outcomeFor(event, context, timeZone),
     note: noteFor(event, context, timeZone),
     finished,
+    join: JOINABLE_STATES.includes(event.state)
+      ? { href: withQuery(ROUTES.QUEUE, { event: event.eventId }), label: t('home_join_queue') }
+      : null,
   };
 }
