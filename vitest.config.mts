@@ -13,6 +13,8 @@ export default defineConfig({
     css: { modules: { classNameStrategy: 'non-scoped' } },
     coverage: {
       provider: 'v8',
+      // lcov feeds SonarQube Cloud (sonar-project.properties); text and html are for people.
+      reporter: ['text', 'html', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
       // Route files are thin server components (covered by the build); types and test files hold no logic.
       // mocks/browser.ts only registers the Service Worker, which jsdom does not have; its handlers are tested in Node.
