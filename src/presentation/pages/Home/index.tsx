@@ -2,6 +2,7 @@
 
 import type { HomeControllerInterface } from '@controllers/home.controller';
 import container from '@infrastructure/di/container';
+import '@infrastructure/di/controllers/home';
 import AppFooter from '@presentation/components/AppFooter';
 import AppHeader from '@presentation/components/AppHeader';
 import TabBar from '@presentation/components/TabBar';

@@ -9,6 +9,7 @@ import OrderScreen from '../index';
 let controller: OrderControllerInterface;
 
 vi.mock('@infrastructure/di/container', () => ({ default: { resolve: () => controller } }));
+vi.mock('@infrastructure/di/controllers/order', () => ({}));
 
 const base = (): OrderControllerInterface => ({
   t: ((k: string) => k) as never,

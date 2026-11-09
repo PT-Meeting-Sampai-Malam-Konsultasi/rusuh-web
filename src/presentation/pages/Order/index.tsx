@@ -2,6 +2,7 @@
 
 import type { OrderControllerInterface } from '@controllers/order.controller';
 import container from '@infrastructure/di/container';
+import '@infrastructure/di/controllers/order';
 import FlowHeader from '@presentation/components/FlowHeader';
 
 import CategoryList from './components/CategoryList';

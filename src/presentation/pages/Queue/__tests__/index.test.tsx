@@ -9,6 +9,7 @@ import QueueScreen from '../index';
 let controller: QueueControllerInterface;
 
 vi.mock('@infrastructure/di/container', () => ({ default: { resolve: () => controller } }));
+vi.mock('@infrastructure/di/controllers/queue', () => ({}));
 
 const t = ((k: string, params?: Record<string, unknown>) => (params ? `${k}:${JSON.stringify(params)}` : k)) as never;
 

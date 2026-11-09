@@ -6,6 +6,7 @@ import NotFoundScreen from '../index';
 vi.mock('@infrastructure/di/container', () => ({
   default: { resolve: () => ({ t: (k: string) => k, homeHref: '/' }) },
 }));
+vi.mock('@infrastructure/di/controllers/not-found', () => ({}));
 
 describe('NotFoundScreen', () => {
   it('passes the controller values to the status screen', () => {
