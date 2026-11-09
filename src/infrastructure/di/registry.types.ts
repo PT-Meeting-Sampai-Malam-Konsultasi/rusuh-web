@@ -22,6 +22,7 @@ import type { RequestSignInCodeUseCaseInterface } from '@core/use_case/auth/requ
 import type { VerifySignInCodeUseCaseInterface } from '@core/use_case/auth/verify-sign-in-code.use-case';
 import type { GetOrderCategoriesUseCaseInterface } from '@core/use_case/booking/get-order-categories.use-case';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
+import type { ClaimTurnUseCaseInterface } from '@core/use_case/queue/claim-turn.use-case';
 import type { FollowQueueUseCaseInterface } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
 import type { HomeControllerInterface } from '@controllers/home.controller';
@@ -83,6 +84,8 @@ export interface AwilixRegistry {
   useLoading: () => LoadingApi;
   usePopupError: () => PopupErrorApi;
   useNetworkStatus: () => NetworkStatusApi;
+  /** True while the tab is in front (`visibilitychange`). */
+  usePageVisible: () => boolean;
 
   // services
   accountService: AccountServiceInterface;
@@ -97,6 +100,7 @@ export interface AwilixRegistry {
   getOrderCategoriesUseCase: GetOrderCategoriesUseCaseInterface;
   joinQueueUseCase: JoinQueueUseCaseInterface;
   followQueueUseCase: FollowQueueUseCaseInterface;
+  claimTurnUseCase: ClaimTurnUseCaseInterface;
   refreshSessionUseCase: RefreshSessionUseCaseInterface;
   requestSignInCodeUseCase: RequestSignInCodeUseCaseInterface;
   verifySignInCodeUseCase: VerifySignInCodeUseCaseInterface;

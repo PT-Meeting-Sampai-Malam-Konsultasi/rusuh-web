@@ -26,7 +26,12 @@ function setup({ deviceToken = 'device-old' as string | null, stored = null as S
         status: 201,
       }),
     },
-    queueService: { joinQueue: vi.fn().mockResolvedValue({ data: PLACE, status: 200 }), getFrontier: vi.fn() },
+    queueService: {
+      joinQueue: vi.fn().mockResolvedValue({ data: PLACE, status: 200 }),
+      getFrontier: vi.fn(),
+      claimTurn: vi.fn(),
+      getMyPlace: vi.fn(),
+    },
     deviceTokenStore: {
       get: vi.fn(() => device),
       set: vi.fn((token: string) => {

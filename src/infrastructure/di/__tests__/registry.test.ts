@@ -32,6 +32,7 @@ const KEYS = {
   useLoading: true,
   usePopupError: true,
   useNetworkStatus: true,
+  usePageVisible: true,
   accountService: true,
   authService: true,
   catalogService: true,
@@ -42,6 +43,7 @@ const KEYS = {
   getOrderCategoriesUseCase: true,
   joinQueueUseCase: true,
   followQueueUseCase: true,
+  claimTurnUseCase: true,
   refreshSessionUseCase: true,
   requestSignInCodeUseCase: true,
   verifySignInCodeUseCase: true,
@@ -99,6 +101,7 @@ describe('DI registries', () => {
     expect(typeof container.resolve('queueService').joinQueue).toBe('function');
     expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
     expect(typeof container.resolve('followQueueUseCase').poll).toBe('function');
+    expect(typeof container.resolve('claimTurnUseCase').execute).toBe('function');
   });
 
   it('wires the auth and account services', () => {

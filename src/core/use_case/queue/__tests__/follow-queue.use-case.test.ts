@@ -122,7 +122,7 @@ describe('FollowQueueUseCase', () => {
   let streamHandlers: QueueStreamHandlers | undefined;
   const close = vi.fn();
   const deps = {
-    queueService: { joinQueue: vi.fn(), getFrontier: vi.fn() },
+    queueService: { joinQueue: vi.fn(), getFrontier: vi.fn(), claimTurn: vi.fn(), getMyPlace: vi.fn() },
     queueStream: {
       open: vi.fn((_id: string, _tokens: unknown, handlers: QueueStreamHandlers) => {
         streamHandlers = handlers;
