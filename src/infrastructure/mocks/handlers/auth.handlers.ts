@@ -33,6 +33,12 @@ const problemWith = (status: number, code: string, title: string, extra: Record<
  * The core auth service as the sign-in page sees it (ADR-0006). Sessions live in this factory, so a page reload
  * signs out, as it does until the refresh cookie works across our domains.
  */
+/** One @, no spaces, a dot inside the domain. Split, not a regex, so it cannot backtrack. */
+const isEmailShaped = (email: string | undefined): email is string => {
+  const [local, domain, ...rest] = (email ?? '').split('@');
+  return !!local && !!domain && rest.length === 0 && !/\s/.test(email ?? '') && domain.slice(1, -1).includes('.');
+};
+
 export function authHandlers({ coreApiUrl, getScenario, now }: MockContext): HttpHandler[] {
   const challenges = new Map<string, MockChallenge>();
   const accounts = new Map<string, User>([
@@ -65,7 +71,7 @@ export function authHandlers({ coreApiUrl, getScenario, now }: MockContext): Htt
         return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
       }
       const { email } = (await request.json()) as { email?: string };
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!isEmailShaped(email)) {
         return problem(400, 'VALIDATION_FAILED', 'Email tidak valid');
       }
       const time = now().getTime();

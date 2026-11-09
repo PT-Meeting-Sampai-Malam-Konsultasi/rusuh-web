@@ -105,7 +105,9 @@ describe('auth mock', () => {
   });
 
   it('rejects a bad e-mail, a missing device or a missing gate', async () => {
-    await expect(request('nadia@')).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    for (const email of ['nadia@', 'nadia@gmail', 'na dia@gmail.com', 'a@b@c.id', 'nadia@.id', 'nadia@gmail.']) {
+      await expect(request(email)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    }
     await expect(auth.requestOtp({ email: 'a@b.id', locale: 'id' }, '', gate)).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
     });
