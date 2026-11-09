@@ -70,7 +70,7 @@ describe('DI registries', () => {
 
   beforeAll(async () => {
     // Each page shell imports its controller registration; load them all here.
-    for (const file of readdirSync(CONTROLLERS_DIR)) await import(`../controllers/${file.replace(/\.ts$/, '')}`);
+    await Promise.all(Object.values(import.meta.glob('../controllers/*.ts')).map((load) => load()));
   });
 
   it('registers every key of AwilixRegistry, and nothing else', () => {

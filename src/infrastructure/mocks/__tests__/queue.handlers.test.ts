@@ -197,7 +197,9 @@ describe('queue mock', () => {
       expect((await open('evt_pelita', {})).status).toBe(401);
       const far = await register();
       const { queueToken } = (await queue.joinQueue('evt_pelita', far, 'ts')).data;
-      for (let i = 0; i < 1000; i += 1) await queue.joinQueue('evt_pelita', await register(), 'ts');
+      // 800 more places put the next one past streamFrom (1.248 + 800 > 2.000). The mock only checks that a device
+      // header is there, so the joins skip registering and go out in parallel (one by one is too slow on CI).
+      await Promise.all(Array.from({ length: 800 }, (_, i) => queue.joinQueue('evt_pelita', `device-${i}`, 'ts')));
       const last = await register();
       const lastPlace = (await queue.joinQueue('evt_pelita', last, 'ts')).data;
       const tooFar = await open('evt_pelita', { 'X-Device-Token': last, 'X-Queue-Token': lastPlace.queueToken });
@@ -205,6 +207,6 @@ describe('queue mock', () => {
       expect(await tooFar.json()).toMatchObject({ code: 'TOO_FAR' });
       scenario = 'stream_off';
       expect((await open('evt_pelita', { 'X-Device-Token': far, 'X-Queue-Token': queueToken })).status).toBe(409);
-    });
+    }, 15_000);
   });
 });
