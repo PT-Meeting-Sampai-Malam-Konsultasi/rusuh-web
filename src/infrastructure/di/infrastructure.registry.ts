@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLoading } from '@contexts/loading.context';
 import { useNetworkStatus } from '@contexts/network-status.context';
+import { usePageVisible } from '@contexts/page-visibility';
 import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
 import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
@@ -51,8 +52,15 @@ export function registerInfrastructure() {
       createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
     ).singleton(),
     analyticsAdapter: asFunction(() => createAnalyticsAdapter()).singleton(),
+    // The session too: claiming a turn needs it (ADR-0025), and a join with it attaches the place to the account.
     queueHttp: asFunction((d: Deps) =>
-      createHttpAdapter({ baseUrl: d.config.queueApiUrl, timeoutMs: d.config.apiTimeoutMs, getLocale: locale(d) }),
+      createHttpAdapter({
+        baseUrl: d.config.queueApiUrl,
+        timeoutMs: d.config.apiTimeoutMs,
+        getLocale: locale(d),
+        getAccessToken: () => d.tokenStore.getAccessToken(),
+        refreshSession,
+      }),
     ).singleton(),
     coreHttp: asFunction((d: Deps) =>
       createHttpAdapter({
@@ -77,5 +85,6 @@ export function registerInfrastructure() {
     useLoading: asValue(useLoading),
     usePopupError: asValue(usePopupError),
     useNetworkStatus: asValue(useNetworkStatus),
+    usePageVisible: asValue(usePageVisible),
   });
 }

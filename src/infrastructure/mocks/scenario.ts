@@ -11,6 +11,8 @@ export const MOCK_SCENARIOS = [
   'offline',
   'admission_invalid',
   'stream_off',
+  /** FR-08: a new number joins 20 places back, so the turn comes in seconds. */
+  'near_front',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];

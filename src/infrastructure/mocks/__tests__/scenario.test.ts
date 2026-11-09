@@ -17,5 +17,6 @@ describe('resolveScenario', () => {
   it('knows the admission_invalid and stream_off scenarios', () => {
     expect(resolveScenario('?mock=admission_invalid', null)).toBe('admission_invalid');
     expect(resolveScenario('?mock=stream_off', null)).toBe('stream_off');
+    expect(resolveScenario('?mock=near_front', null)).toBe('near_front');
   });
 });
