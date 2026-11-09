@@ -1,7 +1,13 @@
 import type { TFunction } from 'i18next';
 
 import type { EventState, EventSummary } from '@core/entities/catalog/catalog.entity';
-import { EVENT_STAMP, FINISHED_STATES, JOINABLE_STATES, type EventStampTone } from '@utils/constants/event-state';
+import {
+  EVENT_STAMP,
+  FINISHED_STATES,
+  JOINABLE_STATES,
+  QUEUE_ANYWAY_STATES,
+  type EventStampTone,
+} from '@utils/constants/event-state';
 import { ROUTES, withQuery } from '@utils/constants/routes';
 
 import {
@@ -40,9 +46,16 @@ export interface EventCardView {
   /** Extra line at the bottom of the card: opening time, or why the event is temporarily full. */
   note: { lead: string; strong?: string; detail?: string } | null;
   finished: boolean;
-  /** Set while the queue is open and stock remains: where the card leads (the waiting room) and its label. */
-  join: { href: string; label: string } | null;
+  /** Word stamped across a sold-out poster ("HABIS"); null otherwise. */
+  overlay: string | null;
+  /**
+   * Where the card leads (the waiting room). `join`: queue open and stock left (FR-02, primary).
+   * `anyway`: temporarily full, the queue is paused but still accepts joins (FR-03, secondary).
+   */
+  join: { href: string; label: string; kind: JoinKind } | null;
 }
+
+export type JoinKind = 'join' | 'anyway';
 
 export interface EventCardContext {
   t: TFunction;
@@ -58,6 +71,13 @@ export function posterToneFor(eventId: string): PosterTone {
   let hash = 0;
   for (const char of eventId) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return CARD_TONES[hash % CARD_TONES.length];
+}
+
+function joinFor(event: EventSummary, t: TFunction): EventCardView['join'] {
+  const href = withQuery(ROUTES.QUEUE, { event: event.eventId });
+  if (JOINABLE_STATES.includes(event.state)) return { href, label: t('home_join_queue'), kind: 'join' };
+  if (QUEUE_ANYWAY_STATES.includes(event.state)) return { href, label: t('home_queue_anyway'), kind: 'anyway' };
+  return null;
 }
 
 function timeLeft(ms: number, t: TFunction): string {
@@ -131,8 +151,7 @@ export function toEventCardView(event: EventSummary, context: EventCardContext):
     outcome: outcomeFor(event, context, timeZone),
     note: noteFor(event, context, timeZone),
     finished,
-    join: JOINABLE_STATES.includes(event.state)
-      ? { href: withQuery(ROUTES.QUEUE, { event: event.eventId }), label: t('home_join_queue') }
-      : null,
+    overlay: event.state === 'sold_out' ? t('home_sold_out_overlay') : null,
+    join: joinFor(event, t),
   };
 }

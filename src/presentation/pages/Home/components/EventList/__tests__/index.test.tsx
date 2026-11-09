@@ -22,6 +22,7 @@ const CARD: EventCardView = {
   outcome: null,
   note: { lead: 'Dibuka', strong: 'Jum, 30 Okt · 10.00 WIB', detail: '7 hari 14 jam lagi' },
   finished: false,
+  overlay: null,
   join: null,
 };
 

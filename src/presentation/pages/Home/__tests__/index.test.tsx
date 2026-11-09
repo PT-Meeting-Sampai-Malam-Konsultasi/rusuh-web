@@ -21,6 +21,7 @@ const card = (id: string, name: string): EventCardView => ({
   outcome: null,
   note: null,
   finished: false,
+  overlay: null,
   join: null,
 });
 
@@ -74,7 +75,7 @@ describe('HomeScreen', () => {
       ...base(),
       featured: {
         ...card('evt_samudra', 'Samudra'),
-        join: { href: '/queue?event=evt_samudra', label: 'home_join_queue' },
+        join: { href: '/queue?event=evt_samudra', label: 'home_join_queue', kind: 'join' },
       },
     };
     render(<HomeScreen />);

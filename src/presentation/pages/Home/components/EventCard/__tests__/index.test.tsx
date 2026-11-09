@@ -23,6 +23,7 @@ const CARD: EventCardView = {
   outcome: null,
   note: { lead: 'Dibuka', strong: 'Jum, 30 Okt · 10.00 WIB', detail: '7 hari 14 jam lagi' },
   finished: false,
+  overlay: null,
   join: null,
 };
 
@@ -80,7 +81,7 @@ describe('EventCard', () => {
         state: 'on_sale',
         stamp: { tone: 'on', label: 'Antrian dibuka' },
         note: null,
-        join: { href: '/queue?event=evt_langit', label: 'Masuk antrian' },
+        join: { href: '/queue?event=evt_langit', label: 'Masuk antrian', kind: 'join' },
       },
       2,
       onSelect,
@@ -92,5 +93,63 @@ describe('EventCard', () => {
     link.addEventListener('click', (e) => e.preventDefault());
     await userEvent.click(link);
     expect(onSelect).toHaveBeenCalledWith('evt_langit', 3);
+  });
+
+  it('offers "Tetap antre" as its only link while temporarily full', async () => {
+    const onSelect = vi.fn();
+    renderCard(
+      {
+        ...CARD,
+        state: 'temporarily_full',
+        stamp: { tone: 'full', label: 'Penuh sementara' },
+        note: { lead: 'Sisa tiket sedang dibayar pembeli lain.' },
+        join: { href: '/queue?event=evt_langit', label: 'Tetap antre', kind: 'anyway' },
+      },
+      0,
+      onSelect,
+    );
+    const item = screen.getByRole('listitem');
+    expect(item.className).not.toContain('active');
+    const link = screen.getByRole('link', { name: 'Tetap antre: Langit Sore — Senja Panjang' });
+    expect(link).toHaveTextContent('Tetap antre');
+    expect(link.className).toContain('secondary');
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    link.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(link);
+    expect(onSelect).toHaveBeenCalledWith('evt_langit', 1);
+  });
+
+  it('dims a sold-out card, stamps the poster and offers nothing to press', () => {
+    const { container } = renderCard({
+      ...CARD,
+      state: 'sold_out',
+      stamp: { tone: 'sold', label: 'Habis terjual' },
+      price: null,
+      outcome: 'Semua 12.000 tiket terjual dalam 41 menit.',
+      note: null,
+      finished: true,
+      overlay: 'HABIS',
+    });
+    expect(screen.getByRole('listitem').className).toContain('out');
+    expect(container.querySelector('.dim')).not.toBeNull();
+    const plate = screen.getByText('HABIS');
+    expect(plate).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('dims an ended card without the sold-out plate', () => {
+    const { container } = renderCard({
+      ...CARD,
+      state: 'ended',
+      stamp: { tone: 'ended', label: 'Penjualan berakhir' },
+      price: null,
+      outcome: 'Penjualan online ditutup 29 Okt.',
+      note: null,
+      finished: true,
+    });
+    expect(container.querySelector('.dim')).not.toBeNull();
+    expect(screen.queryByText('HABIS')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

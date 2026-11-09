@@ -31,4 +31,13 @@ describe('ButtonLink', () => {
     expect(className).toContain('sm');
     expect(className).toContain('full');
   });
+
+  it('takes an accessible name when the label needs context', () => {
+    render(
+      <ButtonLink href="/queue?event=evt_rimba" ariaLabel="Tetap antre: Rimba — Pesta Akar">
+        Tetap antre
+      </ButtonLink>,
+    );
+    expect(screen.getByRole('link', { name: 'Tetap antre: Rimba — Pesta Akar' })).toBeInTheDocument();
+  });
 });

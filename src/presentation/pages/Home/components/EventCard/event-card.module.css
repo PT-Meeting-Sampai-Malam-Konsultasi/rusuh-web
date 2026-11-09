@@ -11,7 +11,7 @@
 
 .tiltLeft,
 .tiltRight {
-  @apply flex-none self-start;
+  @apply relative flex-none self-start;
 
   @variant md {
     @apply self-auto;
@@ -88,6 +88,32 @@
 
 .detail {
   @apply block tabular-nums;
+}
+
+/* Queue anyway (temporarily full): a secondary button under the note, not a stretched link. */
+.anyway {
+  @apply mt-2;
+}
+
+/* Finished (sold out, ended): the poster fades to grey, the title steps back, nothing reacts. */
+.out .title {
+  @apply text-ink-2;
+}
+
+.dim {
+  filter: grayscale(1) contrast(0.9);
+  opacity: 0.85;
+}
+
+/* Sold-out plate stamped across the poster, in full colour on the grey poster. */
+.overlay {
+  @apply pointer-events-none absolute top-[44%] left-1/2 border-2 border-ink bg-paper px-1.5 pt-[3px] pb-px font-display text-[22px] leading-none font-extrabold whitespace-nowrap text-ink;
+  font-stretch: 75%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+
+  @variant md {
+    @apply border-3 px-3.5 pt-1.5 pb-0.5 text-[54px];
+  }
 }
 
 /* Active card (joinable): the call to action's ::after covers the card, so the whole card is one link. */

@@ -23,7 +23,8 @@ const LIVE: EventCardView = {
   outcome: null,
   note: null,
   finished: false,
-  join: { href: '/queue?event=evt_samudra', label: 'Masuk antrian' },
+  overlay: null,
+  join: { href: '/queue?event=evt_samudra', label: 'Masuk antrian', kind: 'join' },
 };
 
 const t = ((k: string) => k) as never;
@@ -34,6 +35,28 @@ describe('HomeHero', () => {
     const onSelect = vi.fn();
     render(<HomeHero {...props} event={LIVE} onSelect={onSelect} />);
     const link = screen.getByRole('link', { name: /Masuk antrian/ });
+    expect(link).toHaveAttribute('href', '/queue?event=evt_samudra');
+    expect(screen.getByText('Satu tempat antrian per perangkat.')).toBeInTheDocument();
+    link.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(link);
+    expect(onSelect).toHaveBeenCalledWith('evt_samudra', 0);
+  });
+
+  it('offers "Tetap antre" as a secondary button while temporarily full', async () => {
+    const onSelect = vi.fn();
+    render(
+      <HomeHero
+        {...props}
+        onSelect={onSelect}
+        event={{
+          ...LIVE,
+          state: 'temporarily_full',
+          join: { href: '/queue?event=evt_samudra', label: 'Tetap antre', kind: 'anyway' },
+        }}
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Tetap antre' });
+    expect(link.className).toContain('secondary');
     expect(link).toHaveAttribute('href', '/queue?event=evt_samudra');
     expect(screen.getByText('Satu tempat antrian per perangkat.')).toBeInTheDocument();
     link.addEventListener('click', (e) => e.preventDefault());
