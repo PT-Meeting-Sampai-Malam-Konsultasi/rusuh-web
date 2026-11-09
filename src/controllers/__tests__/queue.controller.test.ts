@@ -182,6 +182,7 @@ describe('QueueController', () => {
       seq: '19.700',
       updated: 'queue_updated_now',
       rate: null,
+      eta: null,
     });
     expect(result.current.event).toMatchObject({
       name: 'Pelita',
@@ -587,6 +588,44 @@ describe('QueueController', () => {
       result.current.queueAgain();
       expect(refetch).toHaveBeenCalled();
       expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_rejoin', { eventId: 'evt_pelita' });
+    });
+  });
+
+  describe('wait estimate (FR-09)', () => {
+    it('shows the range from the frontier speed, one number when it meets, "soon" near the front', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ rateLow: 240, rateHigh: 360 }) };
+      expect(render().result.current.waiting?.eta).toBe('queue_eta_range:{"low":3,"high":6}');
+
+      frontierState = { data: frontier({ rateLow: 300, rateHigh: 300, served: 18500 }) };
+      expect(render().result.current.waiting?.eta).toBe('queue_eta_single:{"minutes":4}');
+
+      frontierState = { data: frontier({ rateLow: 240, rateHigh: 360, served: 19600 }) };
+      expect(render().result.current.waiting?.eta).toBe('queue_eta_soon');
+    });
+
+    it('shows none without a speed', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ rateLow: 0, rateHigh: 0, ratePerMin: 0 }) };
+      expect(render().result.current.waiting?.eta).toBeNull();
+    });
+
+    it('holds a small rise for the same number, and starts over for a new one', () => {
+      joinState = { data: place({ served: 13700, joinedServed: 13000 }) };
+      frontierState = { data: frontier({ served: 13700, rateLow: 240, rateHigh: 360 }) }; // 6.000 back: 15–25
+      const { result, rerender } = render();
+      expect(result.current.waiting?.eta).toBe('queue_eta_range:{"low":15,"high":25}');
+      frontierState = { data: frontier({ served: 13700, rateLow: 220, rateHigh: 360 }) }; // 15–30: +20%, held
+      rerender();
+      expect(result.current.waiting?.eta).toBe('queue_eta_range:{"low":15,"high":25}');
+      frontierState = { data: frontier({ served: 13700, rateLow: 150, rateHigh: 360 }) }; // 15–40: +60%, shown
+      rerender();
+      expect(result.current.waiting?.eta).toBe('queue_eta_range:{"low":15,"high":40}');
+
+      joinState = { data: place({ seq: 19750, served: 13700, joinedServed: 13000 }) };
+      frontierState = { data: frontier({ served: 13700, rateLow: 220, rateHigh: 360 }) };
+      rerender();
+      expect(result.current.waiting?.eta).toBe('queue_eta_range:{"low":15,"high":30}');
     });
   });
 });
