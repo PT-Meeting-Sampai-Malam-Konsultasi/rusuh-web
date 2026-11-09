@@ -6,7 +6,8 @@ Always delegate to `controller-writer`. Rules: `.claude/rules/controller.md`.
 
 1. `src/controllers/{page-name}.controller.ts`: interface (named) + factory (default).
 2. `src/controllers/__tests__/{page-name}.controller.test.ts`.
-3. Register in `controllers.registry.ts` as `asFunction(Controller)` — no `.singleton()`.
+3. Register in `src/infrastructure/di/controllers/{page-name}.ts` as `asFunction(Controller)` — no `.singleton()`.
+   The page shell imports that file (`import '@infrastructure/di/controllers/{page-name}';`) and its test mocks it.
 4. Add the interface to `AwilixRegistry`; check every destructured key is registered.
 
 ## Template

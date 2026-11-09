@@ -1,6 +1,6 @@
 ---
 name: scaffold-app
-description: Set up the rusuh-web architecture base on top of the generated Next.js 16 project — dependencies, path aliases, protocols and adapters, Awilix DI with four registries, i18n and Tailwind theme, contexts and shared components, providers and error boundaries, code-quality tooling and Vitest. Use once at the start, or to add a missing scaffold step.
+description: Set up the rusuh-web architecture base on top of the generated Next.js 16 project — dependencies, path aliases, protocols and adapters, Awilix DI with three shared registries and per-page controllers, i18n and Tailwind theme, contexts and shared components, providers and error boundaries, code-quality tooling and Vitest. Use once at the start, or to add a missing scaffold step.
 ---
 
 # Scaffold the app

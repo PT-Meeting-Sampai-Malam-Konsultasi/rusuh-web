@@ -54,17 +54,23 @@ Vitest resolves the same aliases through `vite-tsconfig-paths`.
 
 ## DI container (Awilix, PROXY mode)
 
-- Four registries, strict order: `infrastructure.registry.ts → services.registry.ts → helpers.registry.ts →
-  controllers.registry.ts`, called by `registerAll()` in `src/infrastructure/di/index.ts`. Later registries may depend on
-  earlier ones, never the reverse.
+- Three shared registries, strict order: `infrastructure.registry.ts → services.registry.ts → helpers.registry.ts`,
+  called by `registerAll()` in `src/infrastructure/di/index.ts`. Later registries may depend on earlier ones, never the
+  reverse.
+- **Controllers register per page**, not in `registerAll()`: one file per controller in
+  `src/infrastructure/di/controllers/<page>.ts` (`container.register({ xController: asFunction(XController) })` at module
+  scope), imported for its side effect by that page's shell (`import '@infrastructure/di/controllers/<page>';`).
+  `providers.tsx` loads on every page, so anything `registerAll()` imports ships on every page; a controller's
+  libraries (React Hook Form, Zod, Snap…) must ship only with its own page. The page's test mocks that import
+  (`vi.mock('@infrastructure/di/controllers/<page>', () => ({}))`) like it mocks the container.
 - Lifetimes:
   - Adapters: `asFunction(createAdapter).singleton()`
   - Services and use cases: `asFunction(Factory).singleton()`
   - Controllers: `asFunction(Controller)` — **no** `.singleton()` (they call hooks, fresh per resolve)
   - Config, constants, hook references: `asValue(...)`
 - `AwilixRegistry` (`src/infrastructure/di/registry.types.ts`) is the single source of truth. **Every key in it has a
-  `container.register()` call** in one of the four registries. Awilix resolves at runtime, so TypeScript will not catch a
-  missing registration. Count keys vs registrations after every change.
+  `container.register()` call** in one of the three registries or a `di/controllers/` file. Awilix resolves at
+  runtime, so TypeScript will not catch a missing registration. Count keys vs registrations after every change.
 - Constants such as `ERROR_CODE_MAP` go in `helpers.registry.ts` as `asValue(object)`, never an empty `{}`.
 
 ### Hooks registered in `infrastructure.registry.ts` (as `asValue`, real implementations)
@@ -114,6 +120,7 @@ Controllers receive these as parameters; they never import them.
 - ❌ Reading `process.env` outside `config.ts`, or reading it dynamically
 - ❌ Turning on `cacheComponents` / `partialPrefetching` / `output: "standalone"` without changing the hosting decision
 - ❌ A key in `AwilixRegistry` without a registration
+- ❌ Registering a controller in `registerAll()` (or importing one from `providers.tsx`): its libraries load on every page
 - ❌ `.singleton()` on a controller; `asFunction` for a hook
 - ❌ Service calls in `layout.tsx`, `providers.tsx` or route files
 - ❌ Server Actions, `cookies()`, middleware/proxy, or dynamic segments without `generateStaticParams`
