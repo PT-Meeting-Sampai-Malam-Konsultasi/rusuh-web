@@ -42,6 +42,8 @@ interface MockPlace {
 interface MockQueue {
   opensAt: number | null;
   startedAt: number | null;
+  /** The placement scenario this queue was started under (see `placementOf`). */
+  placement?: string;
 }
 
 interface MockQueueState {
@@ -83,13 +85,30 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
   let devices = saved?.devices ?? 0;
   const persist = () => saveState({ places: [...places], nextSeq: [...nextSeq], queues: [...queues], devices });
 
+  /** Where new numbers land: `near_front` 20 places back, `far_back` 12.000, `ok` 1.248; null for scenarios that
+   *  don't say (`stream_off`, `slow`…), which keep the running queue's placement. */
+  const placementOf = () => {
+    const scenario = getScenario();
+    return scenario === 'near_front' || scenario === 'far_back' || scenario === 'ok' ? scenario : null;
+  };
+
   const queueOf = (eventId: string) => {
     let queue = queues.get(eventId);
     if (!queue) {
-      queue = { opensAt: null, startedAt: null };
+      queue = { opensAt: null, startedAt: null, placement: placementOf() ?? 'ok' };
       queues.set(eventId, queue);
     }
     return queue;
+  };
+
+  /** Switching `?mock=` between placements starts that event's queue over, so the new scenario shows at once. */
+  const restartOnNewPlacement = (eventId: string) => {
+    const queue = queues.get(eventId);
+    const placement = placementOf();
+    if (!queue || !placement || (queue.placement ?? 'ok') === placement) return;
+    queues.delete(eventId);
+    nextSeq.delete(eventId);
+    for (const key of [...places.keys()]) if (key.endsWith(`|${eventId}`)) places.delete(key);
   };
 
   /** Where the line would be with a crowd behind the mock devices. */
@@ -102,8 +121,9 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
   /** A new number joins 1.248 places back, behind every number handed out before it. */
   const takeSeq = (eventId: string, time: number) => {
     queueOf(eventId).startedAt ??= time;
-    // `near_front`: 20 places back, so the turn comes in about 4 s.
-    const ahead = getScenario() === 'near_front' ? 20 : AHEAD_AT_JOIN;
+    // `near_front`: 20 places back, so the turn comes in about 4 s; `far_back`: 12.000 back, a long wait.
+    const placement = placementOf() ?? queueOf(eventId).placement;
+    const ahead = { near_front: 20, far_back: 12_000 }[placement as string] ?? AHEAD_AT_JOIN;
     const seq = Math.max(nextSeq.get(eventId) ?? SERVED_AT_JOIN + ahead, rawServed(eventId, time) + ahead);
     nextSeq.set(eventId, seq + 1);
     return seq;
@@ -202,6 +222,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       const key = `${device}|${eventId}`;
       const today = now();
       const time = today.getTime();
+      restartOnNewPlacement(eventId);
       let place = places.get(key);
       // After a missed turn, joining again gives a new number at the back.
       if (place && missed(eventId, place, time)) place = undefined;
