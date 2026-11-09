@@ -33,6 +33,7 @@ const base = (): QueueControllerInterface => ({
     seq: '19.700',
     updated: 'Diperbarui 2 detik lalu',
     rate: '300 orang masuk / menit',
+    eta: '± 4–6 menit lagi',
   },
   prequeue: null,
   paused: null,
@@ -65,6 +66,7 @@ describe('QueueScreen', () => {
     expect(track).toHaveAttribute('aria-valuenow', '45.7');
     expect(track.style.getPropertyValue('--p')).toBe('45.7%');
     expect(screen.getByText('queue_number:{"number":"18.452"}')).toBeInTheDocument();
+    expect(screen.getByText('± 4–6 menit lagi').tagName).toBe('STRONG');
     const live = screen.getByText(/Diperbarui 2 detik lalu/);
     expect(live).toHaveTextContent('Diperbarui 2 detik lalu · 300 orang masuk / menit');
     expect(live).toHaveAttribute('aria-live', 'off');
@@ -74,8 +76,9 @@ describe('QueueScreen', () => {
   });
 
   it('shows only when it was updated while there is no rate yet', () => {
-    controller = { ...base(), waiting: { ...base().waiting!, updated: 'Baru saja diperbarui', rate: null } };
+    controller = { ...base(), waiting: { ...base().waiting!, updated: 'Baru saja diperbarui', rate: null, eta: null } };
     render(<QueueScreen />);
+    expect(screen.queryByText(/menit lagi/)).not.toBeInTheDocument();
     expect(screen.getByText('Baru saja diperbarui')).toHaveTextContent(/^Baru saja diperbarui$/);
   });
 

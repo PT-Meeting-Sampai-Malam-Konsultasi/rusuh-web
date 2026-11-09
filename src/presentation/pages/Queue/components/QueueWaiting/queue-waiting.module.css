@@ -1,14 +1,5 @@
 @reference "../../../../../styles/app.css";
 
-/* HiFi .wr-eta em: when the number was last updated and how fast the line moves (FR-07). */
-.live {
-  @apply mt-[18px] text-[13px] text-ink-2;
-
-  @variant md {
-    @apply mt-6 text-[15px];
-  }
-}
-
 .nowrap {
   @apply whitespace-nowrap;
 }

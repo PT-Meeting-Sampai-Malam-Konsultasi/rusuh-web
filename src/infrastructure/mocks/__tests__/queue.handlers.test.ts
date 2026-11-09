@@ -271,4 +271,25 @@ describe('queue mock', () => {
     const { data } = await queue.joinQueue('evt_pelita', await register(), 'ts');
     expect(data.seq! - data.served!).toBe(20);
   });
+
+  it('joins 12.000 places back in the far_back scenario, too far to stream', async () => {
+    server.resetHandlers(...mockHandlers());
+    scenario = 'far_back';
+    const { data } = await queue.joinQueue('evt_pelita', await register(), 'ts');
+    expect(data.seq! - data.served!).toBe(12_000);
+  });
+
+  it('starts the queue over when the placement scenario changes, keeping the place otherwise', async () => {
+    server.resetHandlers(...mockHandlers());
+    const device = await register();
+    scenario = 'far_back';
+    const far = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+    expect(far.seq! - far.served!).toBe(12_000);
+    scenario = 'stream_off'; // not a placement: same number
+    expect((await queue.joinQueue('evt_pelita', device, 'ts')).data.seq).toBe(far.seq);
+    scenario = 'near_front';
+    const near = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+    expect(near.seq! - near.served!).toBe(20);
+    expect((await queue.joinQueue('evt_pelita', device, 'ts')).data.seq).toBe(near.seq);
+  });
 });

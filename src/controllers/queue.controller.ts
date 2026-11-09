@@ -11,6 +11,7 @@ import {
   type FrontierResult,
 } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
+import { holdWaitEstimate, waitEstimate, type WaitEstimate } from '@core/use_case/queue/wait-estimate';
 import type { ClaimTurnResult, TurnWindowResult } from '@core/use_case/queue/claim-turn.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
@@ -56,6 +57,8 @@ export interface QueueWaitingView {
   updated: string;
   /** "300 orang masuk / menit", or null before there is a rate. */
   rate: string | null;
+  /** "± 4–6 menit lagi", "± 4 menit lagi" or "kurang dari 1 menit lagi"; null without a speed (FR-09). */
+  eta: string | null;
 }
 
 export interface QueuePrequeueView {
@@ -359,6 +362,22 @@ const QueueController = ({
   const secondsAgo = Math.max(0, Math.floor((now - updatedAt) / 1000));
   const rate = frontier?.ratePerMin ?? 0;
 
+  // FR-09: the range only goes down; held per number, so "Antre lagi" starts fresh. Holding twice gives the same
+  // answer, so a repeated render is harmless.
+  const shownEta = useRef<{ seq: number | null; estimate: WaitEstimate | null }>({ seq: null, estimate: null });
+  const nextEta =
+    status === 'waiting' && place ? waitEstimate(place.position, frontier?.rateLow, frontier?.rateHigh) : null;
+  const previousEta = shownEta.current.seq === (place?.seq ?? null) ? shownEta.current.estimate : null;
+  const eta = holdWaitEstimate(previousEta, nextEta);
+  shownEta.current = { seq: place?.seq ?? null, estimate: eta };
+  const etaText = !eta
+    ? null
+    : eta.kind === 'soon'
+      ? t('queue_eta_soon')
+      : eta.low === eta.high
+        ? t('queue_eta_single', { minutes: eta.low })
+        : t('queue_eta_range', { low: eta.low, high: eta.high });
+
   const waiting = useMemo((): QueueWaitingView | null => {
     if (status !== 'waiting' || !place || place.seq === null || place.served === null) return null;
     return {
@@ -368,8 +387,9 @@ const QueueController = ({
       seq: formatCount(place.seq, locale),
       updated: secondsAgo < 1 ? t('queue_updated_now') : t('queue_updated', { seconds: secondsAgo }),
       rate: rate > 0 ? t('queue_rate', { rate: formatCount(rate, locale) }) : null,
+      eta: etaText,
     };
-  }, [status, place, locale, secondsAgo, rate, t]);
+  }, [status, place, locale, secondsAgo, rate, t, etaText]);
 
   const pausedReasons: Partial<Record<string, string>> = {
     stock: t('home_temporarily_full_note'),
