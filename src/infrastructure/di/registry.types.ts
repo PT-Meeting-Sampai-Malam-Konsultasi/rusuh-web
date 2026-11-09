@@ -10,6 +10,7 @@ import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
 import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
+import type { GetOrderCategoriesUseCaseInterface } from '@core/use_case/booking/get-order-categories.use-case';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
 import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
@@ -71,6 +72,7 @@ export interface AwilixRegistry {
 
   // use cases
   getHomeEventsUseCase: GetHomeEventsUseCaseInterface;
+  getOrderCategoriesUseCase: GetOrderCategoriesUseCaseInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;

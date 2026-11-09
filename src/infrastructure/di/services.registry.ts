@@ -2,6 +2,7 @@ import { asFunction } from 'awilix';
 
 import { BookingService } from '@core/services/booking.service';
 import { CatalogService } from '@core/services/catalog.service';
+import { GetOrderCategoriesUseCase } from '@core/use_case/booking/get-order-categories.use-case';
 import { GetHomeEventsUseCase } from '@core/use_case/catalog/get-home-events.use-case';
 
 import container from './container';
@@ -12,5 +13,6 @@ export function registerServices() {
     catalogService: asFunction(CatalogService).singleton(),
     bookingService: asFunction(BookingService).singleton(),
     getHomeEventsUseCase: asFunction(GetHomeEventsUseCase).singleton(),
+    getOrderCategoriesUseCase: asFunction(GetOrderCategoriesUseCase).singleton(),
   });
 }

@@ -29,6 +29,7 @@ const KEYS = {
   catalogService: true,
   bookingService: true,
   getHomeEventsUseCase: true,
+  getOrderCategoriesUseCase: true,
   ERROR_CODE_MAP: true,
   homeController: true,
   notFoundController: true,
