@@ -12,15 +12,25 @@ interface QueueWaitingProps {
   waiting: QueueWaitingView;
 }
 
-/** "Anda antrian ke-1.248" and how far the line has moved since the buyer joined (FR-06). */
+/** "Anda antrian ke-1.248", when it was last updated (FR-07) and how far the line has moved since joining (FR-06). */
 export default function QueueWaiting({ t, waiting }: QueueWaitingProps) {
   return (
     <section className={view.view} aria-live="polite">
       <p className={view.lead}>{t('queue_lead_position')}</p>
       <PrintNumber value={waiting.position} />
+      {/* Changes every second: kept out of the announcements, the number above is what matters. */}
+      <p className={`${styles.live} ${view.rise}`} style={{ '--i': 2 } as CSSProperties} aria-live="off">
+        {waiting.updated}
+        {waiting.rate && (
+          <>
+            {' · '}
+            <span className={styles.nowrap}>{waiting.rate}</span>
+          </>
+        )}
+      </p>
       <div
         className={`${styles.track} ${view.rise}`}
-        style={{ '--p': `${waiting.progress}%`, '--i': 2 } as CSSProperties}
+        style={{ '--p': `${waiting.progress}%`, '--i': 3 } as CSSProperties}
         role="progressbar"
         aria-label={t('queue_track_label')}
         aria-valuemin={0}

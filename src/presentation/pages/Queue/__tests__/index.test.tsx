@@ -26,7 +26,14 @@ const base = (): QueueControllerInterface => ({
     venueLine: 'Lapangan Simpang Lima, Semarang',
     kicker: 'LIVE · Antrian dibuka',
   },
-  waiting: { position: '1.248', progress: 45.7, served: '18.452', seq: '19.700' },
+  waiting: {
+    position: '1.248',
+    progress: 45.7,
+    served: '18.452',
+    seq: '19.700',
+    updated: 'Diperbarui 2 detik lalu',
+    rate: '300 orang masuk / menit',
+  },
   prequeue: null,
   paused: null,
   errorMessage: '',
@@ -55,9 +62,18 @@ describe('QueueScreen', () => {
     expect(track).toHaveAttribute('aria-valuenow', '45.7');
     expect(track.style.getPropertyValue('--p')).toBe('45.7%');
     expect(screen.getByText('queue_number:{"number":"18.452"}')).toBeInTheDocument();
+    const live = screen.getByText(/Diperbarui 2 detik lalu/);
+    expect(live).toHaveTextContent('Diperbarui 2 detik lalu · 300 orang masuk / menit');
+    expect(live).toHaveAttribute('aria-live', 'off');
     expect(screen.getByRole('region', { name: 'queue_notes_label' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'queue_title' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false');
+  });
+
+  it('shows only when it was updated while there is no rate yet', () => {
+    controller = { ...base(), waiting: { ...base().waiting!, updated: 'Baru saja diperbarui', rate: null } };
+    render(<QueueScreen />);
+    expect(screen.getByText('Baru saja diperbarui')).toHaveTextContent(/^Baru saja diperbarui$/);
   });
 
   it('shows the joining view with the Turnstile slot while the number is fetched', () => {
