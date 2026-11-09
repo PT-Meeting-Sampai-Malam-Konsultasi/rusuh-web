@@ -14,6 +14,7 @@ import type { GetOrderCategoriesUseCaseInterface } from '@core/use_case/booking/
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
 import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
+import type { OrderControllerInterface } from '@controllers/order.controller';
 import type { AppConfig } from '@infrastructure/config';
 
 /** Shapes of the context hooks (implemented in src/contexts, scaffold step 5). */
@@ -80,6 +81,7 @@ export interface AwilixRegistry {
   // controllers
   homeController: HomeControllerInterface;
   notFoundController: NotFoundControllerInterface;
+  orderController: OrderControllerInterface;
 
   // services, use cases and more controllers are added here by /add-feature
 }

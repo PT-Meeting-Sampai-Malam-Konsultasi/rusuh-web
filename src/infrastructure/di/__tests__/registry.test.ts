@@ -33,6 +33,7 @@ const KEYS = {
   ERROR_CODE_MAP: true,
   homeController: true,
   notFoundController: true,
+  orderController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 
 describe('DI registries', () => {
