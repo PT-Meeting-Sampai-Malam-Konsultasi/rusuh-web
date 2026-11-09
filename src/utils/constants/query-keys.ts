@@ -5,4 +5,6 @@ export const QUERY_KEYS = {
   CATEGORIES: 'categories',
   QUEUE_PLACE: 'queue-place',
   QUEUE_FRONTIER: 'queue-frontier',
+  QUEUE_TURN: 'queue-turn',
+  QUEUE_CLAIM: 'queue-claim',
 } as const;

@@ -11,6 +11,7 @@ import {
   type FrontierResult,
 } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
+import type { ClaimTurnResult, TurnWindowResult } from '@core/use_case/queue/claim-turn.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
 import { ROUTES } from '@utils/constants/routes';
@@ -70,6 +71,17 @@ export interface QueuePausedView {
   reason: string;
 }
 
+export interface QueueTurnView {
+  /** "19.700": "Nomor 19.700, silakan masuk." */
+  seq: string;
+  /** Seconds left in the 60 s window, or null until it is known. */
+  seconds: number | null;
+  /** The claim is on its way (signed in, page in front). */
+  claiming: boolean;
+  /** Guest: where "Masuk untuk lanjut" goes (claiming needs a session, ADR-0025); null when signed in. */
+  signInHref: string | null;
+}
+
 export interface QueueControllerInterface {
   t: TFunction;
   status: QueueStatus;
@@ -77,6 +89,11 @@ export interface QueueControllerInterface {
   waiting: QueueWaitingView | null;
   prequeue: QueuePrequeueView | null;
   paused: QueuePausedView | null;
+  turn: QueueTurnView | null;
+  /** "Pilih tiket sekarang": claim at once. */
+  claimNow: () => void;
+  /** "Antre lagi" after a missed turn: a new number at the back. */
+  queueAgain: () => void;
   /** Translated; '' unless status is 'error'. */
   errorMessage: string;
   retry: () => void;
@@ -90,6 +107,7 @@ type QueueControllerDeps = Pick<
   AwilixRegistry,
   | 'joinQueueUseCase'
   | 'followQueueUseCase'
+  | 'claimTurnUseCase'
   | 'getHomeEventsUseCase'
   | 'analyticsAdapter'
   | 'storage'
@@ -98,6 +116,8 @@ type QueueControllerDeps = Pick<
   | 'useQueryTanstack'
   | 'useQueryClientTanstack'
   | 'useSearchParamsNext'
+  | 'useRouterNext'
+  | 'usePageVisible'
 >;
 
 /** Same query as Home, so arriving from Home shows the poster at once. */
@@ -106,6 +126,7 @@ const EVENTS_STALE_MS = 5_000;
 const QueueController = ({
   joinQueueUseCase,
   followQueueUseCase,
+  claimTurnUseCase,
   getHomeEventsUseCase,
   analyticsAdapter,
   storage,
@@ -114,6 +135,8 @@ const QueueController = ({
   useQueryTanstack,
   useQueryClientTanstack,
   useSearchParamsNext,
+  useRouterNext,
+  usePageVisible,
 }: QueueControllerDeps): QueueControllerInterface => {
   const { t, i18n } = useTranslation();
   const locale: FormatLocale = i18n.language === 'en' ? 'en' : 'id';
@@ -174,7 +197,34 @@ const QueueController = ({
   const frontier = frontierQuery.data?.kind === 'frontier' ? frontierQuery.data.frontier : null;
   const place = joined ? applyFrontier(joined, frontier) : null;
   const live = following && !!place && (place.state === 'open' || place.state === 'paused') && !place.turnReached;
-  const status = queueStatusFor(hasEventId, place ? { kind: 'joined', place } : result, joinQuery.isError);
+  const baseStatus = queueStatusFor(hasEventId, place ? { kind: 'joined', place } : result, joinQuery.isError);
+
+  // FR-08: at the turn, claim while the page is in front (a background tab waits; the buyer has 60 s to come back).
+  // Both queries are keyed by the number, so "Antre lagi" starts clean with the new one.
+  const router = useRouterNext();
+  const visible = usePageVisible();
+  const atTurn = !!place?.turnReached && place.state === 'open';
+  const windowQuery = useQueryTanstack<TurnWindowResult, HttpError>({
+    queryKey: [QUERY_KEYS.QUEUE_TURN, eventId, place?.seq],
+    queryFn: () => claimTurnUseCase.turnWindow(eventId),
+    enabled: atTurn,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const claimQuery = useQueryTanstack<ClaimTurnResult, HttpError>({
+    queryKey: [QUERY_KEYS.QUEUE_CLAIM, eventId, place?.seq],
+    queryFn: () => claimTurnUseCase.execute(eventId),
+    enabled: atTurn && visible,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: (query) => (query.state.data?.kind === 'retry' ? query.state.data.afterMs : false),
+  });
+  const claim = claimQuery.data;
+  const turnWindow = windowQuery.data;
   const summary = findHomeEvent(eventsQuery.data, eventId);
 
   const trackedFor = useRef<JoinQueueResult | null>(null);
@@ -191,12 +241,42 @@ const QueueController = ({
   // One clock for the pre-queue countdown, "Diperbarui n detik lalu" and the stream retry: elapsed time only, never a
   // deadline against the device clock.
   const [now, setNow] = useState(() => Date.now());
-  const ticking = status === 'prequeue' || live;
+  const ticking = baseStatus === 'prequeue' || live || atTurn;
   useEffect(() => {
     if (!ticking) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [ticking]);
+
+  // The 60 s window: server times plus the time since that answer, never the device clock alone.
+  const turnSeconds =
+    turnWindow?.kind === 'window'
+      ? Math.max(
+          0,
+          (Date.parse(turnWindow.turnExpiresAt) - Date.parse(turnWindow.serverNow)) / 1000 -
+            (now - windowQuery.dataUpdatedAt) / 1000,
+        )
+      : null;
+  const admitted = claim?.kind === 'admitted';
+  const status = ((): QueueStatus => {
+    if (claim?.kind === 'sold-out' || turnWindow?.kind === 'sold-out') return 'sold-out';
+    if (!atTurn) return baseStatus;
+    if (claim?.kind === 'missed' || turnWindow?.kind === 'missed' || (turnSeconds === 0 && !admitted)) return 'missed';
+    if (claim?.kind === 'paused') return 'paused';
+    return 'turn';
+  })();
+
+  // Admitted: on to the order page, with the admission token kept in memory for it (replace: Back must not reclaim).
+  useEffect(() => {
+    if (claim?.kind !== 'admitted') return;
+    analyticsAdapter.trackEvent('queue_claim', { eventId, outcome: 'admitted' });
+    router.replace(`${ROUTES.ORDER}?event=${encodeURIComponent(eventId)}`);
+  }, [claim, analyticsAdapter, eventId, router]);
+
+  const claimedOutcome = claim && claim.kind !== 'admitted' && claim.kind !== 'retry' ? claim.kind : null;
+  useEffect(() => {
+    if (claimedOutcome) analyticsAdapter.trackEvent('queue_claim', { eventId, outcome: claimedOutcome });
+  }, [claimedOutcome, analyticsAdapter, eventId]);
 
   // Near the front: stream instead of polling while it is healthy; on a failure, poll and try again later.
   const wantStream = live && canStream(place?.position ?? null, frontier?.streamFrom) && now >= streamRetryAt;
@@ -254,6 +334,8 @@ const QueueController = ({
     if (!summary) return null;
     const kickers: Partial<Record<QueueStatus, string>> = {
       waiting: t('queue_kicker_open'),
+      turn: t('queue_kicker_open'),
+      missed: t('queue_kicker_open'),
       prequeue: opensAtLabel ? t('queue_kicker_prequeue', { time: opensAtLabel }) : t('queue_kicker_open'),
       paused: t('queue_kicker_paused'),
       'sold-out': t('queue_kicker_closed'),
@@ -313,6 +395,25 @@ const QueueController = ({
               (summary?.state === 'temporarily_full' ? t('home_temporarily_full_note') : t('queue_paused_operator')),
           }
         : null,
+    turn:
+      status === 'turn' && place?.seq != null
+        ? {
+            seq: formatCount(place.seq, locale),
+            seconds: turnSeconds,
+            claiming: visible && (!claim || claim.kind === 'retry' || claimQuery.isFetching === true),
+            signInHref:
+              claim?.kind === 'sign-in'
+                ? `${ROUTES.LOGIN}?next=${encodeURIComponent(`${ROUTES.QUEUE}?event=${eventId}`)}`
+                : null,
+          }
+        : null,
+    claimNow: () => {
+      void claimQuery.refetch();
+    },
+    queueAgain: () => {
+      analyticsAdapter.trackEvent('queue_rejoin', { eventId });
+      void joinQuery.refetch();
+    },
     errorMessage,
     retry: () => {
       void joinQuery.refetch();

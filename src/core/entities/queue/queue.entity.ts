@@ -57,6 +57,18 @@ export interface QueueTurn {
   serverNow: string;
 }
 
+/** `claimTurn`: the admission for the order page (ADR-0021). */
+export interface Admission {
+  /** Opaque; sent as `X-Admission-Token` on the order calls. */
+  admissionToken: string;
+  slotId: string;
+  /** 1–3 (ADR-0024). */
+  maxTickets: number;
+  /** End of the 16-minute admission TTL: 60 s claim + 5 min order + 10 min payment. */
+  expiresAt: string;
+  serverNow: string;
+}
+
 export interface DeviceRegistration {
   /** EdDSA-signed `device+jwt`, 30 days (api/tokens.md). */
   deviceToken: string;

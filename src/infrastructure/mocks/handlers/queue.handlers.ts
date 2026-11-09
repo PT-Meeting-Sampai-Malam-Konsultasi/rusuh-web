@@ -1,7 +1,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
-import type { DeviceRegistration, Frontier, QueuePlace, QueueTurn } from '@core/entities/queue/queue.entity';
+import type { Admission, DeviceRegistration, Frontier, QueuePlace, QueueTurn } from '@core/entities/queue/queue.entity';
 
 import { eventsFixture } from '../fixtures/events.fixture';
 import { failure, problem, type MockContext } from './shared';
@@ -12,12 +12,16 @@ const PREQUEUE_MS = 9 * 60_000;
 /** The HiFi's numbers: number 19.700 joins while 18.452 is served (1.248 ahead). */
 const FIRST_SEQ = 19_700;
 const SERVED_AT_JOIN = 18_452;
+/** Every new number joins this many places back, as the first one does. */
+const AHEAD_AT_JOIN = FIRST_SEQ - SERVED_AT_JOIN;
 /** People let in per second while a sale runs: 300 a minute, so the first number's turn comes after about 4 minutes. */
 const ADMIT_PER_SECOND = 5;
 /** Devices this close to the front may stream (ADR-0015 default). */
 const STREAM_FROM = 2000;
 /** The turn window (FR-08). */
 const TURN_MS = 60_000;
+/** Admission TTL: 60 s claim + 5 min order + 10 min payment (ADR-0021). */
+const ADMISSION_MS = 16 * 60_000;
 /** The stream sends a frontier every controller tick. */
 const TICK_MS = 1000;
 /** The mock is the server, and a server outlives a page reload: its queue is kept for the tab in sessionStorage. */
@@ -30,6 +34,8 @@ interface MockPlace {
   seq: number | null;
   joinedAt: number;
   opensAt: number | null;
+  /** Set by the first claim; a repeat returns the same admission. */
+  admittedAt?: number;
 }
 
 /** One clock per event: `served` moves from the opening (or the first join) for every device alike. */
@@ -86,19 +92,48 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
     return queue;
   };
 
+  /** Where the line would be with a crowd behind the mock devices. */
+  const rawServed = (eventId: string, time: number) => {
+    const startedAt = queues.get(eventId)?.startedAt;
+    if (startedAt == null) return SERVED_AT_JOIN;
+    return SERVED_AT_JOIN + Math.floor(((time - startedAt) / 1000) * ADMIT_PER_SECOND);
+  };
+
+  /** A new number joins 1.248 places back, behind every number handed out before it. */
   const takeSeq = (eventId: string, time: number) => {
-    const seq = nextSeq.get(eventId) ?? FIRST_SEQ;
-    nextSeq.set(eventId, seq + 1);
     queueOf(eventId).startedAt ??= time;
+    // `near_front`: 20 places back, so the turn comes in about 4 s.
+    const ahead = getScenario() === 'near_front' ? 20 : AHEAD_AT_JOIN;
+    const seq = Math.max(nextSeq.get(eventId) ?? SERVED_AT_JOIN + ahead, rawServed(eventId, time) + ahead);
+    nextSeq.set(eventId, seq + 1);
     return seq;
   };
 
   /** Never past the newest number handed out: the turn comes to each mock device in order. */
-  const servedAt = (eventId: string, time: number, paused: boolean) => {
-    const startedAt = queues.get(eventId)?.startedAt;
-    if (startedAt == null || paused) return SERVED_AT_JOIN;
-    const moved = Math.floor(((time - startedAt) / 1000) * ADMIT_PER_SECOND);
-    return Math.min((nextSeq.get(eventId) ?? FIRST_SEQ) - 1, SERVED_AT_JOIN + moved);
+  const servedAt = (eventId: string, time: number, paused: boolean) =>
+    paused ? SERVED_AT_JOIN : Math.min((nextSeq.get(eventId) ?? FIRST_SEQ) - 1, rawServed(eventId, time));
+
+  /** When `served` reaches this number, and when its 60 s window ends. */
+  const turnOf = (eventId: string, seq: number) => {
+    const startedAt = queues.get(eventId)?.startedAt ?? 0;
+    const at = startedAt + Math.ceil(((seq - SERVED_AT_JOIN) / ADMIT_PER_SECOND) * 1000);
+    return { at, expiresAt: at + TURN_MS };
+  };
+
+  /** A turn that passed its window without a claim: the place is gone (MISSED). */
+  const missed = (eventId: string, place: MockPlace, time: number) =>
+    place.seq !== null && place.admittedAt === undefined && time > turnOf(eventId, place.seq).expiresAt;
+
+  /** The place of the device and queue tokens on a request, or a problem response. */
+  const placeFor = (request: Request, eventId: string) => {
+    const device = request.headers.get('X-Device-Token');
+    if (!device || !request.headers.get('X-Queue-Token')) {
+      return { error: problem(401, 'UNAUTHORIZED', 'Token antrian tidak ada') };
+    }
+    const key = `${device}|${eventId}`;
+    const place = places.get(key);
+    if (!findEvent(eventId) || !place) return { error: problem(404, 'NOT_FOUND', 'Antrian tidak ditemukan') };
+    return { key, place };
   };
 
   const findEvent = (eventId: string) =>
@@ -168,6 +203,8 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       const today = now();
       const time = today.getTime();
       let place = places.get(key);
+      // After a missed turn, joining again gives a new number at the back.
+      if (place && missed(eventId, place, time)) place = undefined;
       if (!place) {
         const queue = queueOf(eventId);
         const preopen = event.state === 'waiting_room_open' && (queue.opensAt === null || time < queue.opensAt);
@@ -247,7 +284,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
                 event: eventId,
                 seq,
                 served: frontier.served,
-                turnExpiresAt: new Date(time + TURN_MS).toISOString(),
+                turnExpiresAt: new Date(turnOf(eventId, seq).expiresAt).toISOString(),
                 serverNow: new Date(time).toISOString(),
               };
               controller.enqueue(encoder.encode(sse('turn', turn)));
@@ -263,6 +300,64 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       });
       return new HttpResponse(body, {
         headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store, no-transform' },
+      });
+    }),
+
+    http.get(`${queueApiUrl}/queue/:eventId/me`, async ({ request, params }) => {
+      const failed = await failure(getScenario());
+      if (failed) return failed;
+      const eventId = String(params.eventId);
+      const found = placeFor(request, eventId);
+      if (found.error) return found.error;
+      const { key, place } = found;
+      const time = now().getTime();
+      if (missed(eventId, place, time)) {
+        places.delete(key);
+        persist();
+        return problem(410, 'MISSED', 'Giliran terlewat');
+      }
+      const event = findEvent(eventId) as EventSummary;
+      const frontier = frontierOf(event, time);
+      const body: QueuePlace = {
+        eventId,
+        state: frontier.state,
+        seq: place.seq,
+        served: frontier.served,
+        serverNow: new Date(time).toISOString(),
+        queueToken: `mock-queue.${eventId}.${place.seq ?? 'pre'}`,
+        turnExpiresAt:
+          place.seq !== null && frontier.served >= place.seq
+            ? new Date(turnOf(eventId, place.seq).expiresAt).toISOString()
+            : null,
+      };
+      return HttpResponse.json(body);
+    }),
+
+    http.post(`${queueApiUrl}/queue/:eventId/claim`, async ({ request, params }) => {
+      const failed = await failure(getScenario());
+      if (failed) return failed;
+      // A JWT session is required (ADR-0025): a guest signs in first.
+      if (!request.headers.get('Authorization')) return problem(401, 'UNAUTHORIZED', 'Silakan masuk dulu');
+      const eventId = String(params.eventId);
+      const found = placeFor(request, eventId);
+      if (found.error) return found.error;
+      const { key, place } = found;
+      const time = now().getTime();
+      if (place.seq === null) return problem(409, 'NOT_YET', 'Belum giliran Anda');
+      if (missed(eventId, place, time)) {
+        places.delete(key);
+        persist();
+        return problem(410, 'MISSED', 'Giliran terlewat');
+      }
+      if (time < turnOf(eventId, place.seq).at) return problem(409, 'NOT_YET', 'Belum giliran Anda');
+      place.admittedAt ??= time;
+      persist();
+      return HttpResponse.json<Admission>({
+        admissionToken: `mock-admission.${eventId}.${place.seq}`,
+        slotId: `s_mock${place.seq}`,
+        maxTickets: 3,
+        expiresAt: new Date(place.admittedAt + ADMISSION_MS).toISOString(),
+        serverNow: new Date(time).toISOString(),
       });
     }),
   ];

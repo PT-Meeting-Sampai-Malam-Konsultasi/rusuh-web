@@ -1,8 +1,9 @@
 // @vitest-environment node
 // Node: Axios uses its http adapter here, so the request really leaves the app and MSW answers it.
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Admission } from '@core/entities/queue/queue.entity';
 import { DeviceService } from '@core/services/device.service';
 import { QueueService } from '@core/services/queue.service';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
@@ -57,8 +58,9 @@ describe('queue mock', () => {
     const again = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
     expect(again.seq).toBe(19700);
     expect(again.served).toBe(18502);
+    // A later number also joins 1.248 places back, behind the crowd that came in since.
     const other = (await queue.joinQueue('evt_pelita', await register(), 'ts')).data;
-    expect(other.seq).toBe(19701);
+    expect(other).toMatchObject({ seq: 19750, served: 18502 });
   });
 
   it('holds a waiting-room event in pre-queue, then draws a number at opening', async () => {
@@ -208,5 +210,65 @@ describe('queue mock', () => {
       scenario = 'stream_off';
       expect((await open('evt_pelita', { 'X-Device-Token': far, 'X-Queue-Token': queueToken })).status).toBe(409);
     }, 15_000);
+  });
+
+  describe('turn', () => {
+    const SESSION = { Authorization: 'Bearer mock' };
+    const TURN_AT = new Date('2026-11-09T03:04:09.600Z'); // 1.248 places at 5 a second
+
+    beforeEach(() => server.resetHandlers(...mockHandlers())); // a fresh queue: the first number is 19.700
+
+    const claim = (device: string, queueToken: string, session = true) =>
+      queueHttp.post<Admission>(`queue/evt_pelita/claim`, undefined, {
+        headers: { 'X-Device-Token': device, 'X-Queue-Token': queueToken, ...(session ? SESSION : {}) },
+      });
+
+    it('admits at the turn with a session, the same admission on a repeat', async () => {
+      const device = await register();
+      const { queueToken } = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+      await expect(claim(device, queueToken)).rejects.toMatchObject({ status: 409, code: 'NOT_YET' });
+      now = TURN_AT;
+      await expect(claim(device, queueToken, false)).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
+      const { data } = await claim(device, queueToken);
+      expect(data).toMatchObject({
+        admissionToken: 'mock-admission.evt_pelita.19700',
+        maxTickets: 3,
+        expiresAt: '2026-11-09T03:20:09.600Z',
+      });
+      now = new Date(TURN_AT.getTime() + 120_000);
+      expect((await claim(device, queueToken)).data).toEqual({ ...data, serverNow: now.toISOString() });
+    });
+
+    it('gives the place its 60 s window, then misses it and joins again at the back', async () => {
+      const device = await register();
+      const { queueToken } = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+      expect((await queue.getMyPlace('evt_pelita', device, queueToken)).data.turnExpiresAt).toBeNull();
+      now = TURN_AT;
+      expect((await queue.getMyPlace('evt_pelita', device, queueToken)).data).toMatchObject({
+        seq: 19700,
+        turnExpiresAt: '2026-11-09T03:05:09.600Z',
+      });
+      now = new Date(TURN_AT.getTime() + 61_000);
+      await expect(claim(device, queueToken)).rejects.toMatchObject({ status: 410, code: 'MISSED' });
+      await expect(queue.getMyPlace('evt_pelita', device, queueToken)).rejects.toMatchObject({ status: 404 });
+      const again = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+      expect(again.seq! - again.served!).toBe(1248);
+    });
+
+    it('misses on the place read too, and needs the tokens', async () => {
+      const device = await register();
+      const { queueToken } = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+      now = new Date(TURN_AT.getTime() + 61_000);
+      await expect(queue.getMyPlace('evt_pelita', device, queueToken)).rejects.toMatchObject({ code: 'MISSED' });
+      await expect(queue.getMyPlace('evt_pelita', '', '')).rejects.toMatchObject({ status: 401 });
+      await expect(claim('nobody', 'q')).rejects.toMatchObject({ status: 404 });
+    });
+  });
+
+  it('joins 20 places back in the near_front scenario, so the turn comes in seconds', async () => {
+    server.resetHandlers(...mockHandlers());
+    scenario = 'near_front';
+    const { data } = await queue.joinQueue('evt_pelita', await register(), 'ts');
+    expect(data.seq! - data.served!).toBe(20);
   });
 });

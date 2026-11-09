@@ -1,0 +1,28 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .turn-h .reg: the shout in pink over a blue plate a hair off register, on two lines when it must wrap. */
+.reg {
+  @apply relative inline-block;
+}
+
+.plate {
+  @apply absolute top-0 left-0 text-blue;
+  transform: translate(0.026em, 0.02em);
+}
+
+.face {
+  @apply relative text-pink;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .face {
+    animation: slam 0.45s var(--ease-out-print) both;
+  }
+}
+
+@keyframes slam {
+  from {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}

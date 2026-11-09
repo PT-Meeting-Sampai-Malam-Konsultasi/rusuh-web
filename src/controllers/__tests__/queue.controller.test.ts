@@ -66,6 +66,12 @@ describe('QueueController', () => {
   let eventsOptions: Record<string, unknown>;
   let frontierOptions: Record<string, unknown>;
   let frontierState: QueryState;
+  let claimOptions: Record<string, unknown>;
+  let claimState: QueryState;
+  let windowOptions: Record<string, unknown>;
+  let windowState: QueryState;
+  let visible: boolean;
+  const router = { replace: vi.fn(), push: vi.fn() };
   let streamHandlers: FollowQueueHandlers | undefined;
   const closeStream = vi.fn();
   const setQueryData = vi.fn();
@@ -89,6 +95,12 @@ describe('QueueController', () => {
       }),
     },
     useQueryClientTanstack: () => queryClient,
+    claimTurnUseCase: {
+      execute: vi.fn().mockResolvedValue('claimed'),
+      turnWindow: vi.fn().mockResolvedValue('window'),
+    },
+    useRouterNext: () => router,
+    usePageVisible: () => visible,
     getHomeEventsUseCase: { execute: vi.fn().mockResolvedValue('events') },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -96,11 +108,16 @@ describe('QueueController', () => {
     useTranslation: () => ({ t, i18n }),
     useSearchParamsNext: () => new URLSearchParams(search),
     useQueryTanstack: (options: { queryKey: unknown[] } & Record<string, unknown>) => {
-      const key = options.queryKey[0];
-      if (key === 'queue-frontier') frontierOptions = options;
-      else if (key === 'queue-place') joinOptions = options;
-      else eventsOptions = options;
-      const state = key === 'queue-frontier' ? frontierState : key === 'queue-place' ? joinState : eventsState;
+      const key = options.queryKey[0] as string;
+      const slots: Record<string, [(o: Record<string, unknown>) => void, () => QueryState]> = {
+        'queue-frontier': [(o) => (frontierOptions = o), () => frontierState],
+        'queue-place': [(o) => (joinOptions = o), () => joinState],
+        'queue-claim': [(o) => (claimOptions = o), () => claimState],
+        'queue-turn': [(o) => (windowOptions = o), () => windowState],
+      };
+      const [capture, read] = slots[key] ?? [(o) => (eventsOptions = o), () => eventsState];
+      capture(options);
+      const state = read();
       return { data: undefined, isError: false, error: null, refetch, dataUpdatedAt: 0, ...state };
     },
   });
@@ -112,6 +129,9 @@ describe('QueueController', () => {
     search = 'event=evt_pelita';
     joinState = {};
     frontierState = {};
+    claimState = {};
+    windowState = {};
+    visible = true;
     streamHandlers = undefined;
     eventsState = { data: EVENTS };
     i18n.language = 'id';
@@ -360,12 +380,13 @@ describe('QueueController', () => {
       expect(interval()).toBe(false);
     });
 
-    it('stops at the turn: last place, full track, no more polls (the claim is FR-08)', () => {
+    it('stops following at the turn: no more polls or stream, the turn view takes over', () => {
       joinState = { data: place() };
       frontierState = { data: frontier({ served: 19700, streamFrom: 2000 }) };
       const d = deps();
       const { result } = render(d);
-      expect(result.current.waiting).toMatchObject({ position: '1', progress: 100 });
+      expect(result.current.status).toBe('turn');
+      expect(result.current.waiting).toBeNull();
       expect(interval()).toBe(false);
       expect(d.followQueueUseCase.stream).not.toHaveBeenCalled();
     });
@@ -444,6 +465,128 @@ describe('QueueController', () => {
       frontierState = { data: frontier({ streamFrom: 2000 }) };
       render(d);
       expect(frontierOptions.enabled).toBe(true);
+    });
+  });
+
+  describe('turn (FR-08)', () => {
+    const atTurn = () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ served: 19700 }) };
+    };
+
+    it('claims at the turn while the page is in front, and reads the 60 s window', async () => {
+      atTurn();
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.status).toBe('turn');
+      expect(result.current.turn).toEqual({ seq: '19.700', seconds: null, claiming: true, signInHref: null });
+      expect(claimOptions).toMatchObject({
+        queryKey: ['queue-claim', 'evt_pelita', 19700],
+        enabled: true,
+        retry: false,
+        staleTime: Infinity,
+      });
+      expect(windowOptions).toMatchObject({ queryKey: ['queue-turn', 'evt_pelita', 19700], enabled: true });
+      await expect((claimOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('claimed');
+      await expect((windowOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('window');
+      expect(d.claimTurnUseCase.execute).toHaveBeenCalledWith('evt_pelita');
+    });
+
+    it('waits in a background tab, and claims nothing before the turn', () => {
+      atTurn();
+      visible = false;
+      const { result } = render();
+      expect(claimOptions.enabled).toBe(false);
+      expect(result.current.turn?.claiming).toBe(false);
+
+      visible = true;
+      joinState = { data: place() };
+      frontierState = { data: frontier() };
+      render();
+      expect(claimOptions.enabled).toBe(false);
+      expect(windowOptions.enabled).toBe(false);
+    });
+
+    it('goes on to the order page once admitted, replacing the waiting room', () => {
+      atTurn();
+      claimState = { data: { kind: 'admitted', admission: { admissionToken: 'adm' } } };
+      const d = deps();
+      render(d);
+      expect(router.replace).toHaveBeenCalledWith('/order?event=evt_pelita');
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_claim', {
+        eventId: 'evt_pelita',
+        outcome: 'admitted',
+      });
+    });
+
+    it('claims again after the retry delay, and on "Pilih tiket sekarang"', () => {
+      atTurn();
+      const { result } = render();
+      const interval = claimOptions.refetchInterval as (q: { state: { data: unknown } }) => number | false;
+      expect(interval({ state: { data: { kind: 'retry', afterMs: 1500 } } })).toBe(1500);
+      expect(interval({ state: { data: { kind: 'sign-in' } } })).toBe(false);
+      result.current.claimNow();
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    it('sends a guest to sign in, and back to this queue', () => {
+      atTurn();
+      claimState = { data: { kind: 'sign-in' } };
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.turn).toMatchObject({
+        claiming: false,
+        signInHref: '/login?next=%2Fqueue%3Fevent%3Devt_pelita',
+      });
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_claim', {
+        eventId: 'evt_pelita',
+        outcome: 'sign-in',
+      });
+    });
+
+    it('counts the 60 s down from server time, and misses the turn at 0', () => {
+      vi.useFakeTimers({ now: 1_000_000 });
+      atTurn();
+      visible = false;
+      windowState = {
+        data: { kind: 'window', turnExpiresAt: '2026-11-09T03:01:00Z', serverNow: '2026-11-09T03:00:08Z' },
+        dataUpdatedAt: 1_000_000,
+      };
+      const { result } = render();
+      expect(result.current.turn?.seconds).toBe(52);
+      act(() => vi.advanceTimersByTime(50_000));
+      expect(result.current.turn?.seconds).toBe(2);
+      act(() => vi.advanceTimersByTime(3000));
+      expect(result.current.status).toBe('missed');
+      expect(result.current.turn).toBeNull();
+    });
+
+    it.each([
+      [{ kind: 'missed' }, 'missed'],
+      [{ kind: 'paused' }, 'paused'],
+      [{ kind: 'sold-out' }, 'sold-out'],
+    ] as const)('shows the claim answer %o as %s', (data, status) => {
+      atTurn();
+      claimState = { data };
+      expect(render().result.current.status).toBe(status);
+    });
+
+    it('misses or closes from the window answer too', () => {
+      atTurn();
+      windowState = { data: { kind: 'missed' } };
+      expect(render().result.current.status).toBe('missed');
+      windowState = { data: { kind: 'sold-out' } };
+      expect(render().result.current.status).toBe('sold-out');
+    });
+
+    it('queues again at the back after a missed turn', () => {
+      atTurn();
+      claimState = { data: { kind: 'missed' } };
+      const d = deps();
+      const { result } = render(d);
+      result.current.queueAgain();
+      expect(refetch).toHaveBeenCalled();
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_rejoin', { eventId: 'evt_pelita' });
     });
   });
 });

@@ -44,4 +44,19 @@ describe('QueueService', () => {
     await expect(QueueService({ queueHttp }).getFrontier('a/b')).resolves.toBe(response);
     expect(queueHttp.get).toHaveBeenCalledWith('queue/a%2Fb/frontier');
   });
+
+  it('claims the turn and reads the place with the device and queue tokens', async () => {
+    const admission = { data: { admissionToken: 'adm' }, status: 200 };
+    queueHttp.post.mockResolvedValue(admission);
+    await expect(QueueService({ queueHttp }).claimTurn('a/b', 'd', 'q')).resolves.toBe(admission);
+    expect(queueHttp.post).toHaveBeenCalledWith('queue/a%2Fb/claim', undefined, {
+      headers: { 'X-Device-Token': 'd', 'X-Queue-Token': 'q' },
+    });
+    const place = { data: { seq: 1 }, status: 200 };
+    queueHttp.get.mockResolvedValue(place);
+    await expect(QueueService({ queueHttp }).getMyPlace('a/b', 'd', 'q')).resolves.toBe(place);
+    expect(queueHttp.get).toHaveBeenCalledWith('queue/a%2Fb/me', {
+      headers: { 'X-Device-Token': 'd', 'X-Queue-Token': 'q' },
+    });
+  });
 });
