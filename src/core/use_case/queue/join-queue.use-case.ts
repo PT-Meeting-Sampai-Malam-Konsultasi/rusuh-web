@@ -2,6 +2,8 @@ import type { QueuePlace, QueueState } from '@core/entities/queue/queue.entity';
 import { errorCodeOf, withDeviceToken } from '@core/use_case/device/with-device-token';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 
+import { positionOf, progressOf } from './place';
+
 /** The place as the waiting room needs it. */
 export interface JoinedPlace {
   eventId: string;
@@ -36,19 +38,6 @@ type Deps = Pick<
   AwilixRegistry,
   'deviceService' | 'queueService' | 'deviceTokenStore' | 'queuePlaceStore' | 'turnstile'
 >;
-
-function positionOf(seq: number | null, served: number | null): number | null {
-  return seq !== null && served !== null ? Math.max(1, seq - served) : null;
-}
-
-function progressOf(seq: number | null, served: number | null, joinedServed: number | null): number {
-  if (seq === null || served === null) return 0;
-  const start = joinedServed ?? served;
-  const span = seq - start;
-  if (span <= 0) return 0;
-  const percent = Math.min(100, Math.max(0, ((served - start) / span) * 100));
-  return Math.round(percent * 10) / 10;
-}
 
 const OUTCOMES: Readonly<Record<string, JoinQueueResult['kind']>> = {
   QUEUE_CLOSED: 'sold-out',

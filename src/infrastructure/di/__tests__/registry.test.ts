@@ -41,6 +41,7 @@ const KEYS = {
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
   joinQueueUseCase: true,
+  followQueueUseCase: true,
   refreshSessionUseCase: true,
   requestSignInCodeUseCase: true,
   verifySignInCodeUseCase: true,
@@ -97,6 +98,7 @@ describe('DI registries', () => {
     expect(typeof container.resolve('deviceService').registerDevice).toBe('function');
     expect(typeof container.resolve('queueService').joinQueue).toBe('function');
     expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
+    expect(typeof container.resolve('followQueueUseCase').poll).toBe('function');
   });
 
   it('wires the auth and account services', () => {
