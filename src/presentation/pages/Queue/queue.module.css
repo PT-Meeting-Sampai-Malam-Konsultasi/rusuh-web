@@ -1,0 +1,61 @@
+@reference "../../../styles/app.css";
+
+/* Leaves room for the phone tab bar; the desktop footer follows the content. */
+.page {
+  @apply flex min-h-screen flex-col pb-[84px];
+
+  @variant md {
+    @apply pb-0;
+  }
+}
+
+.main {
+  @apply flex-1;
+}
+
+/* Phone: banner, number, notes. Desktop: number left, tilted poster right (HiFi .wr). */
+.room {
+  @apply mx-auto max-w-[calc(1328px+112px)] px-4;
+
+  @variant md {
+    @apply grid items-start gap-x-10 px-14 pt-[30px];
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      'main aside'
+      'notes notes';
+  }
+
+  @variant lg {
+    @apply gap-x-16;
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+}
+
+.heading {
+  @apply sr-only;
+}
+
+.column {
+  @apply min-w-0;
+  grid-area: main;
+}
+
+.aside {
+  @apply -order-1;
+  grid-area: aside;
+
+  @variant md {
+    @apply order-none;
+  }
+}
+
+.notes {
+  grid-area: notes;
+}
+
+/* Phones stack: the banner goes first. */
+@media (width < 45rem) {
+  .room {
+    @apply flex flex-col;
+  }
+}

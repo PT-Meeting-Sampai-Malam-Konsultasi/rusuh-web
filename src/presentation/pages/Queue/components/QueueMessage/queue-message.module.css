@@ -1,0 +1,27 @@
+@reference "../../../../../styles/app.css";
+
+.message {
+  @apply mx-auto flex max-w-[calc(720px+32px)] flex-col gap-5 px-4 py-16;
+
+  @variant md {
+    @apply py-24;
+  }
+}
+
+.title {
+  @apply font-display text-[56px] leading-[0.86] font-extrabold;
+  font-stretch: 75%;
+  text-wrap: balance;
+
+  @variant md {
+    @apply text-[88px];
+  }
+}
+
+.body {
+  @apply max-w-[560px] text-lg text-ink-2;
+}
+
+.actions {
+  @apply mt-2 flex flex-wrap gap-4;
+}

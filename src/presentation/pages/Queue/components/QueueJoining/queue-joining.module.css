@@ -1,0 +1,32 @@
+@reference "../../../../../styles/app.css";
+
+.line {
+  @apply block h-6 w-48 bg-paper-2;
+}
+
+/* Where the number will land: the same height, breathing gently. */
+.number {
+  @apply mt-3.5 h-[120px] w-[min(320px,80%)] bg-paper-2;
+
+  @variant md {
+    @apply mt-[22px] h-[clamp(112px,17.6vw,264px)] w-[min(520px,70%)];
+  }
+}
+
+/* Turnstile renders inside; empty (and so invisible) unless a click is needed. */
+.slot {
+  @apply mt-5 empty:hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .number,
+  .line {
+    animation: breathe 1.4s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes breathe {
+  to {
+    opacity: 0.45;
+  }
+}

@@ -4,17 +4,24 @@ import type { useTranslation } from 'react-i18next';
 
 import type { AdmissionStoreProtocol } from '@core/protocols/admission-store.protocol';
 import type { AnalyticsProtocol } from '@core/protocols/analytics.protocol';
+import type { DeviceTokenStoreProtocol } from '@core/protocols/device-token-store.protocol';
 import type { HttpProtocol } from '@core/protocols/http.protocol';
+import type { QueuePlaceStoreProtocol } from '@core/protocols/queue-place-store.protocol';
 import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
+import type { TurnstileProtocol } from '@core/protocols/turnstile.protocol';
 import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
+import type { DeviceServiceInterface } from '@core/services/device.service';
+import type { QueueServiceInterface } from '@core/services/queue.service';
 import type { GetOrderCategoriesUseCaseInterface } from '@core/use_case/booking/get-order-categories.use-case';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
+import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
 import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { OrderControllerInterface } from '@controllers/order.controller';
+import type { QueueControllerInterface } from '@controllers/queue.controller';
 import type { AppConfig } from '@infrastructure/config';
 
 /** Shapes of the context hooks (implemented in src/contexts, scaffold step 5). */
@@ -47,6 +54,9 @@ export interface AwilixRegistry {
   storage: StorageProtocol;
   tokenStore: TokenStoreProtocol;
   admissionStore: AdmissionStoreProtocol;
+  deviceTokenStore: DeviceTokenStoreProtocol;
+  queuePlaceStore: QueuePlaceStoreProtocol;
+  turnstile: TurnstileProtocol;
   analyticsAdapter: AnalyticsProtocol;
   queueHttp: HttpProtocol;
   coreHttp: HttpProtocol;
@@ -70,10 +80,13 @@ export interface AwilixRegistry {
   // services
   catalogService: CatalogServiceInterface;
   bookingService: BookingServiceInterface;
+  deviceService: DeviceServiceInterface;
+  queueService: QueueServiceInterface;
 
   // use cases
   getHomeEventsUseCase: GetHomeEventsUseCaseInterface;
   getOrderCategoriesUseCase: GetOrderCategoriesUseCaseInterface;
+  joinQueueUseCase: JoinQueueUseCaseInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
@@ -82,6 +95,7 @@ export interface AwilixRegistry {
   homeController: HomeControllerInterface;
   notFoundController: NotFoundControllerInterface;
   orderController: OrderControllerInterface;
+  queueController: QueueControllerInterface;
 
   // services, use cases and more controllers are added here by /add-feature
 }

@@ -3,6 +3,7 @@ import { asFunction } from 'awilix';
 import HomeController from '@controllers/home.controller';
 import NotFoundController from '@controllers/not-found.controller';
 import OrderController from '@controllers/order.controller';
+import QueueController from '@controllers/queue.controller';
 
 import container from './container';
 
@@ -12,5 +13,6 @@ export function registerControllers() {
     homeController: asFunction(HomeController),
     notFoundController: asFunction(NotFoundController),
     orderController: asFunction(OrderController),
+    queueController: asFunction(QueueController),
   });
 }

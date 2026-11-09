@@ -3,4 +3,5 @@ export const QUERY_KEYS = {
   EVENTS: 'events',
   EVENT: 'event',
   CATEGORIES: 'categories',
+  QUEUE_PLACE: 'queue-place',
 } as const;

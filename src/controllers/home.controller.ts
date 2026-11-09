@@ -7,19 +7,12 @@ import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import type { FormatLocale } from '@utils/format/date';
 import { toEventCardView, type EventCardView } from '@utils/format/event-card';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
-import { ROUTES } from '@utils/constants/routes';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
+import { mainNav, type NavItem } from '@utils/navigation';
+
+export type { NavItem } from '@utils/navigation';
 
 export type HomeStatus = 'loading' | 'error' | 'empty' | 'ready';
-
-export interface NavItem {
-  href: string;
-  label: string;
-  icon: 'events' | 'queue' | 'tickets' | 'account';
-  current: boolean;
-  /** Shown in the desktop header too (the queue tab is phone-only). */
-  desktop: boolean;
-}
 
 export interface HomeControllerInterface {
   t: TFunction;
@@ -85,12 +78,7 @@ const HomeController = ({
   const errorCode = query.error?.code;
   const errorMessage = errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
 
-  const nav: NavItem[] = [
-    { href: ROUTES.HOME, label: t('nav_events'), icon: 'events', current: true, desktop: true },
-    { href: ROUTES.QUEUE, label: t('nav_queue'), icon: 'queue', current: false, desktop: false },
-    { href: ROUTES.TICKETS, label: t('nav_tickets'), icon: 'tickets', current: false, desktop: true },
-    { href: ROUTES.ACCOUNT, label: t('nav_account'), icon: 'account', current: false, desktop: true },
-  ];
+  const nav: NavItem[] = mainNav(t, 'events');
 
   return {
     t,

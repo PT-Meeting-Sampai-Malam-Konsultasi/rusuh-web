@@ -11,6 +11,9 @@ const KEYS = {
   storage: true,
   tokenStore: true,
   admissionStore: true,
+  deviceTokenStore: true,
+  queuePlaceStore: true,
+  turnstile: true,
   analyticsAdapter: true,
   queueHttp: true,
   coreHttp: true,
@@ -28,12 +31,16 @@ const KEYS = {
   useNetworkStatus: true,
   catalogService: true,
   bookingService: true,
+  deviceService: true,
+  queueService: true,
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
+  joinQueueUseCase: true,
   ERROR_CODE_MAP: true,
   homeController: true,
   notFoundController: true,
   orderController: true,
+  queueController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 
 describe('DI registries', () => {
@@ -58,11 +65,20 @@ describe('DI registries', () => {
     expect(typeof container.resolve('queueStream').open).toBe('function');
     expect(container.resolve('admissionStore')).toBe(container.resolve('admissionStore'));
     expect(container.resolve('bookingService')).toBe(container.resolve('bookingService'));
+    expect(container.resolve('deviceTokenStore')).toBe(container.resolve('deviceTokenStore'));
+    expect(container.resolve('queuePlaceStore')).toBe(container.resolve('queuePlaceStore'));
+    expect(typeof container.resolve('turnstile').getToken).toBe('function');
   });
 
   it('keeps the admission store empty unless the mock API is on', () => {
     const store = container.resolve('admissionStore');
     const expected = container.resolve('config').apiMock ? 'mock-admission-token' : null;
     expect(store.get('evt_never_claimed')).toBe(expected);
+  });
+
+  it('wires the queue services and the join use case', () => {
+    expect(typeof container.resolve('deviceService').registerDevice).toBe('function');
+    expect(typeof container.resolve('queueService').joinQueue).toBe('function');
+    expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
   });
 });
