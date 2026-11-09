@@ -157,10 +157,16 @@ const QueueController = ({
     staleTime: EVENTS_STALE_MS,
   });
 
-  // One join per visit: every join costs a Turnstile check, and joining again returns the same place anyway.
+  // One join per visit. A refresh or a new tab resumes the stored place (FR-10); "Antre lagi" marks the next one as a
+  // real rejoin at the back.
+  const rejoinNext = useRef(false);
   const joinQuery = useQueryTanstack<JoinQueueResult, HttpError>({
     queryKey: [QUERY_KEYS.QUEUE_PLACE, eventId],
-    queryFn: () => joinQueueUseCase.execute(eventId),
+    queryFn: () => {
+      const rejoin = rejoinNext.current;
+      rejoinNext.current = false;
+      return joinQueueUseCase.execute(eventId, { rejoin });
+    },
     enabled: hasEventId,
     staleTime: Infinity,
     gcTime: 0,
@@ -200,7 +206,11 @@ const QueueController = ({
   const frontier = frontierQuery.data?.kind === 'frontier' ? frontierQuery.data.frontier : null;
   const place = joined ? applyFrontier(joined, frontier) : null;
   const live = following && !!place && (place.state === 'open' || place.state === 'paused') && !place.turnReached;
-  const baseStatus = queueStatusFor(hasEventId, place ? { kind: 'joined', place } : result, joinQuery.isError);
+  const baseStatus = queueStatusFor(
+    hasEventId,
+    place && result?.kind === 'joined' ? { ...result, place } : result,
+    joinQuery.isError,
+  );
 
   // FR-08: at the turn, claim while the page is in front (a background tab waits; the buyer has 60 s to come back).
   // Both queries are keyed by the number, so "Antre lagi" starts clean with the new one.
@@ -236,7 +246,7 @@ const QueueController = ({
     trackedFor.current = result;
     analyticsAdapter.trackEvent('queue_join', {
       eventId,
-      outcome: result.kind,
+      outcome: result.kind === 'joined' && result.resumed ? 'resumed' : result.kind,
       state: result.kind === 'joined' ? result.place.state : 'none',
     });
   }, [result, analyticsAdapter, eventId]);
@@ -432,6 +442,7 @@ const QueueController = ({
     },
     queueAgain: () => {
       analyticsAdapter.trackEvent('queue_rejoin', { eventId });
+      rejoinNext.current = true;
       void joinQuery.refetch();
     },
     errorMessage,
