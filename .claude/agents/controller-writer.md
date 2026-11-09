@@ -25,8 +25,8 @@ The spec, `.claude/rules/controller.md`, `.claude/rules/error-handling.md`,
 - Countdowns from `expiresAt − serverNow`; polling via `refetchInterval`.
 - `useWatch`, never `watch()`. `trackPageView` in `useEffect(…, [])`.
 - No business logic or helper functions in the body.
-- Register `asFunction(Controller)` (no `.singleton()`) in `controllers.registry.ts`; every destructured key must be
-  registered somewhere.
+- Register `asFunction(Controller)` (no `.singleton()`) in `src/infrastructure/di/controllers/{page-name}.ts`, imported
+  by the page shell (not `registerAll()`); every destructured key must be registered somewhere.
 - Tests with `renderHook`, mocking every dependency; cover loading paths, error mapping and navigation.
 - Mark tasks `[x]` as you finish them.
 

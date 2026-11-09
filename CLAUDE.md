@@ -33,7 +33,7 @@ src/app/            Next.js route files: thin, server components; metadata + ren
 src/presentation/   Client screens ('use client'): page shell resolves its controller, sections are props-in/JSX-out
 src/controllers/    Page logic: factory functions that use hooks received from DI; return a typed interface
 src/core/           Pure TypeScript, zero framework: protocols/, entities/, services/, use_case/
-src/infrastructure/ Adapters, config, DI container + 4 registries, i18n
+src/infrastructure/ Adapters, config, DI container (3 shared registries + per-page controllers), i18n
 src/contexts/       Loading, popup-error, network-status providers (hooks registered in DI)
 src/styles/app.css  Tailwind entry + @theme tokens (Poster Sablon)
 ```
@@ -46,8 +46,9 @@ src/styles/app.css  Tailwind entry + @theme tokens (Poster Sablon)
 | `presentation/` | controllers via `container.resolve` | `core/` directly, infrastructure |
 | `app/` | presentation screens | everything else |
 
-DI registry order: **infrastructure → services → helpers → controllers**. Every key in `AwilixRegistry` has a
-`container.register()` call.
+DI registry order: **infrastructure → services → helpers**, in `registerAll()`. Controllers register **per page**
+(`src/infrastructure/di/controllers/<page>.ts`, imported by the page shell) so a page's libraries never load on other
+pages. Every key in `AwilixRegistry` has a `container.register()` call.
 
 ## Where the rules are
 

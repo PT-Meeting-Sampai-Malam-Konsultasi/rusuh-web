@@ -28,6 +28,7 @@ const card = (id: string, name: string): EventCardView => ({
 let controller: HomeControllerInterface;
 
 vi.mock('@infrastructure/di/container', () => ({ default: { resolve: () => controller } }));
+vi.mock('@infrastructure/di/controllers/home', () => ({}));
 
 const base = (): HomeControllerInterface => ({
   t: ((k: string) => k) as never,

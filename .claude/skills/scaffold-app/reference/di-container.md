@@ -9,8 +9,8 @@
 | `src/infrastructure/di/infrastructure.registry.ts` | adapters, `config`, framework and context hooks |
 | `src/infrastructure/di/services.registry.ts` | services and use cases (empty at first) |
 | `src/infrastructure/di/helpers.registry.ts` | `ERROR_CODE_MAP`, context-bridge helpers, pure utilities |
-| `src/infrastructure/di/controllers.registry.ts` | controllers (empty at first) |
-| `src/infrastructure/di/index.ts` | `registerAll()` calling the four in order, idempotent (guard against double registration in dev) |
+| `src/infrastructure/di/controllers/<page>.ts` | one per controller, imported by its page shell (none at first) |
+| `src/infrastructure/di/index.ts` | `registerAll()` calling the three in order, idempotent (guard against double registration in dev) |
 
 ## `infrastructure.registry.ts` (initial)
 
@@ -61,7 +61,7 @@ step 5's tasks replace them.
 - Strict order; later registries depend on earlier ones only.
 - Hooks are `asValue(realHook)` — never `asValue(null)`, never `asFunction`.
 - Controllers: no `.singleton()`. Adapters, services, use cases: `.singleton()`.
-- After every change: keys in `AwilixRegistry` = `container.register` keys across the four files.
+- After every change: keys in `AwilixRegistry` = `container.register` keys across the three registries and `di/controllers/`.
 
 ## Gate
 

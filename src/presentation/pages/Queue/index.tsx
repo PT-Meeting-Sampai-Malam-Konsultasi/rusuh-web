@@ -2,6 +2,7 @@
 
 import type { QueueControllerInterface, QueueStatus } from '@controllers/queue.controller';
 import container from '@infrastructure/di/container';
+import '@infrastructure/di/controllers/queue';
 import AppFooter from '@presentation/components/AppFooter';
 import AppHeader from '@presentation/components/AppHeader';
 import TabBar from '@presentation/components/TabBar';

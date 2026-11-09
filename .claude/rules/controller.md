@@ -67,7 +67,8 @@ the top of its render**, so the hooks inside the factory keep a stable order.
   against a deadline alone.
 - `useWatch` for reactive form values; never `watch()` (React 19 re-render issue).
 - `trackPageView` inside `useEffect(..., [])`, not in the render body.
-- Registered in `controllers.registry.ts` as `asFunction(Controller)` — **no** `.singleton()`.
+- Registered in its own `src/infrastructure/di/controllers/{page-name}.ts` as `asFunction(Controller)` — **no**
+  `.singleton()` — and that file is imported by the page shell, never by `registerAll()` (see scaffold rule).
 - File name `{page-name}.controller.ts`, never `use-…`.
 
 ## Testing

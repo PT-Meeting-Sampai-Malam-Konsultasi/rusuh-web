@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import container from '../container';
@@ -43,6 +46,9 @@ const KEYS = {
   queueController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 
+const CONTROLLERS_DIR = join(__dirname, '../controllers');
+const PAGES_DIR = join(__dirname, '../../../presentation/pages');
+
 describe('DI registries', () => {
   beforeAll(() => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '0.0.0-test');
@@ -53,6 +59,11 @@ describe('DI registries', () => {
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-test');
     registerAll();
     registerAll(); // idempotent
+  });
+
+  beforeAll(async () => {
+    // Each page shell imports its controller registration; load them all here.
+    for (const file of readdirSync(CONTROLLERS_DIR)) await import(`../controllers/${file.replace(/\.ts$/, '')}`);
   });
 
   it('registers every key of AwilixRegistry, and nothing else', () => {
@@ -80,5 +91,23 @@ describe('DI registries', () => {
     expect(typeof container.resolve('deviceService').registerDevice).toBe('function');
     expect(typeof container.resolve('queueService').joinQueue).toBe('function');
     expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
+  });
+
+  it('has every page shell import the registration of the controller it resolves', () => {
+    const registered = new Map(
+      readdirSync(CONTROLLERS_DIR).map((file) => {
+        const code = readFileSync(join(CONTROLLERS_DIR, file), 'utf8');
+        return [code.match(/register\(\{ (\w+):/)?.[1], file.replace(/\.ts$/, '')];
+      }),
+    );
+    for (const page of readdirSync(PAGES_DIR)) {
+      const shell = readFileSync(join(PAGES_DIR, page, 'index.tsx'), 'utf8');
+      for (const [, key] of shell.matchAll(/container\.resolve<\w+>\('(\w+Controller)'\)/g)) {
+        expect(registered.get(key), `${key} has no file in di/controllers`).toBeDefined();
+        expect(shell, `${page} must import its controller registration`).toContain(
+          `import '@infrastructure/di/controllers/${registered.get(key)}';`,
+        );
+      }
+    }
   });
 });
