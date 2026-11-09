@@ -31,5 +31,5 @@ registration and tests. Writer: controller-writer. Depends on specs 12 and 13. N
   `?mock=admission_invalid` exercises the redirect.
 - The admission store is in memory only, so a refresh on `/order` sends the buyer to the waiting room. Resuming is
   NFR-02-W1 / FR-10-W1.
-- Deferred: price and availability (FR-12-W1), steppers and `min(maxTicketsPerOrder, reservedUnits)` (FR-13-W1),
+- Deferred: price and availability (FR-12-W1), steppers and `min(maxTicketsPerOrder, maxTickets)` (FR-13-W1),
   summary and hold (FR-14-W1), NIK (FR-15-W1), countdown and time's-up (FR-17/18-W1), login sheet on 401 (NFR-07-W2).

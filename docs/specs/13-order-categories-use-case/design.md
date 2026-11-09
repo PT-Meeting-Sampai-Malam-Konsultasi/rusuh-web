@@ -74,7 +74,7 @@ export type OrderCategoriesResult =
       kind: 'ok';
       categories: Category[];
       maxTicketsPerOrder: number;
-      reservedUnits: number;
+      maxTickets: number;
       adminFee: Money;
       /** End of the 5-minute order window (ADR-0005); the timer (FR-17-W1) uses expiresAt − serverNow. */
       expiresAt: string;

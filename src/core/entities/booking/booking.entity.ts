@@ -25,8 +25,8 @@ export interface GetCategoriesResponse {
   categories: Category[];
   /** Policy maximum per order (N-1). */
   maxTicketsPerOrder: number;
-  /** Units reserved for this admission, 1–3 (ADR-0004); the order may not exceed it. */
-  reservedUnits: number;
+  /** Maximum tickets this admission allows, 1–3 (ADR-0024); the order may not exceed it. */
+  maxTickets: number;
   /** Fixed amount per order, not per ticket (ADR-0010); shown as "Biaya layanan". */
   adminFee: Money;
   /** End of the 5-minute order window. */

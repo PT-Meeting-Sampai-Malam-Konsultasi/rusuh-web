@@ -17,7 +17,7 @@ First spec of FR-11-W1.
 | Category           | One seat category of an event as `getCategories` returns it (`openapi.yaml` `Category`): name, description, seating, price, availability |
 | Admission token    | `X-Admission-Token`, an `admission+jwt` from `claimTurn` (queue), valid for the 5-minute order window (ADR-0005, `api/tokens.md`)        |
 | Admission store    | In-memory map `eventId → admission token`; filled by FR-08-W1 (claimTurn), read by the order page                                        |
-| reservedUnits      | Units the queue reserved for this admission, 1–3 (ADR-0004); the order may not exceed it                                                 |
+| maxTickets         | Maximum tickets this admission allows, 1–3 (ADR-0024); the order may not exceed it                                                       |
 | maxTicketsPerOrder | Policy maximum per order (N-1), 3                                                                                                        |
 | Mock token         | Placeholder token the admission store returns for any event when `config.apiMock` is true, so `/order` works in dev without the queue    |
 
@@ -96,7 +96,7 @@ SO THAT every state of `/order` can be seen locally with `?mock=<scenario>`
 - SHALL answer `GET {core}/events/:eventId` with the matching event from `eventsFixture(now)`, and with a 404 problem
   `NOT_FOUND` for an unknown id (also under the `empty` scenario, where no event exists)
 - SHALL answer `GET {core}/events/:eventId/categories` with the four HiFi categories (Festival A, Festival B, Tribun
-  Bawah, Tribun Atas), descriptions in ID or EN from `Accept-Language`, `maxTicketsPerOrder` 3, `reservedUnits` 3,
+  Bawah, Tribun Atas), descriptions in ID or EN from `Accept-Language`, `maxTicketsPerOrder` 3, `maxTickets` 3,
   `adminFee` Rp 10.000, `serverNow` = now, `expiresAt` = now + 5 minutes
 - WHEN the `X-Admission-Token` header is missing or empty THEN the categories handler SHALL answer 403
   `ADMISSION_INVALID`

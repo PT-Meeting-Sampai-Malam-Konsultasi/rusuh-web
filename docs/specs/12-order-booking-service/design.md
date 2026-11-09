@@ -167,8 +167,8 @@ export interface GetCategoriesResponse {
   categories: Category[];
   /** Policy maximum per order (N-1). */
   maxTicketsPerOrder: number;
-  /** Units reserved for this admission, 1–3 (ADR-0004); the order may not exceed it. */
-  reservedUnits: number;
+  /** Maximum tickets this admission allows, 1–3 (ADR-0024); the order may not exceed it. */
+  maxTickets: number;
   /** Fixed amount per order, not per ticket (ADR-0010); shown as "Biaya layanan". */
   adminFee: Money;
   /** End of the 5-minute order window. */
@@ -188,7 +188,7 @@ Mock fixture (from `../rusuh-documentation/analysis/hifi/src/detail.html`):
 | `cat_tribun_bawah` | Tribun Bawah | seated   | 650000  | `almost_gone`       | Duduk · bebas pilih kursi di tribun bawah | Seated · any free seat in the lower stand |
 | `cat_tribun_atas`  | Tribun Atas  | seated   | 450000  | `available`         | Duduk · bebas pilih kursi di tribun atas  | Seated · any free seat in the upper stand |
 
-Response wrapper: `eventId` from the path, `maxTicketsPerOrder: 3`, `reservedUnits: 3`,
+Response wrapper: `eventId` from the path, `maxTicketsPerOrder: 3`, `maxTickets: 3`,
 `adminFee: { amount: 10000, currency: 'IDR' }`, `serverNow: now()`, `expiresAt: now() + 5 min`. Locale: `en` when
 `Accept-Language` starts with `en`, else `id`.
 

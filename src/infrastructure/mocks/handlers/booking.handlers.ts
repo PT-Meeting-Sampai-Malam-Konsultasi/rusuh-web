@@ -30,7 +30,7 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
         eventId,
         categories,
         maxTicketsPerOrder: 3,
-        reservedUnits: 3,
+        maxTickets: 3,
         adminFee: { amount: 10000, currency: 'IDR' },
         expiresAt: new Date(today.getTime() + ORDER_WINDOW_MS).toISOString(),
         serverNow: today.toISOString(),

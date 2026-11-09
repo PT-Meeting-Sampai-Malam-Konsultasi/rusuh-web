@@ -24,4 +24,4 @@ data through, re-throw everything else; registration and tests. Writer: use-case
 - Gate: `npm run typecheck && npm run lint && npx vitest --run` (coverage ≥ 85% for the use case).
 - No expiry check here (`expiresAt <= serverNow`): the time's-up sheet is FR-17-W1 / FR-18-W1. The server rejects an
   expired token with `ADMISSION_INVALID`, which this use case already classifies.
-- No `min(maxTicketsPerOrder, reservedUnits)` here: the order limit belongs to the stepper use case of FR-13-W1.
+- No `min(maxTicketsPerOrder, maxTickets)` here: the order limit belongs to the stepper use case of FR-13-W1.

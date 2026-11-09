@@ -47,7 +47,7 @@ SO THAT the page and the later steppers and timer (FR-13, FR-17) use the server'
 
 #### Acceptance Criteria
 
-- WHEN the call succeeds THEN SHALL return `{ kind: 'ok', categories, maxTicketsPerOrder, reservedUnits, adminFee,
+- WHEN the call succeeds THEN SHALL return `{ kind: 'ok', categories, maxTicketsPerOrder, maxTickets, adminFee,
 expiresAt, serverNow }` from the response, in the server's order, without mutating it
 - SHALL call `bookingService.getCategories(eventId, admissionToken)` exactly once per `execute`
 - WHEN the service rejects with any other error (`UNAUTHORIZED`, `NETWORK_ERROR`, `TIMEOUT`, `INTERNAL_ERROR`,
