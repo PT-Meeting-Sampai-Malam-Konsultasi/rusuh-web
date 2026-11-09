@@ -107,9 +107,9 @@ describe('queue mock', () => {
     await expect(queue.joinQueue('evt_pelita', 'd', 'ts')).rejects.toMatchObject({ status: 503 });
   });
 
-  it('keeps the queue for the tab, so a reload shows the same number and how far the line moved', async () => {
+  it('keeps the queue across a reload or a new tab, so the number stays and the line has moved', async () => {
     const saved = new Map<string, string>();
-    vi.stubGlobal('sessionStorage', {
+    vi.stubGlobal('localStorage', {
       getItem: (key: string) => saved.get(key) ?? null,
       setItem: (key: string, value: string) => saved.set(key, value),
     });
@@ -118,7 +118,7 @@ describe('queue mock', () => {
     const first = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
 
     now = new Date(now.getTime() + 120_000);
-    server.resetHandlers(...mockHandlers()); // a page reload: a fresh mock, same tab
+    server.resetHandlers(...mockHandlers()); // a reload or a new tab: a fresh mock, same storage
     const reloaded = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
     expect(reloaded.seq).toBe(first.seq);
     expect(reloaded.served).toBe((first.served ?? 0) + 600);
@@ -288,8 +288,22 @@ describe('queue mock', () => {
     scenario = 'stream_off'; // not a placement: same number
     expect((await queue.joinQueue('evt_pelita', device, 'ts')).data.seq).toBe(far.seq);
     scenario = 'near_front';
+    // A resumed page reads the place first: the old queue is gone, so it joins the new one.
+    await expect(queue.getMyPlace('evt_pelita', device, far.queueToken)).rejects.toMatchObject({ status: 404 });
     const near = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
     expect(near.seq! - near.served!).toBe(20);
     expect((await queue.joinQueue('evt_pelita', device, 'ts')).data.seq).toBe(near.seq);
+  });
+
+  it('reads the place back with the tokens, drawing the number at opening as a join would', async () => {
+    server.resetHandlers(...mockHandlers());
+    const device = await register();
+    const pre = (await queue.joinQueue('evt_samudra', device, 'ts')).data;
+    const before = (await queue.getMyPlace('evt_samudra', device, pre.queueToken)).data;
+    expect(before).toMatchObject({ state: 'preopen', seq: null, opensAt: '2026-11-09T03:09:00.000Z' });
+    now = new Date('2026-11-09T03:09:05Z');
+    const drawn = (await queue.getMyPlace('evt_samudra', device, pre.queueToken)).data;
+    expect(drawn).toMatchObject({ state: 'open', seq: 19700, served: 18452 + 25 });
+    expect((await queue.joinQueue('evt_samudra', device, 'ts')).data.seq).toBe(19700);
   });
 });

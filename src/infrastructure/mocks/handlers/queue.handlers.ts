@@ -24,7 +24,10 @@ const TURN_MS = 60_000;
 const ADMISSION_MS = 16 * 60_000;
 /** The stream sends a frontier every controller tick. */
 const TICK_MS = 1000;
-/** The mock is the server, and a server outlives a page reload: its queue is kept for the tab in sessionStorage. */
+/**
+ * The mock is the server: its queue outlives a reload and is shared by the tabs, as a server would be (FR-10), so it is
+ * kept in localStorage. Switching the placement scenario starts an event's queue over.
+ */
 const STATE_KEY = 'rusuh.mock.queue';
 
 const base64url = (value: object) =>
@@ -55,7 +58,7 @@ interface MockQueueState {
 
 const loadState = (): MockQueueState | null => {
   try {
-    const saved = globalThis.sessionStorage?.getItem(STATE_KEY);
+    const saved = globalThis.localStorage?.getItem(STATE_KEY);
     return saved ? (JSON.parse(saved) as MockQueueState) : null;
   } catch {
     return null; // Storage blocked or unreadable: start an empty queue.
@@ -64,7 +67,7 @@ const loadState = (): MockQueueState | null => {
 
 const saveState = (state: MockQueueState) => {
   try {
-    globalThis.sessionStorage?.setItem(STATE_KEY, JSON.stringify(state));
+    globalThis.localStorage?.setItem(STATE_KEY, JSON.stringify(state));
   } catch {
     // Storage blocked: the queue lives until the next reload.
   }
@@ -75,7 +78,7 @@ const sse = (event: string, data: object, id?: number) =>
 
 /**
  * The queue service as the waiting room sees it: device registration, an idempotent join per device and event, the
- * public frontier and the stream near the front. Kept for the tab (see STATE_KEY), so a refresh keeps the number.
+ * public frontier and the stream near the front. Kept across reloads and tabs (see STATE_KEY), so the number stays.
  */
 export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): HttpHandler[] {
   const saved = loadState();
@@ -140,6 +143,13 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
     return { at, expiresAt: at + TURN_MS };
   };
 
+  /** The draw: once the room opens, a waiting place gets its number; the line starts moving at the opening. */
+  const draw = (eventId: string, place: MockPlace, time: number) => {
+    if (place.seq !== null || place.opensAt === null || time < place.opensAt) return;
+    place.seq = takeSeq(eventId, place.opensAt);
+    place.joinedAt = time;
+  };
+
   /** A turn that passed its window without a claim: the place is gone (MISSED). */
   const missed = (eventId: string, place: MockPlace, time: number) =>
     place.seq !== null && place.admittedAt === undefined && time > turnOf(eventId, place.seq).expiresAt;
@@ -150,6 +160,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
     if (!device || !request.headers.get('X-Queue-Token')) {
       return { error: problem(401, 'UNAUTHORIZED', 'Token antrian tidak ada') };
     }
+    restartOnNewPlacement(eventId);
     const key = `${device}|${eventId}`;
     const place = places.get(key);
     if (!findEvent(eventId) || !place) return { error: problem(404, 'NOT_FOUND', 'Antrian tidak ditemukan') };
@@ -237,11 +248,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
         };
         places.set(key, place);
       }
-      // The draw: once the room opens, the waiting device gets its number; the line starts moving at the opening.
-      if (place.seq === null && place.opensAt !== null && time >= place.opensAt) {
-        place.seq = takeSeq(eventId, place.opensAt);
-        place.joinedAt = time;
-      }
+      draw(eventId, place, time);
       persist();
 
       const body: QueuePlace = {
@@ -337,11 +344,14 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
         persist();
         return problem(410, 'MISSED', 'Giliran terlewat');
       }
+      draw(eventId, place, time);
+      persist();
       const event = findEvent(eventId) as EventSummary;
       const frontier = frontierOf(event, time);
       const body: QueuePlace = {
         eventId,
-        state: frontier.state,
+        state: place.seq === null ? 'preopen' : frontier.state,
+        ...(place.seq === null && place.opensAt !== null ? { opensAt: new Date(place.opensAt).toISOString() } : {}),
         seq: place.seq,
         served: frontier.served,
         serverNow: new Date(time).toISOString(),
