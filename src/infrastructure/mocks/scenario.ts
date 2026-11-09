@@ -2,7 +2,7 @@
  * Mock scenarios, picked with `?mock=<name>` on any page (kept for the tab in sessionStorage, `?mock=ok` resets).
  * Lets QA see every state without a backend.
  */
-export const MOCK_SCENARIOS = ['ok', 'empty', 'sold_out', 'slow', 'error', 'offline'] as const;
+export const MOCK_SCENARIOS = ['ok', 'empty', 'sold_out', 'slow', 'error', 'offline', 'admission_invalid'] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];
 

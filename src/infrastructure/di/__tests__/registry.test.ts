@@ -10,6 +10,7 @@ const KEYS = {
   config: true,
   storage: true,
   tokenStore: true,
+  admissionStore: true,
   analyticsAdapter: true,
   queueHttp: true,
   coreHttp: true,
@@ -26,10 +27,13 @@ const KEYS = {
   usePopupError: true,
   useNetworkStatus: true,
   catalogService: true,
+  bookingService: true,
   getHomeEventsUseCase: true,
+  getOrderCategoriesUseCase: true,
   ERROR_CODE_MAP: true,
   homeController: true,
   notFoundController: true,
+  orderController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 
 describe('DI registries', () => {
@@ -52,5 +56,13 @@ describe('DI registries', () => {
     expect(container.resolve('coreHttp')).toBe(container.resolve('coreHttp'));
     expect(container.resolve('config').coreApiUrl).toBe('https://core.test/v1');
     expect(typeof container.resolve('queueStream').open).toBe('function');
+    expect(container.resolve('admissionStore')).toBe(container.resolve('admissionStore'));
+    expect(container.resolve('bookingService')).toBe(container.resolve('bookingService'));
+  });
+
+  it('keeps the admission store empty unless the mock API is on', () => {
+    const store = container.resolve('admissionStore');
+    const expected = container.resolve('config').apiMock ? 'mock-admission-token' : null;
+    expect(store.get('evt_never_claimed')).toBe(expected);
   });
 });

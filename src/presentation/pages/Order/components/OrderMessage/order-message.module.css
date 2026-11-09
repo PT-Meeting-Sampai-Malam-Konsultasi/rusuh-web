@@ -1,0 +1,48 @@
+@reference "../../../../../styles/app.css";
+
+.message {
+  @apply flex flex-col gap-4 pt-6;
+
+  @variant md {
+    @apply gap-5 pt-10;
+  }
+}
+
+.title {
+  @apply font-display text-[40px] leading-[0.92] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+
+  @variant md {
+    font-size: clamp(40px, 5vw, 64px);
+  }
+}
+
+.body {
+  @apply max-w-[560px] text-base text-ink-2;
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+.actions {
+  @apply mt-2 flex flex-wrap items-center gap-5;
+}
+
+.link {
+  @apply inline-flex min-h-11 items-center font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}

@@ -1,0 +1,61 @@
+@reference "../../../../../styles/app.css";
+
+.header {
+  @apply flex items-center gap-3.5;
+
+  @variant md {
+    @apply gap-[22px];
+  }
+}
+
+.art {
+  @apply flex-none;
+}
+
+.text {
+  @apply min-w-0;
+}
+
+.title {
+  @apply font-display text-[30px] leading-[0.92] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+
+  @variant md {
+    @apply text-5xl;
+  }
+}
+
+/* Subtitle under the name on phones, beside it from 720px. */
+.subtitle {
+  @apply mt-1 block text-[0.55em] text-pink-ink;
+  font-stretch: 85%;
+
+  @variant md {
+    @apply mt-0 ml-1.5 inline text-[0.5em];
+  }
+}
+
+.meta {
+  @apply mt-1 text-[13px] leading-normal text-ink-2;
+
+  @variant md {
+    @apply mt-2 text-[15px];
+  }
+}
+
+/* Print pass on first entry: the event header first, then the categories (60ms stagger). */
+@media (prefers-reduced-motion: no-preference) {
+  .header {
+    animation: rise 0.45s var(--ease-print) both;
+    animation-delay: 120ms;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}

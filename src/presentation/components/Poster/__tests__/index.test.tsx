@@ -29,4 +29,36 @@ describe('Poster', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', '/posters/deru.webp');
     expect(screen.getByText('Deru')).toBeInTheDocument();
   });
+
+  it('prints only the title at thumb size', () => {
+    render(
+      <Poster
+        tone="blue"
+        size="thumb"
+        title="Samudra"
+        kicker="Rusuh menghadirkan"
+        subtitle="Tur Gelombang 2026"
+        meta={{ date: '12.12.26', place: 'GBK' }}
+      />,
+    );
+    expect(screen.getByText('SAMUDRA')).toBeInTheDocument();
+    expect(screen.queryByText('Rusuh menghadirkan')).toBeNull();
+    expect(screen.queryByText('Tur Gelombang 2026')).toBeNull();
+    expect(screen.queryByText('12.12.26')).toBeNull();
+  });
+
+  it('loads thumb artwork eagerly at its own size when asked', () => {
+    const { container } = render(
+      <Poster tone="blue" size="thumb" title="Samudra" imageUrl="/posters/samudra.webp" loading="eager" />,
+    );
+    const img = container.querySelector('img');
+    expect(img).toHaveAttribute('loading', 'eager');
+    expect(img).toHaveAttribute('width', '84');
+    expect(img).toHaveAttribute('height', '104');
+  });
+
+  it('lazy-loads artwork by default', () => {
+    const { container } = render(<Poster tone="pink" size="card" title="Deru" imageUrl="/posters/deru.webp" />);
+    expect(container.querySelector('img')).toHaveAttribute('loading', 'lazy');
+  });
 });
