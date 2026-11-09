@@ -1,0 +1,96 @@
+@reference "../../../../../styles/app.css";
+
+.section {
+  @apply mt-[34px];
+
+  @variant md {
+    @apply mt-[52px];
+  }
+}
+
+/* Heading over the note on phones; side by side from 720px. Ink rule under both. */
+.head {
+  @apply flex flex-col gap-1.5 border-b-[2.5px] border-ink pb-3;
+
+  @variant md {
+    @apply flex-row items-baseline justify-between gap-8;
+  }
+}
+
+.heading {
+  @apply font-display text-[26px] leading-none font-bold;
+  font-stretch: 85%;
+
+  @variant md {
+    font-size: clamp(28px, 3vw, 40px);
+  }
+}
+
+.badge {
+  @apply mr-2.5 inline-grid size-7 place-items-center bg-ink font-display text-lg leading-none font-extrabold text-paper;
+  font-stretch: 75%;
+  vertical-align: 3px;
+
+  @variant md {
+    @apply mr-3.5 size-9 text-[22px];
+    vertical-align: 4px;
+  }
+}
+
+.note {
+  @apply text-[13px] leading-normal text-ink-2;
+
+  @variant md {
+    @apply max-w-[420px] text-right text-sm;
+  }
+}
+
+.list {
+  @apply list-none;
+}
+
+/* One-column grid now; price, status and stepper columns join it in FR-12/13-W1. */
+.row {
+  @apply grid items-center gap-5 border-b border-hair py-3.5;
+  grid-template-columns: minmax(0, 1fr);
+
+  @variant md {
+    @apply py-[18px];
+  }
+}
+
+.name {
+  @apply min-w-0;
+}
+
+.title {
+  @apply font-display text-[19px] leading-[1.1] font-bold;
+  font-stretch: 85%;
+
+  @variant md {
+    @apply text-[22px];
+  }
+}
+
+.description {
+  @apply mt-[3px] text-[13px] text-ink-2;
+
+  @variant md {
+    @apply text-sm;
+  }
+}
+
+/* Rises 60ms after the event header. */
+@media (prefers-reduced-motion: no-preference) {
+  .section {
+    animation: rise 0.45s var(--ease-print) both;
+    animation-delay: 180ms;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}

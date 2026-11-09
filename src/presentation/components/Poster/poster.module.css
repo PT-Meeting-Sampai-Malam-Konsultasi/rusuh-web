@@ -199,3 +199,28 @@
     }
   }
 }
+
+/* Thumb: the order page event header. Title only, small halftone. */
+.thumb {
+  @apply h-[72px] w-[58px] flex-none;
+  box-shadow: 3px 3px 0 var(--color-ink);
+  --title-size: 13px;
+
+  &::before {
+    background-size: 8px 8px;
+  }
+
+  .inner {
+    @apply justify-end px-1.5 py-2;
+  }
+
+  .title {
+    overflow-wrap: normal;
+  }
+
+  @variant md {
+    @apply h-[104px] w-[84px];
+    box-shadow: var(--shadow-off-s);
+    --title-size: 19px;
+  }
+}

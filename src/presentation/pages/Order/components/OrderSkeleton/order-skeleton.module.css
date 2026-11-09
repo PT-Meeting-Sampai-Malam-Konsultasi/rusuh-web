@@ -1,0 +1,140 @@
+@reference "../../../../../styles/app.css";
+
+/* Route fallback: same box sizes as the page shell (order.module.css) and FlowHeader. */
+.page {
+  @apply flex min-h-screen flex-col;
+}
+
+.headerBar {
+  @apply sticky top-0 z-20 h-[62.5px] border-b-[2.5px] border-ink bg-paper;
+
+  @variant md {
+    @apply h-[82.5px];
+  }
+}
+
+.main {
+  @apply mx-auto w-full max-w-[calc(1328px+112px)] flex-1 px-4 pt-[18px] pb-12;
+
+  @variant md {
+    @apply grid items-start gap-10 px-14 pt-10 pb-20;
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+
+  @variant lg {
+    @apply gap-[72px];
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+}
+
+.flowMain {
+  @apply min-w-0;
+}
+
+.srOnly {
+  @apply sr-only;
+}
+
+.event {
+  @apply flex items-center gap-3.5;
+
+  @variant md {
+    @apply gap-[22px];
+  }
+}
+
+.thumb,
+.title,
+.line,
+.heading,
+.note,
+.name,
+.description {
+  @apply block bg-paper-2;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+}
+
+.thumb {
+  @apply h-[72px] w-[58px] flex-none;
+
+  @variant md {
+    @apply h-[104px] w-[84px];
+  }
+}
+
+.lines {
+  @apply flex min-w-0 flex-1 flex-col gap-2;
+}
+
+.title {
+  @apply h-7 w-3/5 max-w-[360px];
+
+  @variant md {
+    @apply h-11;
+  }
+}
+
+.line {
+  @apply h-3.5 w-full max-w-[420px];
+}
+
+.section {
+  @apply mt-[34px] block;
+
+  @variant md {
+    @apply mt-[52px];
+  }
+}
+
+.head {
+  @apply flex flex-col gap-1.5 border-b-[2.5px] border-ink pb-3;
+
+  @variant md {
+    @apply flex-row items-center justify-between gap-8;
+  }
+}
+
+.heading {
+  @apply h-7 w-40;
+
+  @variant md {
+    @apply h-10 w-56;
+  }
+}
+
+.note {
+  @apply h-3.5 w-full max-w-[420px];
+
+  @variant md {
+    @apply w-80;
+  }
+}
+
+.row {
+  @apply flex flex-col gap-1.5 border-b border-hair py-3.5;
+
+  @variant md {
+    @apply py-[18px];
+  }
+}
+
+.name {
+  @apply h-5 w-40;
+
+  @variant md {
+    @apply h-6;
+  }
+}
+
+.description {
+  @apply h-3.5 w-64 max-w-full;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

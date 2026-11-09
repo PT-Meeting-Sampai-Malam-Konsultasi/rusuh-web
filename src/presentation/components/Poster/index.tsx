@@ -4,7 +4,8 @@ export type PosterTone = 'blue' | 'pink' | 'paper' | 'ink';
 
 interface PosterProps {
   tone: PosterTone;
-  size: 'hero' | 'card';
+  /** 'thumb': the order page header (58×72 phone, 84×104 from 720px), title only. */
+  size: 'hero' | 'card' | 'thumb';
   title: string;
   kicker?: string;
   subtitle?: string;
@@ -14,7 +15,11 @@ interface PosterProps {
   /** The hero poster carries the page's h1. */
   titleAs?: 'h1' | 'p';
   titleId?: string;
+  /** Above-the-fold artwork (the order page thumb) loads eagerly. */
+  loading?: 'lazy' | 'eager';
 }
+
+const IMAGE_SIZE = { hero: [400, 500], card: [400, 500], thumb: [84, 104] } as const;
 
 /** Screen-printed event poster: halftone, condensed title, tilted subtitle plate. Generated when there is no artwork. */
 export default function Poster({
@@ -27,21 +32,24 @@ export default function Poster({
   meta,
   titleAs: Title = 'p',
   titleId,
+  loading = 'lazy',
 }: PosterProps) {
+  const [width, height] = IMAGE_SIZE[size];
+  const thumb = size === 'thumb';
   return (
     <div className={`${styles.poster} ${styles[tone]} ${styles[size]}`}>
       {imageUrl ? (
         <>
           {/* Event artwork from the API: next/image has no optimizer in export mode. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className={styles.image} src={imageUrl} alt="" width={400} height={500} loading="lazy" />
+          <img className={styles.image} src={imageUrl} alt="" width={width} height={height} loading={loading} />
           <Title className={styles.srOnly} id={titleId}>
             {title}
           </Title>
         </>
       ) : (
         <div className={styles.inner}>
-          {kicker && <span className={styles.kicker}>{kicker}</span>}
+          {kicker && !thumb && <span className={styles.kicker}>{kicker}</span>}
           {size === 'hero' && (
             <svg className={styles.waves} viewBox="0 0 400 150" aria-hidden="true">
               <g fill="none" strokeWidth="9" strokeLinecap="square">
@@ -54,8 +62,8 @@ export default function Poster({
           <Title className={styles.title} id={titleId}>
             {title.toUpperCase()}
           </Title>
-          {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
-          {meta && (
+          {subtitle && !thumb && <span className={styles.subtitle}>{subtitle}</span>}
+          {meta && !thumb && (
             <div className={styles.meta}>
               <b>{meta.date}</b>
               <span>{meta.place}</span>
