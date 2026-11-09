@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
+import type { Frontier } from '@core/entities/queue/queue.entity';
+import type { FollowQueueHandlers } from '@core/use_case/queue/follow-queue.use-case';
 import type { HomeEvents } from '@core/use_case/catalog/get-home-events.use-case';
 import type { JoinedPlace, JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
 
@@ -39,6 +41,19 @@ const place = (extra: Partial<JoinedPlace> = {}): JoinQueueResult => ({
   },
 });
 
+const frontier = (patch: Partial<Frontier> = {}) => ({
+  kind: 'frontier' as const,
+  frontier: {
+    event: 'evt_pelita',
+    state: 'open' as const,
+    served: 18452,
+    ratePerMin: 300,
+    streamFrom: 0,
+    ts: 1,
+    ...patch,
+  },
+});
+
 interface QueryState {
   data?: unknown;
   isError?: boolean;
@@ -49,6 +64,12 @@ interface QueryState {
 describe('QueueController', () => {
   let joinOptions: Record<string, unknown>;
   let eventsOptions: Record<string, unknown>;
+  let frontierOptions: Record<string, unknown>;
+  let frontierState: QueryState;
+  let streamHandlers: FollowQueueHandlers | undefined;
+  const closeStream = vi.fn();
+  const setQueryData = vi.fn();
+  const queryClient = { setQueryData };
   let joinState: QueryState;
   let eventsState: QueryState;
   let search: string;
@@ -60,6 +81,14 @@ describe('QueueController', () => {
   );
   const deps = () => ({
     joinQueueUseCase: { execute: vi.fn().mockResolvedValue('joined') },
+    followQueueUseCase: {
+      poll: vi.fn().mockResolvedValue('frontier'),
+      stream: vi.fn((_eventId: string, handlers: FollowQueueHandlers) => {
+        streamHandlers = handlers;
+        return closeStream;
+      }),
+    },
+    useQueryClientTanstack: () => queryClient,
     getHomeEventsUseCase: { execute: vi.fn().mockResolvedValue('events') },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -67,10 +96,11 @@ describe('QueueController', () => {
     useTranslation: () => ({ t, i18n }),
     useSearchParamsNext: () => new URLSearchParams(search),
     useQueryTanstack: (options: { queryKey: unknown[] } & Record<string, unknown>) => {
-      const isJoin = options.queryKey[0] === 'queue-place';
-      if (isJoin) joinOptions = options;
+      const key = options.queryKey[0];
+      if (key === 'queue-frontier') frontierOptions = options;
+      else if (key === 'queue-place') joinOptions = options;
       else eventsOptions = options;
-      const state = isJoin ? joinState : eventsState;
+      const state = key === 'queue-frontier' ? frontierState : key === 'queue-place' ? joinState : eventsState;
       return { data: undefined, isError: false, error: null, refetch, dataUpdatedAt: 0, ...state };
     },
   });
@@ -81,6 +111,8 @@ describe('QueueController', () => {
     vi.clearAllMocks();
     search = 'event=evt_pelita';
     joinState = {};
+    frontierState = {};
+    streamHandlers = undefined;
     eventsState = { data: EVENTS };
     i18n.language = 'id';
   });
@@ -120,10 +152,17 @@ describe('QueueController', () => {
   });
 
   it('shows the place: position, progress and both numbers, formatted', () => {
-    joinState = { data: place() };
+    joinState = { data: place(), dataUpdatedAt: Date.now() };
     const { result } = render();
     expect(result.current.status).toBe('waiting');
-    expect(result.current.waiting).toEqual({ position: '1.248', progress: 45.7, served: '18.452', seq: '19.700' });
+    expect(result.current.waiting).toEqual({
+      position: '1.248',
+      progress: 45.7,
+      served: '18.452',
+      seq: '19.700',
+      updated: 'queue_updated_now',
+      rate: null,
+    });
     expect(result.current.event).toMatchObject({
       name: 'Pelita',
       kicker: 'queue_kicker_open',
@@ -186,7 +225,7 @@ describe('QueueController', () => {
     expect(result.current.event?.kicker).toBe('queue_kicker_paused');
 
     search = 'event=evt_pelita';
-    joinState = { data: place({ state: 'paused', position: null }) };
+    joinState = { data: place({ state: 'paused', seq: null, served: null, position: null }) };
     const other = render();
     expect(other.result.current.paused).toEqual({ position: null, reason: 'queue_paused_operator' });
   });
@@ -251,5 +290,160 @@ describe('QueueController', () => {
     expect(changeLanguage).toHaveBeenCalledWith('en');
     expect(result.current.nav.find((item) => item.current)?.icon).toBe('queue');
     expect(result.current.homeHref).toBe('/');
+  });
+
+  describe('live updates (FR-07)', () => {
+    const interval = (dataUpdatedAt = 500) =>
+      (frontierOptions.refetchInterval as (q: { state: { data: unknown; dataUpdatedAt: number } }) => number | false)({
+        state: { data: frontierState.data, dataUpdatedAt },
+      });
+
+    it('polls the frontier after the join, every 2–10 s by distance, with jitter fixed per answer', async () => {
+      const d = deps();
+      joinState = { data: place() };
+      render(d);
+      expect(frontierOptions).toMatchObject({
+        queryKey: ['queue-frontier', 'evt_pelita'],
+        enabled: true,
+        retry: false,
+      });
+      expect(interval()).toBe(5000);
+      expect(interval(1_000_000)).toBe(4000);
+      expect(interval(1_000_999)).toBe(5998);
+      expect(interval(1_000_999)).toBe(interval(1_000_999));
+      frontierState = { data: frontier({ served: 19000 }) };
+      expect(interval()).toBe(2000);
+      await expect((frontierOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('frontier');
+      expect(d.followQueueUseCase.poll).toHaveBeenCalledWith('evt_pelita');
+    });
+
+    it('does not poll before the draw', () => {
+      joinState = { data: place({ state: 'preopen', seq: null, served: null, position: null }) };
+      render();
+      expect(frontierOptions.enabled).toBe(false);
+    });
+
+    it('moves the number and the track with the frontier, and shows the admit rate', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ served: 18952 }) };
+      const { result } = render();
+      expect(result.current.waiting).toMatchObject({
+        position: '748',
+        served: '18.952',
+        rate: 'queue_rate:{"rate":"300"}',
+      });
+    });
+
+    it('says how long ago it was updated, ticking every second', () => {
+      vi.useFakeTimers({ now: 1_000_000 });
+      joinState = { data: place(), dataUpdatedAt: 990_000 };
+      frontierState = { data: frontier(), dataUpdatedAt: 998_000 };
+      const { result } = render();
+      expect(result.current.waiting?.updated).toBe('queue_updated:{"seconds":2}');
+      act(() => vi.advanceTimersByTime(3000));
+      expect(result.current.waiting?.updated).toBe('queue_updated:{"seconds":5}');
+    });
+
+    it('pauses and closes with the frontier, giving its reason', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ state: 'paused', reason: 'operator', ratePerMin: 0 }) };
+      const paused = render();
+      expect(paused.result.current.status).toBe('paused');
+      expect(paused.result.current.paused?.reason).toBe('queue_paused_operator');
+
+      frontierState = { data: frontier({ state: 'paused', reason: 'stock' }) };
+      expect(render().result.current.paused?.reason).toBe('home_temporarily_full_note');
+
+      frontierState = { data: frontier({ state: 'closed', reason: 'sold_out' }) };
+      const closed = render();
+      expect(closed.result.current.status).toBe('sold-out');
+      expect(interval()).toBe(false);
+    });
+
+    it('stops at the turn: last place, full track, no more polls (the claim is FR-08)', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ served: 19700, streamFrom: 2000 }) };
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.waiting).toMatchObject({ position: '1', progress: 100 });
+      expect(interval()).toBe(false);
+      expect(d.followQueueUseCase.stream).not.toHaveBeenCalled();
+    });
+
+    it('streams near the front instead of polling, and closes the stream on unmount', () => {
+      const d = deps();
+      joinState = { data: place() };
+      frontierState = { data: frontier({ streamFrom: 2000 }) };
+      const { unmount } = render(d);
+      expect(d.followQueueUseCase.stream).toHaveBeenCalledWith('evt_pelita', expect.any(Object));
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_stream', {
+        eventId: 'evt_pelita',
+        outcome: 'open',
+      });
+
+      const next = frontier({ served: 18500, streamFrom: 2000 }).frontier;
+      act(() => streamHandlers?.onFrontier(next));
+      expect(setQueryData).toHaveBeenCalledWith(['queue-frontier', 'evt_pelita'], { kind: 'frontier', frontier: next });
+      expect(frontierOptions.enabled).toBe(false);
+      act(() => streamHandlers?.onTurn({ event: 'evt_pelita', seq: 1, served: 1, turnExpiresAt: 'a', serverNow: 'b' }));
+
+      unmount();
+      expect(closeStream).toHaveBeenCalled();
+    });
+
+    it('does not stream further back than streamFrom, or when streaming is off', () => {
+      const d = deps();
+      joinState = { data: place() };
+      frontierState = { data: frontier({ streamFrom: 1000 }) };
+      render(d);
+      frontierState = { data: frontier({ streamFrom: 0 }) };
+      render(d);
+      expect(d.followQueueUseCase.stream).not.toHaveBeenCalled();
+    });
+
+    it('falls back to polling and tries the stream again later', () => {
+      vi.useFakeTimers({ now: 1_000_000 });
+      const d = deps();
+      joinState = { data: place() };
+      frontierState = { data: frontier({ streamFrom: 2000 }) };
+      render(d);
+      act(() => streamHandlers?.onFrontier(frontier({ streamFrom: 2000 }).frontier));
+      expect(frontierOptions.enabled).toBe(false);
+
+      act(() => streamHandlers?.onFallback('silent'));
+      expect(frontierOptions.enabled).toBe(true);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_stream', {
+        eventId: 'evt_pelita',
+        outcome: 'silent',
+      });
+      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(1);
+      act(() => vi.advanceTimersByTime(59_000));
+      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(1);
+      act(() => vi.advanceTimersByTime(2000));
+      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a first failed connect and a closed stream after 3 s', () => {
+      vi.useFakeTimers({ now: 1_000_000 });
+      const d = deps();
+      joinState = { data: place() };
+      frontierState = { data: frontier({ streamFrom: 2000 }) };
+      render(d);
+      act(() => streamHandlers?.onFallback('connect_failed'));
+      act(() => vi.advanceTimersByTime(4000));
+      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(2);
+      act(() => streamHandlers?.onClose());
+      act(() => vi.advanceTimersByTime(4000));
+      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(3);
+    });
+
+    it('keeps polling when there is nothing to stream with', () => {
+      const d = deps();
+      d.followQueueUseCase.stream.mockReturnValueOnce(null as never);
+      joinState = { data: place() };
+      frontierState = { data: frontier({ streamFrom: 2000 }) };
+      render(d);
+      expect(frontierOptions.enabled).toBe(true);
+    });
   });
 });
