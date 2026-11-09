@@ -21,4 +21,24 @@ describe('CatalogService', () => {
     coreHttp.get.mockRejectedValue(error);
     await expect(service.listEvents()).rejects.toBe(error);
   });
+
+  it('gets one event from core, with no extra headers', async () => {
+    const response = { data: { eventId: 'evt_samudra' }, status: 200 };
+    coreHttp.get.mockResolvedValue(response);
+    await expect(service.getEvent('evt_samudra')).resolves.toBe(response);
+    expect(coreHttp.get).toHaveBeenCalledTimes(1);
+    expect(coreHttp.get).toHaveBeenCalledWith('events/evt_samudra');
+  });
+
+  it('encodes the event id so it never changes the path shape', async () => {
+    coreHttp.get.mockResolvedValue({ data: {}, status: 200 });
+    await service.getEvent('a/b?c d');
+    expect(coreHttp.get).toHaveBeenCalledWith('events/a%2Fb%3Fc%20d');
+  });
+
+  it('lets a NOT_FOUND from getEvent through unchanged', async () => {
+    const error = { status: 404, code: 'NOT_FOUND', message: 'Not found' };
+    coreHttp.get.mockRejectedValue(error);
+    await expect(service.getEvent('evt_x')).rejects.toBe(error);
+  });
 });

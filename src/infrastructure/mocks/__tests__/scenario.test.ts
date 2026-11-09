@@ -13,4 +13,8 @@ describe('resolveScenario', () => {
   it('ignores unknown names', () => {
     expect(resolveScenario('?mock=chaos', 'nope')).toBe('ok');
   });
+
+  it('knows the admission_invalid scenario', () => {
+    expect(resolveScenario('?mock=admission_invalid', null)).toBe('admission_invalid');
+  });
 });

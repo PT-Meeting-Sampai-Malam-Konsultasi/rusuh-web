@@ -7,6 +7,7 @@ import { useLoading } from '@contexts/loading.context';
 import { useNetworkStatus } from '@contexts/network-status.context';
 import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
+import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
 import { createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 import { createQueueStreamAdapter } from '@infrastructure/adapters/queue-stream.adapter';
@@ -29,6 +30,10 @@ export function registerInfrastructure() {
     config: asValue(createConfig()),
     storage: asFunction(() => createStorageAdapter()).singleton(),
     tokenStore: asFunction(() => createTokenStore()).singleton(),
+    // The mock API accepts a placeholder token so /order works in dev without the queue; real builds start empty.
+    admissionStore: asFunction(({ config }: Pick<Deps, 'config'>) =>
+      createAdmissionStore(config.apiMock ? { fallbackToken: MOCK_ADMISSION_TOKEN } : {}),
+    ).singleton(),
     analyticsAdapter: asFunction(() => createAnalyticsAdapter()).singleton(),
     queueHttp: asFunction((d: Deps) =>
       createHttpAdapter({ baseUrl: d.config.queueApiUrl, timeoutMs: d.config.apiTimeoutMs, getLocale: locale(d) }),

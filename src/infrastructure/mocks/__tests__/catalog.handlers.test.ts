@@ -72,4 +72,26 @@ describe('catalog mock', () => {
     scenario = 'offline';
     await expect(catalog.listEvents()).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   });
+
+  it('serves one event by id', async () => {
+    const { data, status } = await catalog.getEvent('evt_samudra');
+    expect(status).toBe(200);
+    expect(data).toMatchObject({ eventId: 'evt_samudra', name: 'Samudra', state: 'waiting_room_open' });
+  });
+
+  it('answers 404 NOT_FOUND for an unknown event', async () => {
+    await expect(catalog.getEvent('evt_nope')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+  });
+
+  it('answers 404 NOT_FOUND for every event when none exists', async () => {
+    scenario = 'empty';
+    await expect(catalog.getEvent('evt_samudra')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+  });
+
+  it('fails getEvent with the shared failure scenarios', async () => {
+    scenario = 'error';
+    await expect(catalog.getEvent('evt_samudra')).rejects.toMatchObject({ status: 503, code: 'INTERNAL_ERROR' });
+    scenario = 'offline';
+    await expect(catalog.getEvent('evt_samudra')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+  });
 });

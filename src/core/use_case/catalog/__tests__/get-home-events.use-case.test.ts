@@ -16,7 +16,10 @@ const event = (eventId: string, state: EventState, extra: Partial<EventSummary> 
 });
 
 const run = async (items: EventSummary[]) => {
-  const catalogService = { listEvents: vi.fn().mockResolvedValue({ data: { items, serverNow: NOW }, status: 200 }) };
+  const catalogService = {
+    listEvents: vi.fn().mockResolvedValue({ data: { items, serverNow: NOW }, status: 200 }),
+    getEvent: vi.fn(),
+  };
   return GetHomeEventsUseCase({ catalogService }).execute();
 };
 
@@ -75,7 +78,7 @@ describe('GetHomeEventsUseCase', () => {
 
   it('lets infrastructure errors through', async () => {
     const error = { status: 503, code: 'INTERNAL_ERROR', message: 'down' };
-    const catalogService = { listEvents: vi.fn().mockRejectedValue(error) };
+    const catalogService = { listEvents: vi.fn().mockRejectedValue(error), getEvent: vi.fn() };
     await expect(GetHomeEventsUseCase({ catalogService }).execute()).rejects.toBe(error);
   });
 });

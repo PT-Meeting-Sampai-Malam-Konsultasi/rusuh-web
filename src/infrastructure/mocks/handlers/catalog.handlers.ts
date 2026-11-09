@@ -1,9 +1,9 @@
 import { http, HttpResponse } from 'msw';
 
-import type { ListEventsResponse } from '@core/entities/catalog/catalog.entity';
+import type { EventSummary, ListEventsResponse } from '@core/entities/catalog/catalog.entity';
 
 import { eventsFixture } from '../fixtures/events.fixture';
-import { failure, type MockContext } from './shared';
+import { failure, problem, type MockContext } from './shared';
 
 export function catalogHandlers({ coreApiUrl, getScenario, now }: MockContext) {
   return [
@@ -23,6 +23,16 @@ export function catalogHandlers({ coreApiUrl, getScenario, now }: MockContext) {
         { items, serverNow: today.toISOString() },
         { headers: { 'Cache-Control': 'public, max-age=5, stale-while-revalidate=30' } },
       );
+    }),
+    http.get(`${coreApiUrl}/events/:eventId`, async ({ params }) => {
+      const scenario = getScenario();
+      const failed = await failure(scenario);
+      if (failed) return failed;
+      // Under `empty` no event exists, so every id is unknown.
+      const event =
+        scenario === 'empty' ? undefined : eventsFixture(now()).find((e) => e.eventId === String(params.eventId));
+      if (!event) return problem(404, 'NOT_FOUND', 'Event tidak ditemukan');
+      return HttpResponse.json<EventSummary>(event);
     }),
   ];
 }

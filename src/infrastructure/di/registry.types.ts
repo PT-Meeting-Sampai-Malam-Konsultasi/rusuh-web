@@ -2,11 +2,13 @@ import type { useMutation, useQuery, useQueryClient } from '@tanstack/react-quer
 import type { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { useTranslation } from 'react-i18next';
 
+import type { AdmissionStoreProtocol } from '@core/protocols/admission-store.protocol';
 import type { AnalyticsProtocol } from '@core/protocols/analytics.protocol';
 import type { HttpProtocol } from '@core/protocols/http.protocol';
 import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
+import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
 import type { HomeControllerInterface } from '@controllers/home.controller';
@@ -42,6 +44,7 @@ export interface AwilixRegistry {
   config: AppConfig;
   storage: StorageProtocol;
   tokenStore: TokenStoreProtocol;
+  admissionStore: AdmissionStoreProtocol;
   analyticsAdapter: AnalyticsProtocol;
   queueHttp: HttpProtocol;
   coreHttp: HttpProtocol;
@@ -64,6 +67,7 @@ export interface AwilixRegistry {
 
   // services
   catalogService: CatalogServiceInterface;
+  bookingService: BookingServiceInterface;
 
   // use cases
   getHomeEventsUseCase: GetHomeEventsUseCaseInterface;
