@@ -35,6 +35,10 @@ const CODES = [
   'NOT_CANCELLABLE',
   'CODE_INVALID',
   'PAYMENT_PROVIDER_BUSY',
+  'SERVICE_UNAVAILABLE',
+  // Generic codes the core auth service answers with (alongside the specific ones above).
+  'BAD_REQUEST',
+  'TOO_MANY_REQUESTS',
   'NETWORK_ERROR',
   'TIMEOUT',
   'UNKNOWN_ERROR',
