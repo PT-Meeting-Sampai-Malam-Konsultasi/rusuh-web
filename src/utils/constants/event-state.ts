@@ -17,5 +17,8 @@ export const EVENT_STAMP: Readonly<Record<EventState, { tone: EventStampTone; la
 /** States with an open queue and stock left: the card is active and leads to the waiting room (FR-02). */
 export const JOINABLE_STATES: readonly EventState[] = ['waiting_room_open', 'on_sale', 'almost_gone'];
 
+/** Queue paused for stock (unpaid tickets come back): joining still works, offered as a secondary action (FR-03). */
+export const QUEUE_ANYWAY_STATES: readonly EventState[] = ['temporarily_full'];
+
 /** States whose sale is over: shown, but nothing left to buy. */
 export const FINISHED_STATES: readonly EventState[] = ['sold_out', 'ended'];
