@@ -9,6 +9,8 @@ interface ButtonLinkProps {
   size?: 'md' | 'sm';
   fullWidth?: boolean;
   className?: string;
+  /** Accessible name when the visible label is not enough on its own (e.g. "Tetap antre: <event>" in a list). */
+  ariaLabel?: string;
   onClick?: () => void;
   children: ReactNode;
 }
@@ -20,6 +22,7 @@ export default function ButtonLink({
   size = 'md',
   fullWidth = false,
   className,
+  ariaLabel,
   onClick,
   children,
 }: ButtonLinkProps) {
@@ -28,7 +31,7 @@ export default function ButtonLink({
     .join(' ');
   // prefetch off: target pages (e.g. /queue?event=…) depend on runtime ids, and some do not exist yet.
   return (
-    <Link className={classes} href={href} prefetch={false} onClick={onClick}>
+    <Link className={classes} href={href} prefetch={false} aria-label={ariaLabel} onClick={onClick}>
       {children}
     </Link>
   );

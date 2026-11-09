@@ -73,8 +73,14 @@ export default function HomeHero({ t, event, joinHint, onSelect }: HomeHeroProps
         )}
         {event.join && (
           <div className={`${styles.cta} ${styles.rise}`} style={{ '--i': 4 } as CSSProperties}>
-            <ButtonLink href={event.join.href} className={styles.ctaButton} onClick={() => onSelect(event.id, 0)}>
-              {event.join.label} <span aria-hidden="true">→</span>
+            {/* Primary while the queue is open; secondary "Tetap antre" while temporarily full (FR-03). */}
+            <ButtonLink
+              href={event.join.href}
+              variant={event.join.kind === 'join' ? 'primary' : 'secondary'}
+              className={styles.ctaButton}
+              onClick={() => onSelect(event.id, 0)}
+            >
+              {event.join.label} {event.join.kind === 'join' && <span aria-hidden="true">→</span>}
             </ButtonLink>
             <p className={styles.hint}>{joinHint}</p>
           </div>
