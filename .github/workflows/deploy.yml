@@ -24,6 +24,8 @@ jobs:
     # Pull requests from forks get no secrets; ours all come from org members.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.deployment-url }}
     environment:
       name: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'staging' }}
       url: ${{ steps.deploy.outputs.deployment-url }}
@@ -61,3 +63,28 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy out --project-name=${{ env.PROJECT }} --branch=${{ env.BRANCH }} --commit-hash=${{ github.sha }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  # Lighthouse on the URL just deployed (preview, staging or production). Scores below the targets in
+  # lighthouserc.json are warnings for now; the job summary shows the table and links to the full reports.
+  lighthouse:
+    needs: deploy
+    if: needs.deploy.outputs.url != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run Lighthouse
+        id: lhci
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          # Add pages here as features land, e.g. /order?event=evt_samudra.
+          urls: |
+            ${{ needs.deploy.outputs.url }}/
+          configPath: ./lighthouserc.json
+          runs: 3
+          # Public report links for 7 days (the pages are public anyway).
+          temporaryPublicStorage: true
+      - name: Summary
+        if: ${{ !cancelled() }}
+        env:
+          LINKS: ${{ steps.lhci.outputs.links }}
+        run: node scripts/lighthouse-summary.mjs >> "$GITHUB_STEP_SUMMARY"
