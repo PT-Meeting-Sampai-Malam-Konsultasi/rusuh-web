@@ -1,5 +1,5 @@
 import type { QueuePlace, QueueState } from '@core/entities/queue/queue.entity';
-import type { HttpError } from '@core/protocols/http.protocol';
+import { errorCodeOf, withDeviceToken } from '@core/use_case/device/with-device-token';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 
 /** The place as the waiting room needs it. */
@@ -37,9 +37,6 @@ type Deps = Pick<
   'deviceService' | 'queueService' | 'deviceTokenStore' | 'queuePlaceStore' | 'turnstile'
 >;
 
-const codeOf = (error: unknown): string | undefined =>
-  typeof error === 'object' && error !== null ? (error as HttpError).code : undefined;
-
 function positionOf(seq: number | null, served: number | null): number | null {
   return seq !== null && served !== null ? Math.max(1, seq - served) : null;
 }
@@ -70,27 +67,11 @@ export const JoinQueueUseCase = ({
   queuePlaceStore,
   turnstile,
 }: Deps): JoinQueueUseCaseInterface => {
-  const registerDevice = async (): Promise<string> => {
-    const { data } = await deviceService.registerDevice(await turnstile.getToken('register'));
-    deviceTokenStore.set(data.deviceToken);
-    return data.deviceToken;
-  };
-
-  const join = async (eventId: string, deviceToken: string): Promise<QueuePlace> =>
-    (await queueService.joinQueue(eventId, deviceToken, await turnstile.getToken('join'))).data;
-
-  const joinWithDevice = async (eventId: string): Promise<QueuePlace> => {
-    const stored = deviceTokenStore.get();
-    const deviceToken = stored ?? (await registerDevice());
-    try {
-      return await join(eventId, deviceToken);
-    } catch (error) {
-      // A token we just registered and still rejected is not retried: that is a real failure.
-      if (codeOf(error) !== 'UNAUTHORIZED' || !stored) throw error;
-      deviceTokenStore.clear();
-      return join(eventId, await registerDevice());
-    }
-  };
+  const joinWithDevice = (eventId: string): Promise<QueuePlace> =>
+    withDeviceToken({ deviceService, deviceTokenStore, turnstile }, async (deviceToken) => {
+      const { data } = await queueService.joinQueue(eventId, deviceToken, await turnstile.getToken('join'));
+      return data;
+    });
 
   return {
     execute: async (eventId) => {
@@ -98,7 +79,7 @@ export const JoinQueueUseCase = ({
       try {
         place = await joinWithDevice(eventId);
       } catch (error) {
-        const kind = OUTCOMES[codeOf(error) ?? ''];
+        const kind = OUTCOMES[errorCodeOf(error) ?? ''];
         if (!kind) throw error;
         if (kind === 'sold-out') queuePlaceStore.remove(eventId);
         return { kind } as JoinQueueResult;

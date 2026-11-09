@@ -32,6 +32,8 @@ const KEYS = {
   useLoading: true,
   usePopupError: true,
   useNetworkStatus: true,
+  accountService: true,
+  authService: true,
   catalogService: true,
   bookingService: true,
   deviceService: true,
@@ -39,8 +41,12 @@ const KEYS = {
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
   joinQueueUseCase: true,
+  refreshSessionUseCase: true,
+  requestSignInCodeUseCase: true,
+  verifySignInCodeUseCase: true,
   ERROR_CODE_MAP: true,
   homeController: true,
+  loginController: true,
   notFoundController: true,
   orderController: true,
   queueController: true,
@@ -91,6 +97,13 @@ describe('DI registries', () => {
     expect(typeof container.resolve('deviceService').registerDevice).toBe('function');
     expect(typeof container.resolve('queueService').joinQueue).toBe('function');
     expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
+  });
+
+  it('wires the auth and account services', () => {
+    expect(typeof container.resolve('authService').requestOtp).toBe('function');
+    expect(typeof container.resolve('accountService').updateProfile).toBe('function');
+    expect(container.resolve('requestSignInCodeUseCase')).toBe(container.resolve('requestSignInCodeUseCase'));
+    expect(typeof container.resolve('verifySignInCodeUseCase').execute).toBe('function');
   });
 
   it('has every page shell import the registration of the controller it resolves', () => {

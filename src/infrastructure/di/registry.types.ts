@@ -11,14 +11,20 @@ import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol'
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
 import type { TurnstileProtocol } from '@core/protocols/turnstile.protocol';
+import type { AccountServiceInterface } from '@core/services/account.service';
+import type { AuthServiceInterface } from '@core/services/auth.service';
 import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { DeviceServiceInterface } from '@core/services/device.service';
 import type { QueueServiceInterface } from '@core/services/queue.service';
+import type { RefreshSessionUseCaseInterface } from '@core/use_case/auth/refresh-session.use-case';
+import type { RequestSignInCodeUseCaseInterface } from '@core/use_case/auth/request-sign-in-code.use-case';
+import type { VerifySignInCodeUseCaseInterface } from '@core/use_case/auth/verify-sign-in-code.use-case';
 import type { GetOrderCategoriesUseCaseInterface } from '@core/use_case/booking/get-order-categories.use-case';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
 import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
 import type { HomeControllerInterface } from '@controllers/home.controller';
+import type { LoginControllerInterface } from '@controllers/login.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { OrderControllerInterface } from '@controllers/order.controller';
 import type { QueueControllerInterface } from '@controllers/queue.controller';
@@ -78,6 +84,8 @@ export interface AwilixRegistry {
   useNetworkStatus: () => NetworkStatusApi;
 
   // services
+  accountService: AccountServiceInterface;
+  authService: AuthServiceInterface;
   catalogService: CatalogServiceInterface;
   bookingService: BookingServiceInterface;
   deviceService: DeviceServiceInterface;
@@ -87,12 +95,16 @@ export interface AwilixRegistry {
   getHomeEventsUseCase: GetHomeEventsUseCaseInterface;
   getOrderCategoriesUseCase: GetOrderCategoriesUseCaseInterface;
   joinQueueUseCase: JoinQueueUseCaseInterface;
+  refreshSessionUseCase: RefreshSessionUseCaseInterface;
+  requestSignInCodeUseCase: RequestSignInCodeUseCaseInterface;
+  verifySignInCodeUseCase: VerifySignInCodeUseCaseInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
 
   // controllers
   homeController: HomeControllerInterface;
+  loginController: LoginControllerInterface;
   notFoundController: NotFoundControllerInterface;
   orderController: OrderControllerInterface;
   queueController: QueueControllerInterface;
