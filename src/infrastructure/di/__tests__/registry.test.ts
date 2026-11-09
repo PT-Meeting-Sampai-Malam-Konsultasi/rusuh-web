@@ -41,6 +41,7 @@ const KEYS = {
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
   joinQueueUseCase: true,
+  followQueueUseCase: true,
   refreshSessionUseCase: true,
   requestSignInCodeUseCase: true,
   verifySignInCodeUseCase: true,
@@ -69,7 +70,7 @@ describe('DI registries', () => {
 
   beforeAll(async () => {
     // Each page shell imports its controller registration; load them all here.
-    for (const file of readdirSync(CONTROLLERS_DIR)) await import(`../controllers/${file.replace(/\.ts$/, '')}`);
+    await Promise.all(Object.values(import.meta.glob('../controllers/*.ts')).map((load) => load()));
   });
 
   it('registers every key of AwilixRegistry, and nothing else', () => {
@@ -97,6 +98,7 @@ describe('DI registries', () => {
     expect(typeof container.resolve('deviceService').registerDevice).toBe('function');
     expect(typeof container.resolve('queueService').joinQueue).toBe('function');
     expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
+    expect(typeof container.resolve('followQueueUseCase').poll).toBe('function');
   });
 
   it('wires the auth and account services', () => {

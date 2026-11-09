@@ -3,6 +3,13 @@ import type { TFunction } from 'i18next';
 
 import type { HttpError } from '@core/protocols/http.protocol';
 import type { HomeEvents } from '@core/use_case/catalog/get-home-events.use-case';
+import {
+  applyFrontier,
+  canStream,
+  pollDelayMs,
+  streamRetryDelayMs,
+  type FrontierResult,
+} from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
@@ -44,6 +51,10 @@ export interface QueueWaitingView {
   progress: number;
   served: string;
   seq: string;
+  /** "Diperbarui 3 detik lalu": time since the newest frontier (or the join answer). */
+  updated: string;
+  /** "300 orang masuk / menit", or null before there is a rate. */
+  rate: string | null;
 }
 
 export interface QueuePrequeueView {
@@ -78,12 +89,14 @@ export interface QueueControllerInterface {
 type QueueControllerDeps = Pick<
   AwilixRegistry,
   | 'joinQueueUseCase'
+  | 'followQueueUseCase'
   | 'getHomeEventsUseCase'
   | 'analyticsAdapter'
   | 'storage'
   | 'ERROR_CODE_MAP'
   | 'useTranslation'
   | 'useQueryTanstack'
+  | 'useQueryClientTanstack'
   | 'useSearchParamsNext'
 >;
 
@@ -92,12 +105,14 @@ const EVENTS_STALE_MS = 5_000;
 
 const QueueController = ({
   joinQueueUseCase,
+  followQueueUseCase,
   getHomeEventsUseCase,
   analyticsAdapter,
   storage,
   ERROR_CODE_MAP,
   useTranslation,
   useQueryTanstack,
+  useQueryClientTanstack,
   useSearchParamsNext,
 }: QueueControllerDeps): QueueControllerInterface => {
   const { t, i18n } = useTranslation();
@@ -128,9 +143,38 @@ const QueueController = ({
     refetchOnReconnect: false,
   });
 
+  const queryClient = useQueryClientTanstack();
   const result = joinQuery.data;
-  const status = queueStatusFor(hasEventId, result, joinQuery.isError);
-  const place = result?.kind === 'joined' ? result.place : null;
+  const joined = result?.kind === 'joined' ? result.place : null;
+
+  // FR-07: after the join, follow the line by polling the frontier; near the front the stream takes over (ADR-0015).
+  const [streaming, setStreaming] = useState(false);
+  const [fellBack, setFellBack] = useState(false);
+  const [streamRetryAt, setStreamRetryAt] = useState(0);
+  const connectFailures = useRef(0);
+  const following = !!joined && joined.seq !== null;
+
+  const frontierQuery = useQueryTanstack<FrontierResult, HttpError>({
+    queryKey: [QUERY_KEYS.QUEUE_FRONTIER, eventId],
+    queryFn: () => followQueueUseCase.poll(eventId),
+    enabled: hasEventId && following && !streaming,
+    // From the newest answer: the interval follows the position, and polling stops at the turn or when closed.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const next = joined ? applyFrontier(joined, data?.kind === 'frontier' ? data.frontier : null) : null;
+      const active = !!next && (next.state === 'open' || next.state === 'paused') && !next.turnReached;
+      // Jitter fixed per answer (its arrival millisecond): a new random number on every render would restart the
+      // timer each second, while the clock below re-renders, and the poll would never fire.
+      const jitter = (query.state.dataUpdatedAt % 1000) / 1000;
+      return active ? pollDelayMs(next.position, jitter, fellBack) : false;
+    },
+    retry: false,
+    gcTime: 0,
+  });
+  const frontier = frontierQuery.data?.kind === 'frontier' ? frontierQuery.data.frontier : null;
+  const place = joined ? applyFrontier(joined, frontier) : null;
+  const live = following && !!place && (place.state === 'open' || place.state === 'paused') && !place.turnReached;
+  const status = queueStatusFor(hasEventId, place ? { kind: 'joined', place } : result, joinQuery.isError);
   const summary = findHomeEvent(eventsQuery.data, eventId);
 
   const trackedFor = useRef<JoinQueueResult | null>(null);
@@ -144,13 +188,49 @@ const QueueController = ({
     });
   }, [result, analyticsAdapter, eventId]);
 
-  // Pre-queue countdown: server times plus the time since the answer arrived, never the device clock alone.
+  // One clock for the pre-queue countdown, "Diperbarui n detik lalu" and the stream retry: elapsed time only, never a
+  // deadline against the device clock.
   const [now, setNow] = useState(() => Date.now());
+  const ticking = status === 'prequeue' || live;
   useEffect(() => {
-    if (status !== 'prequeue') return;
+    if (!ticking) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [status]);
+  }, [ticking]);
+
+  // Near the front: stream instead of polling while it is healthy; on a failure, poll and try again later.
+  const wantStream = live && canStream(place?.position ?? null, frontier?.streamFrom) && now >= streamRetryAt;
+  useEffect(() => {
+    if (!wantStream) return;
+    const retryLater = (event: Parameters<typeof streamRetryDelayMs>[0]) => {
+      setStreaming(false);
+      setStreamRetryAt(Date.now() + streamRetryDelayMs(event, connectFailures.current));
+      analyticsAdapter.trackEvent('queue_stream', { eventId, outcome: event });
+    };
+    const close = followQueueUseCase.stream(eventId, {
+      onFrontier: (next) => {
+        connectFailures.current = 0;
+        setStreaming(true);
+        setFellBack(false);
+        const data: FrontierResult = { kind: 'frontier', frontier: next };
+        queryClient.setQueryData([QUERY_KEYS.QUEUE_FRONTIER, eventId], data);
+      },
+      // The turn screen and the claim are FR-08; the frontier sent with it already moves the place to the front.
+      onTurn: () => undefined,
+      onFallback: (reason) => {
+        if (reason === 'connect_failed') connectFailures.current += 1;
+        setFellBack(true);
+        retryLater(reason);
+      },
+      onClose: () => retryLater('closed'),
+    });
+    if (!close) return;
+    analyticsAdapter.trackEvent('queue_stream', { eventId, outcome: 'open' });
+    return () => {
+      close();
+      setStreaming(false);
+    };
+  }, [wantStream, eventId, followQueueUseCase, queryClient, analyticsAdapter]);
   const secondsToOpen =
     status === 'prequeue' && place?.opensAt
       ? Math.max(
@@ -193,6 +273,10 @@ const QueueController = ({
 
   const position = place?.position ?? null;
 
+  const updatedAt = Math.max(frontierQuery.dataUpdatedAt, joinQuery.dataUpdatedAt);
+  const secondsAgo = Math.max(0, Math.floor((now - updatedAt) / 1000));
+  const rate = frontier?.ratePerMin ?? 0;
+
   const waiting = useMemo((): QueueWaitingView | null => {
     if (status !== 'waiting' || !place || place.seq === null || place.served === null) return null;
     return {
@@ -200,8 +284,15 @@ const QueueController = ({
       progress: place.progress,
       served: formatCount(place.served, locale),
       seq: formatCount(place.seq, locale),
+      updated: secondsAgo < 1 ? t('queue_updated_now') : t('queue_updated', { seconds: secondsAgo }),
+      rate: rate > 0 ? t('queue_rate', { rate: formatCount(rate, locale) }) : null,
     };
-  }, [status, place, locale]);
+  }, [status, place, locale, secondsAgo, rate, t]);
+
+  const pausedReasons: Partial<Record<string, string>> = {
+    stock: t('home_temporarily_full_note'),
+    operator: t('queue_paused_operator'),
+  };
 
   const errorCode = joinQuery.error?.code;
   const errorMessage =
@@ -218,7 +309,8 @@ const QueueController = ({
         ? {
             position: position !== null ? formatCount(position, locale) : null,
             reason:
-              summary?.state === 'temporarily_full' ? t('home_temporarily_full_note') : t('queue_paused_operator'),
+              pausedReasons[frontier?.reason ?? ''] ??
+              (summary?.state === 'temporarily_full' ? t('home_temporarily_full_note') : t('queue_paused_operator')),
           }
         : null,
     errorMessage,

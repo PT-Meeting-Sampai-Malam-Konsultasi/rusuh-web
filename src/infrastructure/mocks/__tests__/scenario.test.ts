@@ -14,7 +14,8 @@ describe('resolveScenario', () => {
     expect(resolveScenario('?mock=chaos', 'nope')).toBe('ok');
   });
 
-  it('knows the admission_invalid scenario', () => {
+  it('knows the admission_invalid and stream_off scenarios', () => {
     expect(resolveScenario('?mock=admission_invalid', null)).toBe('admission_invalid');
+    expect(resolveScenario('?mock=stream_off', null)).toBe('stream_off');
   });
 });

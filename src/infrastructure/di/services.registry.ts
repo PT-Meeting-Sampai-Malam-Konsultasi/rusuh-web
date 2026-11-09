@@ -11,6 +11,7 @@ import { RequestSignInCodeUseCase } from '@core/use_case/auth/request-sign-in-co
 import { VerifySignInCodeUseCase } from '@core/use_case/auth/verify-sign-in-code.use-case';
 import { GetOrderCategoriesUseCase } from '@core/use_case/booking/get-order-categories.use-case';
 import { GetHomeEventsUseCase } from '@core/use_case/catalog/get-home-events.use-case';
+import { FollowQueueUseCase } from '@core/use_case/queue/follow-queue.use-case';
 import { JoinQueueUseCase } from '@core/use_case/queue/join-queue.use-case';
 
 import container from './container';
@@ -27,6 +28,7 @@ export function registerServices() {
     getHomeEventsUseCase: asFunction(GetHomeEventsUseCase).singleton(),
     getOrderCategoriesUseCase: asFunction(GetOrderCategoriesUseCase).singleton(),
     joinQueueUseCase: asFunction(JoinQueueUseCase).singleton(),
+    followQueueUseCase: asFunction(FollowQueueUseCase).singleton(),
     refreshSessionUseCase: asFunction(RefreshSessionUseCase).singleton(),
     requestSignInCodeUseCase: asFunction(RequestSignInCodeUseCase).singleton(),
     verifySignInCodeUseCase: asFunction(VerifySignInCodeUseCase).singleton(),

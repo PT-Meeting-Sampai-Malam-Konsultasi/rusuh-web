@@ -1,5 +1,18 @@
 @reference "../../../../../styles/app.css";
 
+/* HiFi .wr-eta em: when the number was last updated and how fast the line moves (FR-07). */
+.live {
+  @apply mt-[18px] text-[13px] text-ink-2;
+
+  @variant md {
+    @apply mt-6 text-[15px];
+  }
+}
+
+.nowrap {
+  @apply whitespace-nowrap;
+}
+
 /* From where the buyer joined (left) to their turn (right); blue dots fill as the line moves. */
 .track {
   @apply relative mt-6 h-9 border-[2.5px] border-ink;
