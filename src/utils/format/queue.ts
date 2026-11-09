@@ -5,7 +5,18 @@ import type { HomeEvents } from '@core/use_case/catalog/get-home-events.use-case
 import type { JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
 
 export type QueueStatus =
-  'no-event' | 'joining' | 'waiting' | 'prequeue' | 'paused' | 'sold-out' | 'not-found' | 'elsewhere' | 'error';
+  | 'no-event'
+  | 'joining'
+  | 'waiting'
+  | 'prequeue'
+  | 'paused'
+  | 'sold-out'
+  | 'not-found'
+  | 'elsewhere'
+  | 'error'
+  /** FR-08: `seq <= served`; the controller sets these two, not the join answer. */
+  | 'turn'
+  | 'missed';
 
 /** Which waiting room view to show for the join answer (App Flow 4.2). */
 export function queueStatusFor(hasEventId: boolean, result: JoinQueueResult | undefined, failed: boolean): QueueStatus {
