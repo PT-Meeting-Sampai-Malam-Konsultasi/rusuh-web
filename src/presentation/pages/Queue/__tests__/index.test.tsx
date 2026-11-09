@@ -36,6 +36,9 @@ const base = (): QueueControllerInterface => ({
   },
   prequeue: null,
   paused: null,
+  turn: null,
+  claimNow: vi.fn(),
+  queueAgain: vi.fn(),
   errorMessage: '',
   retry: vi.fn(),
   locale: 'id',
@@ -159,5 +162,56 @@ describe('QueueScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'action_retry' }));
     expect(retry).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('link', { name: 'action_back_home' })).toBeInTheDocument();
+  });
+
+  it('says it is the turn and moves a signed-in buyer in, with the 60 s timer', async () => {
+    controller = {
+      ...base(),
+      status: 'turn',
+      waiting: null,
+      turn: { seq: '19.700', seconds: 52, claiming: false, signInHref: null },
+    };
+    render(<QueueScreen />);
+    expect(screen.getByText('queue_turn_lead:{"number":"19.700"}')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('queue_turn_title');
+    expect(screen.getByRole('timer')).toHaveTextContent('0:52');
+    expect(screen.getByText('queue_turn_say')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'queue_notes_label' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /queue_turn_action/ }));
+    expect(controller.claimNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the claim on its way as busy, and no timer before the window is known', () => {
+    controller = {
+      ...base(),
+      status: 'turn',
+      waiting: null,
+      turn: { seq: '19.700', seconds: null, claiming: true, signInHref: null },
+    };
+    render(<QueueScreen />);
+    expect(screen.getByRole('button', { name: /queue_turn_action/ })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+  });
+
+  it('sends a guest to sign in first', () => {
+    controller = {
+      ...base(),
+      status: 'turn',
+      waiting: null,
+      turn: { seq: '19.700', seconds: 40, claiming: false, signInHref: '/login?next=%2Fqueue' },
+    };
+    render(<QueueScreen />);
+    expect(screen.getByRole('link', { name: /queue_turn_sign_in/ })).toHaveAttribute('href', '/login?next=%2Fqueue');
+    expect(screen.getByText('queue_turn_say_guest')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /queue_turn_action/ })).not.toBeInTheDocument();
+  });
+
+  it('says the turn was missed and queues again on request', async () => {
+    controller = { ...base(), status: 'missed', waiting: null };
+    render(<QueueScreen />);
+    expect(screen.getByText('queue_missed_lead')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('queue_missed_title');
+    await userEvent.click(screen.getByRole('button', { name: /queue_missed_action/ }));
+    expect(controller.queueAgain).toHaveBeenCalledTimes(1);
   });
 });

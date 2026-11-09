@@ -10,15 +10,17 @@ import TabBar from '@presentation/components/TabBar';
 
 import QueueJoining from './components/QueueJoining';
 import QueueMessage from './components/QueueMessage';
+import QueueMissed from './components/QueueMissed';
 import QueueNotes from './components/QueueNotes';
 import QueuePaused from './components/QueuePaused';
 import QueuePrequeue from './components/QueuePrequeue';
 import QueueSoldOut from './components/QueueSoldOut';
+import QueueTurn from './components/QueueTurn';
 import QueueWaiting from './components/QueueWaiting';
 import styles from './queue.module.css';
 
 /** States shown in the waiting room layout; the rest are a plain message. */
-const ROOM: readonly QueueStatus[] = ['joining', 'waiting', 'prequeue', 'paused', 'sold-out'];
+const ROOM: readonly QueueStatus[] = ['joining', 'waiting', 'prequeue', 'paused', 'sold-out', 'turn', 'missed'];
 /** States where the buyer holds a place, so the reassurance notes apply. */
 const WITH_NOTES: readonly QueueStatus[] = ['waiting', 'prequeue', 'paused'];
 
@@ -30,8 +32,23 @@ const MESSAGES = {
 } as const;
 
 export default function QueueScreen() {
-  const { t, status, event, waiting, prequeue, paused, errorMessage, retry, locale, setLocale, nav, homeHref } =
-    container.resolve<QueueControllerInterface>('queueController');
+  const {
+    t,
+    status,
+    event,
+    waiting,
+    prequeue,
+    paused,
+    turn,
+    claimNow,
+    queueAgain,
+    errorMessage,
+    retry,
+    locale,
+    setLocale,
+    nav,
+    homeHref,
+  } = container.resolve<QueueControllerInterface>('queueController');
 
   const message = status in MESSAGES ? MESSAGES[status as keyof typeof MESSAGES] : null;
 
@@ -52,6 +69,8 @@ export default function QueueScreen() {
               {waiting && <QueueWaiting t={t} waiting={waiting} />}
               {status === 'prequeue' && <QueuePrequeue t={t} prequeue={prequeue} />}
               {paused && <QueuePaused t={t} paused={paused} />}
+              {turn && <QueueTurn t={t} turn={turn} onClaim={claimNow} />}
+              {status === 'missed' && <QueueMissed t={t} onQueueAgain={queueAgain} />}
               {status === 'sold-out' && <QueueSoldOut t={t} eventName={event?.name ?? null} homeHref={homeHref} />}
             </div>
             {event && (
