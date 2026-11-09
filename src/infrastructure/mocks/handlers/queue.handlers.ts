@@ -13,6 +13,8 @@ const FIRST_SEQ = 19_700;
 const SERVED_AT_JOIN = 18_452;
 /** People let in per second while a sale runs (shows on a refresh until live updates arrive in FR-07). */
 const ADMIT_PER_SECOND = 5;
+/** The mock is the server, and a server outlives a page reload: its queue is kept for the tab in sessionStorage. */
+const STATE_KEY = 'rusuh.mock.queue';
 
 const base64url = (value: object) =>
   btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -23,14 +25,39 @@ interface MockPlace {
   opensAt: number | null;
 }
 
+interface MockQueueState {
+  places: [string, MockPlace][];
+  nextSeq: [string, number][];
+  devices: number;
+}
+
+const loadState = (): MockQueueState | null => {
+  try {
+    const saved = globalThis.sessionStorage?.getItem(STATE_KEY);
+    return saved ? (JSON.parse(saved) as MockQueueState) : null;
+  } catch {
+    return null; // Storage blocked or unreadable: start an empty queue.
+  }
+};
+
+const saveState = (state: MockQueueState) => {
+  try {
+    globalThis.sessionStorage?.setItem(STATE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage blocked: the queue lives until the next reload.
+  }
+};
+
 /**
  * The queue service as the waiting room sees it: device registration and an idempotent join per device and event.
- * Places live in this factory (the mock is the server), so a refresh keeps the same number.
+ * Places are kept for the tab (see STATE_KEY), so a refresh keeps the same number and shows how far the line moved.
  */
 export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): HttpHandler[] {
-  const places = new Map<string, MockPlace>();
-  const nextSeq = new Map<string, number>();
-  let devices = 0;
+  const saved = loadState();
+  const places = new Map<string, MockPlace>(saved?.places);
+  const nextSeq = new Map<string, number>(saved?.nextSeq);
+  let devices = saved?.devices ?? 0;
+  const persist = () => saveState({ places: [...places], nextSeq: [...nextSeq], devices });
 
   const takeSeq = (eventId: string) => {
     const seq = nextSeq.get(eventId) ?? FIRST_SEQ;
@@ -44,6 +71,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       if (failed) return failed;
       if (!request.headers.get('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
       devices += 1;
+      persist();
       const issued = now().getTime();
       const expiresAt = new Date(issued + 30 * DAY_MS).toISOString();
       const payload = {
@@ -90,6 +118,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
         place.seq = takeSeq(eventId);
         place.joinedAt = time;
       }
+      persist();
 
       const body: QueuePlace = {
         eventId,

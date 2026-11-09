@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Node: Axios uses its http adapter here, so the request really leaves the app and MSW answers it.
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DeviceService } from '@core/services/device.service';
 import { QueueService } from '@core/services/queue.service';
@@ -14,14 +14,14 @@ const QUEUE = 'https://queue.mock.test/v1';
 let now = new Date('2026-11-09T03:00:00Z');
 let scenario: MockScenario = 'ok';
 
-const server = setupServer(
-  ...createHandlers({
+const mockHandlers = () =>
+  createHandlers({
     coreApiUrl: 'https://core.mock.test/v1',
     queueApiUrl: QUEUE,
     getScenario: () => scenario,
     now: () => now,
-  }),
-);
+  });
+const server = setupServer(...mockHandlers());
 const queueHttp = createHttpAdapter({ baseUrl: QUEUE, timeoutMs: 5000 });
 const devices = DeviceService({ queueHttp });
 const queue = QueueService({ queueHttp });
@@ -103,5 +103,25 @@ describe('queue mock', () => {
     scenario = 'error';
     await expect(devices.registerDevice('ts')).rejects.toMatchObject({ status: 503 });
     await expect(queue.joinQueue('evt_pelita', 'd', 'ts')).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('keeps the queue for the tab, so a reload shows the same number and how far the line moved', async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => saved.set(key, value),
+    });
+    server.resetHandlers(...mockHandlers());
+    const device = await register();
+    const first = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+
+    now = new Date(now.getTime() + 120_000);
+    server.resetHandlers(...mockHandlers()); // a page reload: a fresh mock, same tab
+    const reloaded = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+    expect(reloaded.seq).toBe(first.seq);
+    expect(reloaded.served).toBe((first.served ?? 0) + 600);
+
+    vi.unstubAllGlobals();
+    server.resetHandlers(...mockHandlers());
   });
 });
