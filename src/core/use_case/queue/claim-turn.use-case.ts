@@ -22,8 +22,8 @@ export type TurnWindowResult =
   | { kind: 'sold-out' };
 
 export interface ClaimTurnUseCaseInterface {
-  /** `random` (0–1) spreads the retries after FULL. */
-  execute: (eventId: string, random?: number) => Promise<ClaimTurnResult>;
+  /** `jitter` (0–1) spreads the retries after FULL; by default the millisecond of the clock, which differs per device. */
+  execute: (eventId: string, jitter?: number) => Promise<ClaimTurnResult>;
   /** When the 60 s turn window ends, for the countdown when the page was in the background. */
   turnWindow: (eventId: string) => Promise<TurnWindowResult>;
 }
@@ -52,7 +52,7 @@ export const ClaimTurnUseCase = ({
   };
 
   return {
-    execute: async (eventId, random = Math.random()) => {
+    execute: async (eventId, jitter = (Date.now() % 1000) / 1000) => {
       const tokens = tokensFor(eventId);
       if (!tokens) return forget(eventId);
       try {
@@ -63,7 +63,7 @@ export const ClaimTurnUseCase = ({
         const code = errorCodeOf(error);
         if (code === 'UNAUTHORIZED') return { kind: 'sign-in' };
         if (code === 'NOT_YET') return { kind: 'retry', afterMs: 1000 };
-        if (code === 'FULL') return { kind: 'retry', afterMs: Math.round(1000 + 1000 * random) };
+        if (code === 'FULL') return { kind: 'retry', afterMs: Math.round(1000 + 1000 * jitter) };
         if (code === 'NO_STOCK') return { kind: 'paused' };
         if (code === 'QUEUE_CLOSED') return { kind: 'sold-out' };
         if (code && GONE.has(code)) return forget(eventId);

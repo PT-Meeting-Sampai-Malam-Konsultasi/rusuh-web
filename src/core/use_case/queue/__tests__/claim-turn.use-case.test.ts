@@ -74,6 +74,13 @@ describe('ClaimTurnUseCase.execute', () => {
     deps.queueService.claimTurn.mockRejectedValue(error);
     await expect(useCase.execute('evt_pelita')).rejects.toBe(error);
   });
+  it('spreads the FULL retries by the clock millisecond when no jitter is given', async () => {
+    vi.useFakeTimers({ now: 1_000_250 });
+    const { deps, useCase } = setup();
+    deps.queueService.claimTurn.mockRejectedValue(problem(409, 'FULL'));
+    await expect(useCase.execute('evt_pelita')).resolves.toEqual({ kind: 'retry', afterMs: 1250 });
+    vi.useRealTimers();
+  });
 });
 
 describe('ClaimTurnUseCase.turnWindow', () => {
