@@ -1,0 +1,17 @@
+@reference "../../../../../styles/app.css";
+
+.title {
+  @apply mt-5;
+}
+
+.form {
+  @apply max-w-[520px];
+}
+
+.submit {
+  @apply mt-2 w-full;
+
+  @variant md {
+    @apply w-auto justify-self-start;
+  }
+}

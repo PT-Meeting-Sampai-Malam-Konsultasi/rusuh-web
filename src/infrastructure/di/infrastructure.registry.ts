@@ -17,6 +17,7 @@ import { createStorageAdapter } from '@infrastructure/adapters/storage.adapter';
 import { createTokenStore } from '@infrastructure/adapters/token-store.adapter';
 import { createTurnstileAdapter } from '@infrastructure/adapters/turnstile.adapter';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
+import { singleFlight } from '@utils/single-flight';
 import { TURNSTILE_SLOT_ID } from '@utils/constants/turnstile';
 
 import container from './container';
@@ -29,6 +30,10 @@ export function registerInfrastructure() {
     ({ storage, config }: Pick<Deps, 'storage' | 'config'>) =>
     () =>
       storage.get(STORAGE_KEYS.LANGUAGE) ?? config.defaultLocale;
+
+  // Resolved when a 401 arrives, not now: the use case is registered after the infrastructure. Concurrent 401s share
+  // one refresh, because each refresh rotates the cookie and a second one with the old cookie revokes the session.
+  const refreshSession = singleFlight(() => container.resolve('refreshSessionUseCase').execute());
 
   container.register({
     config: asValue(createConfig()),
@@ -49,13 +54,13 @@ export function registerInfrastructure() {
     queueHttp: asFunction((d: Deps) =>
       createHttpAdapter({ baseUrl: d.config.queueApiUrl, timeoutMs: d.config.apiTimeoutMs, getLocale: locale(d) }),
     ).singleton(),
-    // refreshSession is wired by the sign-in feature (NFR-07-W2) once the auth service exists.
     coreHttp: asFunction((d: Deps) =>
       createHttpAdapter({
         baseUrl: d.config.coreApiUrl,
         timeoutMs: d.config.apiTimeoutMs,
         getLocale: locale(d),
         getAccessToken: () => d.tokenStore.getAccessToken(),
+        refreshSession,
       }),
     ).singleton(),
     queueStream: asFunction((d: Deps) => createQueueStreamAdapter({ baseUrl: d.config.queueApiUrl })).singleton(),

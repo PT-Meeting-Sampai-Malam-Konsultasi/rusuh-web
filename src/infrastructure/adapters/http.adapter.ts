@@ -22,7 +22,7 @@ interface Problem {
   traceId?: string;
 }
 
-type RetryConfig = InternalAxiosRequestConfig & { _retried?: boolean };
+type RetryConfig = InternalAxiosRequestConfig & { _retried?: boolean; skipRefresh?: boolean };
 
 /** The `HttpError` contract as a real `Error`, so rejections carry a name and a stack trace. */
 export class HttpRequestError extends Error implements HttpError {
@@ -85,7 +85,7 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
   client.interceptors.response.use(undefined, async (error: unknown) => {
     const config = axios.isAxiosError(error) ? (error.config as RetryConfig | undefined) : undefined;
     const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-    if (status === 401 && config && !config._retried && options.refreshSession) {
+    if (status === 401 && config && !config._retried && !config.skipRefresh && options.refreshSession) {
       config._retried = true;
       if (await options.refreshSession()) {
         config.headers.delete('Authorization');
@@ -99,7 +99,12 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
     const res = await promise;
     return { data: res.data, status: res.status };
   };
-  const opts = (c?: RequestConfig) => ({ headers: c?.headers, signal: c?.signal });
+  const opts = (c?: RequestConfig) => ({
+    headers: c?.headers,
+    signal: c?.signal,
+    ...(c?.withCredentials ? { withCredentials: true } : {}),
+    ...(c?.skipRefresh ? { skipRefresh: true } : {}),
+  });
 
   return {
     get: (path, c) => wrap(client.get(path, opts(c))),

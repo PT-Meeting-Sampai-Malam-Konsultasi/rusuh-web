@@ -1,5 +1,6 @@
 import type { HttpHandler } from 'msw';
 
+import { authHandlers } from './auth.handlers';
 import { bookingHandlers } from './booking.handlers';
 import { catalogHandlers } from './catalog.handlers';
 import { queueHandlers } from './queue.handlers';
@@ -9,6 +10,7 @@ import type { MockContext } from './shared';
 const HANDLER_FACTORIES: Array<(context: MockContext) => HttpHandler[]> = [
   catalogHandlers,
   queueHandlers,
+  authHandlers,
   bookingHandlers,
 ];
 

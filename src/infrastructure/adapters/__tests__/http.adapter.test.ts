@@ -88,6 +88,30 @@ describe('createHttpAdapter', () => {
     await expect(http.get('/me')).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
   });
 
+  it('rejects a skipRefresh 401 without refreshing', async () => {
+    const refreshSession = vi.fn(async () => true);
+    const http = createHttpAdapter({
+      baseUrl: 'https://api.test',
+      timeoutMs: 1000,
+      transport: fail(401, { code: 'UNAUTHORIZED' }),
+      refreshSession,
+    });
+    await expect(http.post('/auth/refresh', undefined, { skipRefresh: true })).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(refreshSession).not.toHaveBeenCalled();
+  });
+
+  it('sends cookies only when asked', async () => {
+    const transport = ok({});
+    const http = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport });
+    await http.post('/auth/otp/verify', {}, { withCredentials: true });
+    await http.get('/events');
+    const calls = (transport as ReturnType<typeof vi.fn>).mock.calls as [InternalAxiosRequestConfig][];
+    expect(calls[0][0].withCredentials).toBe(true);
+    expect(calls[1][0].withCredentials).toBeFalsy();
+  });
+
   it('supports put, patch and delete', async () => {
     const http = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport: ok('done') });
     await expect(http.put('/a', {})).resolves.toMatchObject({ data: 'done' });

@@ -5,9 +5,9 @@ import container from '@infrastructure/di/container';
 import '@infrastructure/di/controllers/queue';
 import AppFooter from '@presentation/components/AppFooter';
 import AppHeader from '@presentation/components/AppHeader';
+import EventAside from '@presentation/components/EventAside';
 import TabBar from '@presentation/components/TabBar';
 
-import QueueEvent from './components/QueueEvent';
 import QueueJoining from './components/QueueJoining';
 import QueueMessage from './components/QueueMessage';
 import QueueNotes from './components/QueueNotes';
@@ -56,7 +56,7 @@ export default function QueueScreen() {
             </div>
             {event && (
               <div className={styles.aside}>
-                <QueueEvent
+                <EventAside
                   event={event}
                   label={t('queue_title')}
                   overlay={status === 'sold-out' ? t('home_sold_out_overlay') : null}

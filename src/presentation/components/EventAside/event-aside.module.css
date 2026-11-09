@@ -1,4 +1,4 @@
-@reference "../../../../../styles/app.css";
+@reference "../../../styles/app.css";
 
 .event {
   @apply relative mt-3.5;
@@ -102,5 +102,14 @@
   from {
     transform: translate(-50%, -50%) rotate(-14deg) scale(1.6);
     opacity: 0;
+  }
+}
+
+/* "Setelah masuk, Anda lanjut ke": a quiet label over the poster (HiFi login). */
+.caption {
+  @apply mb-2 text-xs font-semibold tracking-[0.08em] text-ink-2 uppercase;
+
+  @variant md {
+    @apply mb-3.5;
   }
 }

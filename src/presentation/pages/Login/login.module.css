@@ -1,0 +1,45 @@
+@reference "../../../styles/app.css";
+
+.page {
+  @apply flex min-h-screen flex-col;
+}
+
+.main {
+  @apply flex-1;
+}
+
+/* Phone: event banner, step, notes. Desktop: step left, tilted poster right (HiFi login). */
+.layout {
+  @apply mx-auto flex max-w-[calc(1328px+112px)] flex-col px-4;
+
+  @variant md {
+    @apply grid items-start gap-x-10 px-14 pt-[30px];
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      'main aside'
+      'notes notes';
+  }
+
+  @variant lg {
+    @apply gap-x-16;
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+}
+
+.column {
+  @apply min-w-0;
+  grid-area: main;
+}
+
+.aside {
+  @apply -order-1 pt-3.5;
+  grid-area: aside;
+
+  @variant md {
+    @apply order-none pt-0;
+  }
+}
+
+.notes {
+  grid-area: notes;
+}

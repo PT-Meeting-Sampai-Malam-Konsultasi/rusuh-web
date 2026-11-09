@@ -17,6 +17,10 @@ export interface HttpError {
 export interface RequestConfig {
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** Send cookies (the web's `__Host-rt` refresh cookie on the auth calls). */
+  withCredentials?: boolean;
+  /** Reject a 401 as it is, without refreshing the session first (the auth calls themselves). */
+  skipRefresh?: boolean;
 }
 
 export interface HttpProtocol {

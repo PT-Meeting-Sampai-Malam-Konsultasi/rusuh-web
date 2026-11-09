@@ -1,0 +1,29 @@
+@reference "../../../../../styles/app.css";
+
+.field {
+  @apply grid gap-2;
+}
+
+.label {
+  @apply text-sm font-semibold;
+}
+
+.submit {
+  @apply mt-2;
+
+  @variant md {
+    @apply w-auto min-w-[240px] justify-self-start;
+  }
+}
+
+.resend {
+  @apply grid justify-items-center gap-1 text-[15px] text-ink-2;
+
+  b {
+    @apply font-semibold text-ink tabular-nums;
+  }
+
+  @variant md {
+    @apply justify-items-start;
+  }
+}
