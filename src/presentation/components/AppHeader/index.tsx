@@ -40,6 +40,8 @@ export default function AppHeader({ nav, locale, onLocaleChange, labels }: AppHe
               </Link>
             </span>
           ))}
+          {/* Flow pages (sign-in) pass no links: the language switch still has a place on desktop. */}
+          {!last && switcher}
         </nav>
         <div className={styles.phoneSwitch}>{switcher}</div>
       </div>

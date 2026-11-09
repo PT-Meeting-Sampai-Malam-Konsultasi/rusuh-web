@@ -30,4 +30,18 @@ describe('AppHeader', () => {
     expect(within(main).getByRole('link', { name: 'Event' })).toHaveAttribute('aria-current', 'page');
     expect(within(main).getByRole('group', { name: 'Bahasa' })).toBeInTheDocument();
   });
+
+  it('keeps the language switch on desktop for flow pages without links', () => {
+    render(
+      <AppHeader
+        nav={[]}
+        locale="id"
+        onLocaleChange={vi.fn()}
+        labels={{ home: 'Rusuh', nav: 'Utama', language: 'Bahasa' }}
+      />,
+    );
+    const main = screen.getByRole('navigation', { name: 'Utama' });
+    expect(within(main).queryAllByRole('link')).toHaveLength(0);
+    expect(within(main).getByRole('group', { name: 'Bahasa' })).toBeInTheDocument();
+  });
 });

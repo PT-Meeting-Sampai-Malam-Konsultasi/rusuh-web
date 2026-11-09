@@ -1,0 +1,27 @@
+@reference "../../../../../styles/app.css";
+
+/* Phone: field over a full-width button. Desktop: button beside the field, aligned to the input. */
+.row {
+  @apply grid gap-4;
+
+  @variant md {
+    @apply items-start gap-4;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.field {
+  @apply min-w-0;
+}
+
+.submit {
+  @apply w-full;
+
+  @variant md {
+    @apply mt-[27px] w-auto;
+  }
+}
+
+.term {
+  @apply text-ink underline decoration-1 underline-offset-2;
+}

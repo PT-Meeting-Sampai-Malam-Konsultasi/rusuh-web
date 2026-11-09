@@ -1,0 +1,82 @@
+@reference "../../../../styles/app.css";
+
+/* Shared by the three sign-in steps (HiFi login.html): shout, lead, form. */
+.step {
+  @apply pt-6 pb-8;
+
+  @variant md {
+    @apply pt-2 pb-0;
+  }
+}
+
+.title {
+  @apply font-display text-[44px] leading-[0.92] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+
+  @variant md {
+    font-size: clamp(64px, 7vw, 112px);
+  }
+}
+
+.lead {
+  @apply mt-4 max-w-[640px] text-base text-ink-2;
+
+  @variant md {
+    @apply mt-6 text-[22px] leading-snug;
+  }
+
+  b {
+    @apply font-semibold text-ink;
+  }
+}
+
+.form {
+  @apply mt-6 grid max-w-[640px] gap-4;
+
+  @variant md {
+    @apply mt-10;
+  }
+}
+
+.arrow {
+  @apply text-[22px] leading-none;
+}
+
+.small {
+  @apply text-[13px] text-ink-2;
+
+  b {
+    @apply font-semibold text-ink;
+  }
+}
+
+/* A text action inside a sentence ("Ganti email", "Kirim ulang kode"). */
+.textButton {
+  @apply inline-flex min-h-11 items-center font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply decoration-pink;
+  }
+
+  &:focus-visible {
+    @apply shadow-off-blue outline-none;
+  }
+
+  &:active {
+    @apply text-pink-ink;
+  }
+
+  &:disabled {
+    @apply cursor-not-allowed text-ink-3 no-underline;
+  }
+}
+
+.alert {
+  @apply flex items-start gap-1.5 text-[13px] leading-snug font-semibold text-red;
+
+  b {
+    @apply size-4 flex-none rounded-full bg-red text-center text-[11px] leading-4 font-extrabold text-white;
+  }
+}

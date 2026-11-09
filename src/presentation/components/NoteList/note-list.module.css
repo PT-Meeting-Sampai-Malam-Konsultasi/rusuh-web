@@ -1,4 +1,4 @@
-@reference "../../../../../styles/app.css";
+@reference "../../../styles/app.css";
 
 .notes {
   @apply mt-[30px] border-t-[2.5px] border-ink pb-10;

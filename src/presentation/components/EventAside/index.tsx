@@ -1,19 +1,34 @@
-import type { QueueEventView } from '@controllers/queue.controller';
-import Poster from '@presentation/components/Poster';
+import Poster, { type PosterTone } from '@presentation/components/Poster';
 
-import styles from './queue-event.module.css';
+import styles from './event-aside.module.css';
 
-interface QueueEventProps {
-  event: QueueEventView;
-  label: string;
-  /** Sold out: the poster goes grey and gets the stamped plate. */
-  overlay: string | null;
+/** The event as the aside shows it (waiting room, sign-in). */
+export interface EventAsideView {
+  name: string;
+  subtitle?: string;
+  imageUrl?: string;
+  posterTone: PosterTone;
+  posterDate: string;
+  posterPlace: string;
+  dateLine: string;
+  venueLine: string;
+  kicker: string;
 }
 
-/** Which show this queue is for: the tilted poster beside the number on desktop, a printed banner on phones. */
-export default function QueueEvent({ event, label, overlay }: QueueEventProps) {
+interface EventAsideProps {
+  event: EventAsideView;
+  label: string;
+  /** Sold out: the poster goes grey and gets the stamped plate. */
+  overlay?: string | null;
+  /** A small line above the poster ("Setelah masuk, Anda lanjut ke"). */
+  caption?: string;
+}
+
+/** Which show the page is about: the tilted poster beside the content on desktop, a printed banner on phones. */
+export default function EventAside({ event, label, overlay = null, caption }: EventAsideProps) {
   return (
     <aside className={`${styles.event} ${overlay ? styles.closed : ''}`} aria-label={label}>
+      {caption && <p className={styles.caption}>{caption}</p>}
       {/* Only one of the two is displayed at a time, so screen readers meet the event once. */}
       <div className={styles.poster}>
         <Poster

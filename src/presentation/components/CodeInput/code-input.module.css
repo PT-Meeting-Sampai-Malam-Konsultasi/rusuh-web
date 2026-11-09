@@ -1,0 +1,62 @@
+@reference "../../../styles/app.css";
+
+.code {
+  @apply flex items-center gap-1.5;
+
+  @variant md {
+    @apply gap-2.5;
+  }
+}
+
+/* Splits the code 3 + 3, so it reads like the e-mail. */
+.dash {
+  @apply flex-none font-display text-2xl font-bold text-ink-3;
+}
+
+/* HiFi .otp: a printed box per digit, blue offset on focus. */
+.box {
+  @apply h-[60px] w-full min-w-0 flex-1 border-[2.5px] border-ink bg-card text-center font-display text-[32px] font-extrabold tabular-nums shadow-off-s;
+  font-stretch: 85%;
+  caret-color: var(--color-pink);
+  transition: box-shadow 120ms;
+
+  @variant md {
+    @apply h-[72px] w-[60px] flex-none text-[40px];
+  }
+
+  &:hover:not(:disabled) {
+    @apply bg-white;
+  }
+
+  &:focus-visible,
+  &:focus {
+    @apply shadow-off-blue outline-none;
+  }
+
+  &:disabled {
+    @apply cursor-not-allowed bg-paper-2 text-ink-3 shadow-none;
+  }
+}
+
+.invalid .box {
+  @apply border-red bg-red-tint text-red;
+  box-shadow: 4px 4px 0 var(--color-red);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .invalid {
+    animation: shake 380ms var(--ease-out-print);
+  }
+}
+
+@keyframes shake {
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
