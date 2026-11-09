@@ -1,0 +1,44 @@
+@reference "../../../../../styles/app.css";
+
+/* From where the buyer joined (left) to their turn (right); blue dots fill as the line moves. */
+.track {
+  @apply relative mt-6 h-9 border-[2.5px] border-ink;
+
+  @variant md {
+    @apply mt-[34px] h-[46px];
+  }
+}
+
+.fill {
+  @apply absolute inset-y-0 left-0;
+  width: var(--p, 0%);
+  background: radial-gradient(circle, var(--color-blue) 2.1px, transparent 2.4px) 0 0 / 9px 9px;
+  transition: width 0.6s var(--ease-print);
+}
+
+.me {
+  @apply absolute -top-3 -bottom-3 w-[5px] bg-pink;
+  left: var(--p, 0%);
+  transition: left 0.6s var(--ease-print);
+}
+
+.labels {
+  @apply mt-2.5 flex flex-wrap justify-between gap-x-2.5 gap-y-1 text-xs font-medium;
+
+  b {
+    @apply font-bold tabular-nums;
+  }
+
+  @variant md {
+    @apply flex-nowrap gap-4 text-sm;
+  }
+}
+
+/* Phones: the numbers get their own line under the two ends. */
+.mid {
+  @apply order-3 w-full text-[13px];
+
+  @variant md {
+    @apply order-none w-auto text-sm;
+  }
+}

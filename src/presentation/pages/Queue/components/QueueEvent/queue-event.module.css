@@ -1,0 +1,106 @@
+@reference "../../../../../styles/app.css";
+
+.event {
+  @apply relative mt-3.5;
+
+  @variant md {
+    @apply mt-0;
+  }
+}
+
+.poster {
+  @apply hidden;
+
+  @variant md {
+    @apply block;
+  }
+}
+
+/* The hero poster in a 320–400px column: a smaller title so names like SAMUDRA stay on one line. */
+.narrow.narrow {
+  --title-size: clamp(48px, 5vw, 84px);
+  --subtitle-size: 24px;
+}
+
+/* Phone banner: the poster folded into a strip (HiFi .wr-poster below 720px). */
+.banner {
+  @apply relative grid items-end gap-x-2.5 gap-y-0.5 overflow-hidden border-[2.5px] border-ink px-4 py-3.5;
+  grid-template-columns: 1fr auto;
+  box-shadow: var(--shadow-off-s);
+
+  &::before {
+    @apply pointer-events-none absolute inset-0;
+    content: '';
+    background: radial-gradient(circle, currentcolor 1.6px, transparent 1.9px) 0 0 / 9px 9px;
+    opacity: 0.18;
+  }
+
+  @variant md {
+    @apply hidden;
+  }
+}
+
+.blue {
+  @apply bg-blue text-paper;
+}
+
+.pink {
+  @apply bg-pink text-paper;
+}
+
+.ink {
+  @apply bg-ink text-paper;
+}
+
+.paper {
+  @apply bg-card text-blue;
+}
+
+.kicker {
+  @apply relative col-span-2 text-[11px] font-bold tracking-[0.08em] uppercase;
+}
+
+.name {
+  @apply relative mt-1.5 font-display text-[40px] leading-[0.86] font-extrabold;
+  font-stretch: 75%;
+}
+
+.subtitle {
+  @apply relative mb-1 self-end bg-paper px-1.5 pt-[3px] pb-0.5 font-display text-sm font-bold text-ink;
+  font-stretch: 85%;
+}
+
+.meta {
+  @apply relative col-span-2 mt-2.5 border-t-[1.5px] border-current pt-2 text-[13px] leading-normal;
+}
+
+.closed .poster,
+.closed .banner {
+  filter: grayscale(1);
+}
+
+/* The same tilted plate as the Home sold-out cards, larger. */
+.overlay {
+  @apply pointer-events-none absolute top-1/2 left-[74%] border-3 border-ink bg-paper px-2.5 pt-1 font-display text-[40px] leading-none font-extrabold whitespace-nowrap text-ink;
+  font-stretch: 75%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  box-shadow: 4px 4px 0 var(--color-pink);
+
+  @variant md {
+    @apply left-1/2 border-4 px-[22px] pt-2 pb-0.5 text-[96px];
+    box-shadow: 6px 6px 0 var(--color-pink);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .overlay {
+    animation: stamp-in 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both 0.15s;
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    transform: translate(-50%, -50%) rotate(-14deg) scale(1.6);
+    opacity: 0;
+  }
+}

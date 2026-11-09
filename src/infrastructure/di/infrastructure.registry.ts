@@ -9,11 +9,15 @@ import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
 import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
 import { createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
+import { createDeviceTokenStore } from '@infrastructure/adapters/device-token-store.adapter';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
+import { createQueuePlaceStore } from '@infrastructure/adapters/queue-place-store.adapter';
 import { createQueueStreamAdapter } from '@infrastructure/adapters/queue-stream.adapter';
 import { createStorageAdapter } from '@infrastructure/adapters/storage.adapter';
 import { createTokenStore } from '@infrastructure/adapters/token-store.adapter';
+import { createTurnstileAdapter } from '@infrastructure/adapters/turnstile.adapter';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
+import { TURNSTILE_SLOT_ID } from '@utils/constants/turnstile';
 
 import container from './container';
 import type { AwilixRegistry } from './registry.types';
@@ -33,6 +37,13 @@ export function registerInfrastructure() {
     // The mock API accepts a placeholder token so /order works in dev without the queue; real builds start empty.
     admissionStore: asFunction(({ config }: Pick<Deps, 'config'>) =>
       createAdmissionStore(config.apiMock ? { fallbackToken: MOCK_ADMISSION_TOKEN } : {}),
+    ).singleton(),
+    deviceTokenStore: asFunction(({ storage }: Pick<Deps, 'storage'>) =>
+      createDeviceTokenStore({ storage }),
+    ).singleton(),
+    queuePlaceStore: asFunction(({ storage }: Pick<Deps, 'storage'>) => createQueuePlaceStore({ storage })).singleton(),
+    turnstile: asFunction((d: Deps) =>
+      createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
     ).singleton(),
     analyticsAdapter: asFunction(() => createAnalyticsAdapter()).singleton(),
     queueHttp: asFunction((d: Deps) =>

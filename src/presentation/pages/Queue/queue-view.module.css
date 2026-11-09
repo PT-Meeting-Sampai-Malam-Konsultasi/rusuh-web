@@ -1,0 +1,91 @@
+@reference "../../../styles/app.css";
+
+/* Shared by the waiting room views (HiFi waiting-room.html .wr-main). */
+
+.view {
+  @apply min-w-0 pt-[26px];
+
+  @variant md {
+    @apply pt-[18px];
+  }
+}
+
+.lead {
+  @apply text-lg leading-tight font-medium;
+
+  @variant md {
+    font-size: clamp(18px, 1.7vw, 24px);
+  }
+}
+
+/* "± 4 menit lagi" line: strong statement, muted detail. */
+.eta {
+  @apply mt-[18px] flex flex-wrap items-baseline gap-x-3 gap-y-1.5;
+
+  @variant md {
+    @apply mt-6 gap-x-[18px];
+  }
+
+  strong {
+    @apply font-display text-[32px] leading-none font-bold;
+    font-stretch: 85%;
+
+    @variant md {
+      @apply text-[44px];
+    }
+  }
+
+  span {
+    @apply text-[13px] text-ink-2;
+
+    @variant md {
+      @apply text-[15px];
+    }
+  }
+}
+
+.say {
+  @apply mt-[26px] max-w-[560px] text-[15px] text-ink-2;
+}
+
+.copy {
+  @apply mt-[26px] max-w-[600px] text-base leading-[1.55];
+
+  @variant md {
+    @apply text-[19px];
+  }
+}
+
+/* "Tiket habis." and other one-line verdicts. */
+.verdict {
+  @apply mt-3.5 font-display text-[74px] leading-[0.86] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.025em;
+
+  @variant md {
+    @apply mt-5 -ml-1.5;
+    font-size: clamp(80px, 12vw, 176px);
+  }
+}
+
+.actions {
+  @apply mt-7 flex flex-col items-stretch gap-4;
+
+  @variant md {
+    @apply mt-10 flex-row flex-wrap items-center gap-7;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.45s var(--ease-print) both;
+    animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}

@@ -17,6 +17,8 @@ interface PosterProps {
   titleId?: string;
   /** Above-the-fold artwork (the order page thumb) loads eagerly. */
   loading?: 'lazy' | 'eager';
+  /** Extra class from the page, e.g. a smaller title in a narrow column. */
+  className?: string;
 }
 
 const IMAGE_SIZE = { hero: [400, 500], card: [400, 500], thumb: [84, 104] } as const;
@@ -33,11 +35,12 @@ export default function Poster({
   titleAs: Title = 'p',
   titleId,
   loading = 'lazy',
+  className,
 }: PosterProps) {
   const [width, height] = IMAGE_SIZE[size];
   const thumb = size === 'thumb';
   return (
-    <div className={`${styles.poster} ${styles[tone]} ${styles[size]}`}>
+    <div className={[styles.poster, styles[tone], styles[size], className].filter(Boolean).join(' ')}>
       {imageUrl ? (
         <>
           {/* Event artwork from the API: next/image has no optimizer in export mode. */}
