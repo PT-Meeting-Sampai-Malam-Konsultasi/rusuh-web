@@ -136,6 +136,8 @@
   "queue_paused_title": "Lanjut otomatis",
   "queue_paused_operator": "Penyelenggara sedang memeriksa sistem. Biasanya kurang dari 5 menit.",
   "queue_paused_say": "Jangan tutup atau refresh berulang — tidak mempercepat, tidak memperlambat.",
+  "queue_entering_title": "Tidak ada antrian.",
+  "queue_entering_body": "Kami bawa Anda langsung ke pemilihan tiket…",
   "queue_turn_lead": "Nomor {{number}}, silakan masuk.",
   "queue_turn_title": "Giliran Anda!",
   "queue_turn_action": "Pilih tiket sekarang",

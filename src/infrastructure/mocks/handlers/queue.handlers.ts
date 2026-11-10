@@ -88,11 +88,11 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
   let devices = saved?.devices ?? 0;
   const persist = () => saveState({ places: [...places], nextSeq: [...nextSeq], queues: [...queues], devices });
 
-  /** Where new numbers land: `near_front` 20 places back, `far_back` 12.000, `ok` 1.248; null for scenarios that
-   *  don't say (`stream_off`, `slow`…), which keep the running queue's placement. */
+  /** Where new numbers land: `no_queue` nobody ahead, `near_front` 20 places back, `far_back` 12.000, `ok` 1.248;
+   *  null for scenarios that don't say (`stream_off`, `slow`…), which keep the running queue's placement. */
   const placementOf = () => {
     const scenario = getScenario();
-    return scenario === 'near_front' || scenario === 'far_back' || scenario === 'ok' ? scenario : null;
+    return ['ok', 'near_front', 'far_back', 'no_queue'].includes(scenario) ? scenario : null;
   };
 
   const queueOf = (eventId: string) => {
@@ -126,7 +126,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
     queueOf(eventId).startedAt ??= time;
     // `near_front`: 20 places back, so the turn comes in about 4 s; `far_back`: 12.000 back, a long wait.
     const placement = placementOf() ?? queueOf(eventId).placement;
-    const ahead = { near_front: 20, far_back: 12_000 }[placement as string] ?? AHEAD_AT_JOIN;
+    const ahead = { near_front: 20, far_back: 12_000, no_queue: 0 }[placement as string] ?? AHEAD_AT_JOIN;
     const seq = Math.max(nextSeq.get(eventId) ?? SERVED_AT_JOIN + ahead, rawServed(eventId, time) + ahead);
     nextSeq.set(eventId, seq + 1);
     return seq;

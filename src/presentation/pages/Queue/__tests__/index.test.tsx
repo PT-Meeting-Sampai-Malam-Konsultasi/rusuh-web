@@ -217,4 +217,13 @@ describe('QueueScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: /queue_missed_action/ }));
     expect(controller.queueAgain).toHaveBeenCalledTimes(1);
   });
+
+  it('says there is no queue while taking the buyer on to the tickets', () => {
+    controller = { ...base(), status: 'entering', waiting: null };
+    render(<QueueScreen />);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('queue_entering_title');
+    expect(screen.getByText('queue_entering_body')).toBeInTheDocument();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'queue_notes_label' })).not.toBeInTheDocument();
+  });
 });

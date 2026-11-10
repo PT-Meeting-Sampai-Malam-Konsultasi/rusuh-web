@@ -217,10 +217,14 @@ const QueueController = ({
   const router = useRouterNext();
   const visible = usePageVisible();
   const atTurn = !!place?.turnReached && place.state === 'open';
+  // FR-05: the join answer itself is at the turn, so there is no queue: straight on, no turn screen or 60 s timer.
+  const skipping =
+    joined?.state === 'open' && joined.seq !== null && joined.served !== null && joined.served >= joined.seq;
+  const signInHref = `${ROUTES.LOGIN}?next=${encodeURIComponent(`${ROUTES.QUEUE}?event=${eventId}`)}`;
   const windowQuery = useQueryTanstack<TurnWindowResult, HttpError>({
     queryKey: [QUERY_KEYS.QUEUE_TURN, eventId, place?.seq],
     queryFn: () => claimTurnUseCase.turnWindow(eventId),
-    enabled: atTurn,
+    enabled: atTurn && !skipping,
     staleTime: Infinity,
     gcTime: 0,
     retry: false,
@@ -276,8 +280,20 @@ const QueueController = ({
     if (!atTurn) return baseStatus;
     if (claim?.kind === 'missed' || turnWindow?.kind === 'missed' || (turnSeconds === 0 && !admitted)) return 'missed';
     if (claim?.kind === 'paused') return 'paused';
-    return 'turn';
+    return skipping ? 'entering' : 'turn';
   })();
+
+  // No queue and no session: sign in first (claiming needs it, ADR-0025); back here, the claim goes through.
+  useEffect(() => {
+    if (skipping && claim?.kind === 'sign-in') router.replace(signInHref);
+  }, [skipping, claim, router, signInHref]);
+
+  const skipTracked = useRef(false);
+  useEffect(() => {
+    if (!skipping || skipTracked.current) return;
+    skipTracked.current = true;
+    analyticsAdapter.trackEvent('queue_skip', { eventId });
+  }, [skipping, analyticsAdapter, eventId]);
 
   // Admitted: on to the order page, with the admission token kept in memory for it (replace: Back must not reclaim).
   useEffect(() => {
@@ -349,6 +365,7 @@ const QueueController = ({
       waiting: t('queue_kicker_open'),
       turn: t('queue_kicker_open'),
       missed: t('queue_kicker_open'),
+      entering: t('queue_kicker_open'),
       prequeue: opensAtLabel ? t('queue_kicker_prequeue', { time: opensAtLabel }) : t('queue_kicker_open'),
       paused: t('queue_kicker_paused'),
       'sold-out': t('queue_kicker_closed'),
@@ -431,10 +448,7 @@ const QueueController = ({
             seq: formatCount(place.seq, locale),
             seconds: turnSeconds,
             claiming: visible && (!claim || claim.kind === 'retry' || claimQuery.isFetching === true),
-            signInHref:
-              claim?.kind === 'sign-in'
-                ? `${ROUTES.LOGIN}?next=${encodeURIComponent(`${ROUTES.QUEUE}?event=${eventId}`)}`
-                : null,
+            signInHref: claim?.kind === 'sign-in' ? signInHref : null,
           }
         : null,
     claimNow: () => {

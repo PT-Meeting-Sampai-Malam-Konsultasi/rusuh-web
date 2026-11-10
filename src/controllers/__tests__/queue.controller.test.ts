@@ -659,4 +659,45 @@ describe('QueueController', () => {
       expect(d.joinQueueUseCase.execute).toHaveBeenLastCalledWith('evt_pelita', { rejoin: false });
     });
   });
+
+  describe('no queue (FR-05)', () => {
+    const noQueue = () => {
+      joinState = { data: place({ served: 19700, position: 1, progress: 0 }) };
+    };
+
+    it('goes straight on when the join answer is already at the turn: no turn screen, no window read', () => {
+      noQueue();
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.status).toBe('entering');
+      expect(result.current.turn).toBeNull();
+      expect(claimOptions.enabled).toBe(true);
+      expect(windowOptions.enabled).toBe(false);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_skip', { eventId: 'evt_pelita' });
+    });
+
+    it('moves on to the order page once admitted', () => {
+      noQueue();
+      claimState = { data: { kind: 'admitted', admission: { admissionToken: 'adm' } } };
+      render();
+      expect(router.replace).toHaveBeenCalledWith('/order?event=evt_pelita');
+    });
+
+    it('sends a guest straight to sign in, back to this queue', () => {
+      noQueue();
+      claimState = { data: { kind: 'sign-in' } };
+      render();
+      expect(router.replace).toHaveBeenCalledWith('/login?next=%2Fqueue%3Fevent%3Devt_pelita');
+    });
+
+    it('keeps the turn screen for a turn that came while waiting', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ served: 19700 }) };
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.status).toBe('turn');
+      expect(windowOptions.enabled).toBe(true);
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalledWith('queue_skip', expect.anything());
+    });
+  });
 });

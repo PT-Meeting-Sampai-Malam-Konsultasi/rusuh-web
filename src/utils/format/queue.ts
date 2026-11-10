@@ -14,9 +14,11 @@ export type QueueStatus =
   | 'not-found'
   | 'elsewhere'
   | 'error'
-  /** FR-08: `seq <= served`; the controller sets these two, not the join answer. */
+  /** FR-08: `seq <= served`; the controller sets these, not the join answer. */
   | 'turn'
-  | 'missed';
+  | 'missed'
+  /** FR-05: no queue at all; on the way to the order page. */
+  | 'entering';
 
 /** Which waiting room view to show for the join answer (App Flow 4.2). */
 export function queueStatusFor(hasEventId: boolean, result: JoinQueueResult | undefined, failed: boolean): QueueStatus {

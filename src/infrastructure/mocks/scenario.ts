@@ -15,6 +15,8 @@ export const MOCK_SCENARIOS = [
   'near_front',
   /** FR-07/09: a new number joins 12.000 places back: a long wait estimate, slow polling, no stream. */
   'far_back',
+  /** FR-05: nobody ahead, so the buyer goes straight to the order page. */
+  'no_queue',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];

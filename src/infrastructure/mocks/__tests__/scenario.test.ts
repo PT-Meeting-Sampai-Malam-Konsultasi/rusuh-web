@@ -19,5 +19,6 @@ describe('resolveScenario', () => {
     expect(resolveScenario('?mock=stream_off', null)).toBe('stream_off');
     expect(resolveScenario('?mock=near_front', null)).toBe('near_front');
     expect(resolveScenario('?mock=far_back', null)).toBe('far_back');
+    expect(resolveScenario('?mock=no_queue', null)).toBe('no_queue');
   });
 });

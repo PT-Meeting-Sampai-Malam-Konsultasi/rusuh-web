@@ -306,4 +306,16 @@ describe('queue mock', () => {
     expect(drawn).toMatchObject({ state: 'open', seq: 19700, served: 18452 + 25 });
     expect((await queue.joinQueue('evt_samudra', device, 'ts')).data.seq).toBe(19700);
   });
+
+  it('puts nobody ahead in the no_queue scenario, and admits at once', async () => {
+    server.resetHandlers(...mockHandlers());
+    scenario = 'no_queue';
+    const device = await register();
+    const { data } = await queue.joinQueue('evt_pelita', device, 'ts');
+    expect(data.served).toBeGreaterThanOrEqual(data.seq!);
+    const { data: admission } = await queueHttp.post<Admission>('queue/evt_pelita/claim', undefined, {
+      headers: { 'X-Device-Token': device, 'X-Queue-Token': data.queueToken, Authorization: 'Bearer mock' },
+    });
+    expect(admission.admissionToken).toBe(`mock-admission.evt_pelita.${data.seq}`);
+  });
 });
