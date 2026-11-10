@@ -1,0 +1,103 @@
+@reference "../../../styles/app.css";
+
+/* Leaves room for the phone tab bar; the desktop footer follows the content. */
+.page {
+  @apply flex min-h-screen flex-col pb-[84px];
+
+  @variant md {
+    @apply pb-0;
+  }
+}
+
+.main {
+  @apply flex-1;
+}
+
+/* HiFi .ac: who you are on the left, the NIK card on the right (below on phones). */
+.layout {
+  @apply mx-auto max-w-[calc(1328px+112px)] px-4 pt-[22px] pb-10;
+
+  @variant md {
+    @apply grid items-start gap-10 px-14 pt-9;
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  @variant lg {
+    @apply gap-[72px];
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+}
+
+.column {
+  @apply min-w-0;
+}
+
+.aside {
+  @apply mt-10;
+
+  @variant md {
+    @apply sticky top-[110px] mt-2;
+  }
+}
+
+/* The name is the hero (Display XL). */
+.name {
+  @apply -ml-1 font-display text-[52px] leading-[0.84] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+
+  @variant md {
+    font-size: clamp(64px, 9vw, 128px);
+  }
+}
+
+.email {
+  @apply mt-2 text-base text-ink-2;
+
+  @variant md {
+    @apply mt-3.5 text-xl;
+  }
+}
+
+.out {
+  @apply mt-10 flex items-center gap-7;
+
+  @variant md {
+    @apply mt-12;
+  }
+}
+
+.skeleton {
+  @apply grid gap-4;
+}
+
+.lineXl,
+.line {
+  @apply block bg-paper-2;
+}
+
+.lineXl {
+  @apply h-[52px] w-3/4;
+
+  @variant md {
+    @apply h-24;
+  }
+}
+
+.line {
+  @apply h-5 w-1/2;
+}
+
+.message {
+  @apply grid justify-items-start gap-4;
+}
+
+.messageTitle {
+  @apply font-display text-[40px] leading-[0.9] font-extrabold;
+  font-stretch: 75%;
+}
+
+.messageBody {
+  @apply text-ink-2;
+}

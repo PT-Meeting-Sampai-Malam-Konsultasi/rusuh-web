@@ -1,0 +1,10 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .ac-form: the field, then Simpan and Batal on one line. */
+.form {
+  @apply mt-5 grid max-w-[560px] gap-4;
+}
+
+.actions {
+  @apply flex items-center gap-6;
+}
