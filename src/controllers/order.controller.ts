@@ -130,7 +130,10 @@ const OrderController = ({
     () => (eventData && !eventNotFound ? toOrderEventView(eventData, locale) : null),
     [eventData, eventNotFound, locale],
   );
-  const categories = useMemo(() => (ok ? ok.categories.map(toOrderCategoryView) : []), [ok]);
+  const categories = useMemo(
+    () => (ok ? ok.categories.map((category) => toOrderCategoryView(category, locale, t)) : []),
+    [ok, locale, t],
+  );
 
   const errorCode = (eventError ?? categoriesError)?.code;
   const errorMessage =
