@@ -9,6 +9,7 @@ const t = ((key: string, params?: Record<string, unknown>) => `${key}:${JSON.str
 
 const joined = (state: 'preopen' | 'open' | 'paused' | 'closed', seq: number | null = 10): JoinQueueResult => ({
   kind: 'joined',
+  resumed: false,
   place: {
     eventId: 'e',
     state,

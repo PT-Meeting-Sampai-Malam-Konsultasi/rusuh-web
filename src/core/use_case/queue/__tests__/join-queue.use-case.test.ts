@@ -30,7 +30,8 @@ function setup({ deviceToken = 'device-old' as string | null, stored = null as S
       joinQueue: vi.fn().mockResolvedValue({ data: PLACE, status: 200 }),
       getFrontier: vi.fn(),
       claimTurn: vi.fn(),
-      getMyPlace: vi.fn(),
+      // No place on the server unless a test says so: the use case joins.
+      getMyPlace: vi.fn().mockRejectedValue(problem(404, 'NOT_FOUND')),
     },
     deviceTokenStore: {
       get: vi.fn(() => device),
@@ -58,6 +59,7 @@ describe('JoinQueueUseCase', () => {
     const { deps, places, useCase } = setup();
     await expect(useCase.execute('evt_pelita')).resolves.toEqual({
       kind: 'joined',
+      resumed: false,
       place: {
         eventId: 'evt_pelita',
         state: 'open',
@@ -183,5 +185,63 @@ describe('JoinQueueUseCase', () => {
     const weird = setup();
     weird.deps.queueService.joinQueue.mockRejectedValue('boom');
     await expect(weird.useCase.execute('evt_pelita')).rejects.toBe('boom');
+  });
+
+  describe('resume (FR-10)', () => {
+    const STORED = { queueToken: 'queue-token', seq: 19700, joinedServed: 17400 };
+
+    it('reads the stored place back on a refresh or a new tab, without Turnstile or a new join', async () => {
+      const { deps, places, useCase } = setup({ stored: STORED });
+      deps.queueService.getMyPlace.mockResolvedValue({ data: { ...PLACE, served: 18952 }, status: 200 });
+      await expect(useCase.execute('evt_pelita')).resolves.toMatchObject({
+        kind: 'joined',
+        resumed: true,
+        place: { seq: 19700, served: 18952, joinedServed: 17400, position: 748 },
+      });
+      expect(deps.queueService.getMyPlace).toHaveBeenCalledWith('evt_pelita', 'device-old', 'queue-token');
+      expect(deps.queueService.joinQueue).not.toHaveBeenCalled();
+      expect(deps.turnstile.getToken).not.toHaveBeenCalled();
+      expect(places.get('evt_pelita')).toEqual({ queueToken: 'queue-token', seq: 19700, joinedServed: 17400 });
+    });
+
+    it.each([
+      [401, 'UNAUTHORIZED'],
+      [404, 'NOT_FOUND'],
+    ])('joins when the place read answers %i %s', async (status, code) => {
+      const { deps, useCase } = setup({ stored: STORED });
+      deps.queueService.getMyPlace.mockRejectedValue(problem(status, code));
+      await expect(useCase.execute('evt_pelita')).resolves.toMatchObject({ kind: 'joined', resumed: false });
+      expect(deps.queueService.joinQueue).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['MISSED', 'missed'],
+      ['EXPIRED', 'missed'],
+      ['MOVED', 'elsewhere'],
+      ['QUEUE_CLOSED', 'sold-out'],
+    ])('says why a gone place is gone (410 %s → %s) and forgets it', async (code, kind) => {
+      const { deps, places, useCase } = setup({ stored: STORED });
+      deps.queueService.getMyPlace.mockRejectedValue(problem(410, code));
+      await expect(useCase.execute('evt_pelita')).resolves.toEqual({ kind });
+      expect(places.has('evt_pelita')).toBe(false);
+      expect(deps.queueService.joinQueue).not.toHaveBeenCalled();
+    });
+
+    it('joins at the back on "Antre lagi", whatever is stored', async () => {
+      const { deps, useCase } = setup({ stored: STORED });
+      await expect(useCase.execute('evt_pelita', { rejoin: true })).resolves.toMatchObject({ resumed: false });
+      expect(deps.queueService.getMyPlace).not.toHaveBeenCalled();
+      expect(deps.queueService.joinQueue).toHaveBeenCalled();
+    });
+
+    it('does not resume without a device token, and lets other read errors through', async () => {
+      const none = setup({ deviceToken: null, stored: STORED });
+      await none.useCase.execute('evt_pelita');
+      expect(none.deps.queueService.getMyPlace).not.toHaveBeenCalled();
+
+      const down = setup({ stored: STORED });
+      down.deps.queueService.getMyPlace.mockRejectedValue(problem(0, 'NETWORK_ERROR'));
+      await expect(down.useCase.execute('evt_pelita')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    });
   });
 });

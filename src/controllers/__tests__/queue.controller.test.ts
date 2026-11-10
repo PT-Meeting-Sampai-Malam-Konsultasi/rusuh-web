@@ -26,6 +26,7 @@ const EVENTS = { featured: pelita, others: [rimba], total: 2, serverNow: NOW } a
 
 const place = (extra: Partial<JoinedPlace> = {}): JoinQueueResult => ({
   kind: 'joined',
+  resumed: false,
   place: {
     eventId: 'evt_pelita',
     state: 'open',
@@ -153,7 +154,7 @@ describe('QueueController', () => {
       refetchOnReconnect: false,
     });
     await expect((joinOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('joined');
-    expect(d.joinQueueUseCase.execute).toHaveBeenCalledWith('evt_pelita');
+    expect(d.joinQueueUseCase.execute).toHaveBeenCalledWith('evt_pelita', { rejoin: false });
   });
 
   it('reads the event from the Home list query, sharing its cache', async () => {
@@ -626,6 +627,36 @@ describe('QueueController', () => {
       frontierState = { data: frontier({ served: 13700, rateLow: 220, rateHigh: 360 }) };
       rerender();
       expect(result.current.waiting?.eta).toBe('queue_eta_range:{"low":15,"high":30}');
+    });
+  });
+
+  describe('resume (FR-10)', () => {
+    it('shows the missed view when a refresh finds the turn passed', () => {
+      joinState = { data: { kind: 'missed' } };
+      expect(render().result.current.status).toBe('missed');
+    });
+
+    it('tracks a resumed place as resumed', () => {
+      const d = deps();
+      joinState = { data: { ...place(), resumed: true } };
+      render(d);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_join', {
+        eventId: 'evt_pelita',
+        outcome: 'resumed',
+        state: 'open',
+      });
+    });
+
+    it('rejoins at the back on "Antre lagi" only, then resumes again', async () => {
+      const d = deps();
+      joinState = { data: { kind: 'missed' } };
+      const { result } = render(d);
+      result.current.queueAgain();
+      const run = joinOptions.queryFn as () => Promise<unknown>;
+      await run();
+      expect(d.joinQueueUseCase.execute).toHaveBeenLastCalledWith('evt_pelita', { rejoin: true });
+      await run();
+      expect(d.joinQueueUseCase.execute).toHaveBeenLastCalledWith('evt_pelita', { rejoin: false });
     });
   });
 });

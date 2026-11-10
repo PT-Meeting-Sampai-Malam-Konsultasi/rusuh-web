@@ -23,15 +23,23 @@ export interface JoinedPlace {
 }
 
 export type JoinQueueResult =
-  | { kind: 'joined'; place: JoinedPlace }
+  /** `resumed`: read back with the stored tokens (refresh, new tab), not joined again (FR-10). */
+  | { kind: 'joined'; place: JoinedPlace; resumed: boolean }
   /** 410 QUEUE_CLOSED: sold out, nobody waits for nothing (W-7). */
   | { kind: 'sold-out' }
   | { kind: 'not-found' }
   /** 409: a signed-in account already holds a place on another device (Q-51). */
-  | { kind: 'elsewhere' };
+  | { kind: 'elsewhere' }
+  /** 410 MISSED or EXPIRED on resume: the turn passed; say so instead of handing out a new number. */
+  | { kind: 'missed' };
+
+export interface JoinQueueOptions {
+  /** "Antre lagi": forget the stored place and join at the back. */
+  rejoin?: boolean;
+}
 
 export interface JoinQueueUseCaseInterface {
-  execute: (eventId: string) => Promise<JoinQueueResult>;
+  execute: (eventId: string, options?: JoinQueueOptions) => Promise<JoinQueueResult>;
 }
 
 type Deps = Pick<
@@ -45,9 +53,19 @@ const OUTCOMES: Readonly<Record<string, JoinQueueResult['kind']>> = {
   ACCOUNT_HAS_PLACE_ELSEWHERE: 'elsewhere',
 };
 
+/** Resuming: the place is gone (410), so say why; 401 / 404 mean "join instead". */
+const GONE_ON_RESUME: Readonly<Record<string, JoinQueueResult['kind']>> = {
+  MISSED: 'missed',
+  EXPIRED: 'missed',
+  MOVED: 'elsewhere',
+  QUEUE_CLOSED: 'sold-out',
+};
+const JOIN_INSTEAD = new Set(['UNAUTHORIZED', 'NOT_FOUND']);
+
 /**
  * FR-04: device token (Turnstile + registerDevice, once per browser), then joinQueue with a fresh Turnstile token.
- * A rejected device token (401) is replaced once. The place is kept per event for the later queue calls.
+ * A rejected device token (401) is replaced once. The place is kept per event for the later queue calls, and FR-10
+ * reads it back with those tokens on a refresh or a new tab before joining again.
  */
 export const JoinQueueUseCase = ({
   deviceService,
@@ -62,16 +80,42 @@ export const JoinQueueUseCase = ({
       return data;
     });
 
+  /** FR-10: read the place back with the stored tokens (no Turnstile, no write); null means "join". */
+  const resume = async (eventId: string): Promise<QueuePlace | JoinQueueResult | null> => {
+    const deviceToken = deviceTokenStore.get();
+    const queueToken = queuePlaceStore.get(eventId)?.queueToken;
+    if (!deviceToken || !queueToken) return null;
+    try {
+      const { data } = await queueService.getMyPlace(eventId, deviceToken, queueToken);
+      return data;
+    } catch (error) {
+      const code = errorCodeOf(error) ?? '';
+      if (JOIN_INSTEAD.has(code)) return null;
+      const kind = GONE_ON_RESUME[code];
+      if (!kind) throw error;
+      queuePlaceStore.remove(eventId);
+      return { kind } as JoinQueueResult;
+    }
+  };
+
   return {
-    execute: async (eventId) => {
+    execute: async (eventId, { rejoin = false } = {}) => {
+      if (rejoin) queuePlaceStore.remove(eventId);
+      const resumed = await resume(eventId);
+      if (resumed && 'kind' in resumed) return resumed;
+
       let place: QueuePlace;
-      try {
-        place = await joinWithDevice(eventId);
-      } catch (error) {
-        const kind = OUTCOMES[errorCodeOf(error) ?? ''];
-        if (!kind) throw error;
-        if (kind === 'sold-out') queuePlaceStore.remove(eventId);
-        return { kind } as JoinQueueResult;
+      if (resumed) {
+        place = resumed;
+      } else {
+        try {
+          place = await joinWithDevice(eventId);
+        } catch (error) {
+          const kind = OUTCOMES[errorCodeOf(error) ?? ''];
+          if (!kind) throw error;
+          if (kind === 'sold-out') queuePlaceStore.remove(eventId);
+          return { kind } as JoinQueueResult;
+        }
       }
 
       const served = place.served ?? null;
@@ -82,6 +126,7 @@ export const JoinQueueUseCase = ({
 
       return {
         kind: 'joined',
+        resumed: !!resumed,
         place: {
           eventId: place.eventId,
           state: place.state,
