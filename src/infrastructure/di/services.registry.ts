@@ -6,6 +6,7 @@ import { BookingService } from '@core/services/booking.service';
 import { CatalogService } from '@core/services/catalog.service';
 import { DeviceService } from '@core/services/device.service';
 import { QueueService } from '@core/services/queue.service';
+import { SignOutUseCase } from '@core/use_case/auth/sign-out.use-case';
 import { RefreshSessionUseCase } from '@core/use_case/auth/refresh-session.use-case';
 import { RequestSignInCodeUseCase } from '@core/use_case/auth/request-sign-in-code.use-case';
 import { VerifySignInCodeUseCase } from '@core/use_case/auth/verify-sign-in-code.use-case';
@@ -32,6 +33,7 @@ export function registerServices() {
     followQueueUseCase: asFunction(FollowQueueUseCase).singleton(),
     claimTurnUseCase: asFunction(ClaimTurnUseCase).singleton(),
     refreshSessionUseCase: asFunction(RefreshSessionUseCase).singleton(),
+    signOutUseCase: asFunction(SignOutUseCase).singleton(),
     requestSignInCodeUseCase: asFunction(RequestSignInCodeUseCase).singleton(),
     verifySignInCodeUseCase: asFunction(VerifySignInCodeUseCase).singleton(),
   });

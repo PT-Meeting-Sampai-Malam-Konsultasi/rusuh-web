@@ -17,6 +17,7 @@ import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { DeviceServiceInterface } from '@core/services/device.service';
 import type { QueueServiceInterface } from '@core/services/queue.service';
+import type { SignOutUseCaseInterface } from '@core/use_case/auth/sign-out.use-case';
 import type { RefreshSessionUseCaseInterface } from '@core/use_case/auth/refresh-session.use-case';
 import type { RequestSignInCodeUseCaseInterface } from '@core/use_case/auth/request-sign-in-code.use-case';
 import type { VerifySignInCodeUseCaseInterface } from '@core/use_case/auth/verify-sign-in-code.use-case';
@@ -25,6 +26,7 @@ import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-h
 import type { ClaimTurnUseCaseInterface } from '@core/use_case/queue/claim-turn.use-case';
 import type { FollowQueueUseCaseInterface } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
+import type { AccountControllerInterface } from '@controllers/account.controller';
 import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { LoginControllerInterface } from '@controllers/login.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
@@ -102,6 +104,7 @@ export interface AwilixRegistry {
   followQueueUseCase: FollowQueueUseCaseInterface;
   claimTurnUseCase: ClaimTurnUseCaseInterface;
   refreshSessionUseCase: RefreshSessionUseCaseInterface;
+  signOutUseCase: SignOutUseCaseInterface;
   requestSignInCodeUseCase: RequestSignInCodeUseCaseInterface;
   verifySignInCodeUseCase: VerifySignInCodeUseCaseInterface;
 
@@ -109,6 +112,7 @@ export interface AwilixRegistry {
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
 
   // controllers
+  accountController: AccountControllerInterface;
   homeController: HomeControllerInterface;
   loginController: LoginControllerInterface;
   notFoundController: NotFoundControllerInterface;
