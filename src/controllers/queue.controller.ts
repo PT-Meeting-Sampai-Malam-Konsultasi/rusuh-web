@@ -184,6 +184,8 @@ const QueueController = ({
   const [fellBack, setFellBack] = useState(false);
   const [streamRetryAt, setStreamRetryAt] = useState(0);
   const connectFailures = useRef(0);
+  /** `errorUpdateCount` at the last successful poll: the polls failed in a row since then set the backoff (NFR-01). */
+  const errorsAtLastPoll = useRef(0);
   const following = !!joined && joined.seq !== null;
 
   const frontierQuery = useQueryTanstack<FrontierResult, HttpError>({
@@ -195,10 +197,13 @@ const QueueController = ({
       const data = query.state.data;
       const next = joined ? applyFrontier(joined, data?.kind === 'frontier' ? data.frontier : null) : null;
       const active = !!next && (next.state === 'open' || next.state === 'paused') && !next.turnReached;
+      const { dataUpdatedAt, errorUpdatedAt, errorUpdateCount } = query.state;
+      if (dataUpdatedAt >= errorUpdatedAt) errorsAtLastPoll.current = errorUpdateCount;
+      const failures = errorUpdateCount - errorsAtLastPoll.current;
       // Jitter fixed per answer (its arrival millisecond): a new random number on every render would restart the
       // timer each second, while the clock below re-renders, and the poll would never fire.
-      const jitter = (query.state.dataUpdatedAt % 1000) / 1000;
-      return active ? pollDelayMs(next.position, jitter, fellBack) : false;
+      const jitter = (Math.max(dataUpdatedAt, errorUpdatedAt) % 1000) / 1000;
+      return active ? pollDelayMs(next.position, jitter, fellBack, failures) : false;
     },
     retry: false,
     gcTime: 0,
@@ -236,7 +241,10 @@ const QueueController = ({
     enabled: atTurn && visible,
     staleTime: Infinity,
     gcTime: 0,
-    retry: false,
+    // Expected answers come back as results; a thrown error is the server or the network: try 3 more times, then
+    // hand the button back to the buyer (NFR-01).
+    retry: 3,
+    retryDelay: (attempt) => 1000 * 2 ** attempt,
     refetchOnWindowFocus: false,
     refetchInterval: (query) => (query.state.data?.kind === 'retry' ? query.state.data.afterMs : false),
   });
@@ -447,7 +455,8 @@ const QueueController = ({
         ? {
             seq: formatCount(place.seq, locale),
             seconds: turnSeconds,
-            claiming: visible && (!claim || claim.kind === 'retry' || claimQuery.isFetching === true),
+            claiming:
+              visible && !claimQuery.isError && (!claim || claim.kind === 'retry' || claimQuery.isFetching === true),
             signInHref: claim?.kind === 'sign-in' ? signInHref : null,
           }
         : null,

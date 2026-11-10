@@ -315,9 +315,10 @@ describe('QueueController', () => {
   });
 
   describe('live updates (FR-07)', () => {
-    const interval = (dataUpdatedAt = 500) =>
-      (frontierOptions.refetchInterval as (q: { state: { data: unknown; dataUpdatedAt: number } }) => number | false)({
-        state: { data: frontierState.data, dataUpdatedAt },
+    type IntervalState = { data: unknown; dataUpdatedAt: number; errorUpdatedAt: number; errorUpdateCount: number };
+    const interval = (dataUpdatedAt = 500, errors: Partial<IntervalState> = {}) =>
+      (frontierOptions.refetchInterval as (q: { state: IntervalState }) => number | false)({
+        state: { data: frontierState.data, dataUpdatedAt, errorUpdatedAt: 0, errorUpdateCount: 0, ...errors },
       });
 
     it('polls the frontier after the join, every 2–10 s by distance, with jitter fixed per answer', async () => {
@@ -485,9 +486,11 @@ describe('QueueController', () => {
       expect(claimOptions).toMatchObject({
         queryKey: ['queue-claim', 'evt_pelita', 19700],
         enabled: true,
-        retry: false,
+        retry: 3,
         staleTime: Infinity,
       });
+      const delay = claimOptions.retryDelay as (attempt: number) => number;
+      expect([0, 1, 2].map(delay)).toEqual([1000, 2000, 4000]);
       expect(windowOptions).toMatchObject({ queryKey: ['queue-turn', 'evt_pelita', 19700], enabled: true });
       await expect((claimOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('claimed');
       await expect((windowOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('window');
@@ -698,6 +701,37 @@ describe('QueueController', () => {
       expect(result.current.status).toBe('turn');
       expect(windowOptions.enabled).toBe(true);
       expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalledWith('queue_skip', expect.anything());
+    });
+  });
+
+  describe('graceful states (NFR-01)', () => {
+    type IntervalState = { data: unknown; dataUpdatedAt: number; errorUpdatedAt: number; errorUpdateCount: number };
+    const interval = (state: Partial<IntervalState>) =>
+      (frontierOptions.refetchInterval as (q: { state: IntervalState }) => number | false)({
+        state: { data: frontierState.data, dataUpdatedAt: 500, errorUpdatedAt: 0, errorUpdateCount: 0, ...state },
+      });
+
+    it('backs the poll off while it fails in a row, and goes back to normal after a success', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier() };
+      render();
+      expect(interval({ dataUpdatedAt: 1_000_500 })).toBe(5000); // 1.248 back, success: 5 s
+      expect(interval({ errorUpdatedAt: 1_005_500, errorUpdateCount: 1 })).toBe(10_000);
+      expect(interval({ errorUpdatedAt: 1_015_500, errorUpdateCount: 2 })).toBe(20_000);
+      expect(interval({ errorUpdatedAt: 1_095_500, errorUpdateCount: 5 })).toBe(60_000);
+      expect(interval({ dataUpdatedAt: 1_100_500, errorUpdatedAt: 1_095_500, errorUpdateCount: 5 })).toBe(5000);
+      expect(interval({ dataUpdatedAt: 1_100_500, errorUpdatedAt: 1_105_500, errorUpdateCount: 6 })).toBe(10_000);
+    });
+
+    it('hands the button back once the claim has failed for good', () => {
+      joinState = { data: place() };
+      frontierState = { data: frontier({ served: 19700 }) };
+      claimState = { isError: true, error: { status: 503, code: 'INTERNAL_ERROR', message: 'x' } };
+      const { result } = render();
+      expect(result.current.status).toBe('turn');
+      expect(result.current.turn?.claiming).toBe(false);
+      result.current.claimNow();
+      expect(refetch).toHaveBeenCalled();
     });
   });
 });

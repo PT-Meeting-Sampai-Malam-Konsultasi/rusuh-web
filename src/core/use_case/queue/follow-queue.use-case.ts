@@ -39,6 +39,8 @@ const POLL_TIERS: ReadonlyArray<readonly [number, number]> = [
   [10_000, 5 * SECOND],
 ];
 const POLL_FAR_MS = 10 * SECOND;
+/** Failing polls back off up to this (NFR-01): a struggling server is not hit harder by every device. */
+const POLL_BACKOFF_MAX_MS = 60 * SECOND;
 const JITTER = 0.2;
 /** The server's `retry: 3000`. */
 const STREAM_RETRY_MS = 3 * SECOND;
@@ -46,10 +48,14 @@ const STREAM_RETRY_MS = 3 * SECOND;
 const STREAM_BACKOFF_MS = 60 * SECOND;
 const QUEUE_STATES: ReadonlySet<string> = new Set<QueueState>(['preopen', 'open', 'paused', 'closed']);
 
-/** How long until the next poll: by distance from the front, ±20% so devices don't poll in step. */
-export function pollDelayMs(position: number | null, random: number, fellBack: boolean): number {
+/**
+ * How long until the next poll: by distance from the front, ±20% so devices don't poll in step. After `failures` polls
+ * in a row failed, the wait doubles per failure up to 60 s (NFR-01 "retry with backoff").
+ */
+export function pollDelayMs(position: number | null, random: number, fellBack: boolean, failures = 0): number {
   const tier = position === null ? undefined : POLL_TIERS.find(([upTo]) => position <= upTo);
-  const base = Math.min(tier?.[1] ?? POLL_FAR_MS, fellBack ? 2 * SECOND : Infinity);
+  const normal = Math.min(tier?.[1] ?? POLL_FAR_MS, fellBack ? 2 * SECOND : Infinity);
+  const base = failures > 0 ? Math.min(POLL_BACKOFF_MAX_MS, normal * 2 ** failures) : normal;
   return Math.round(base * (1 - JITTER + 2 * JITTER * random));
 }
 
