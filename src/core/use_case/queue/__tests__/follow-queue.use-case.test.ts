@@ -51,6 +51,14 @@ describe('pollDelayMs', () => {
     expect(pollDelayMs(5000, 1, false)).toBe(6000);
   });
 
+  it('backs off after failures in a row, up to a minute, and keeps the jitter', () => {
+    expect(pollDelayMs(5000, 0.5, false, 1)).toBe(10_000);
+    expect(pollDelayMs(5000, 0.5, false, 2)).toBe(20_000);
+    expect(pollDelayMs(5000, 0.5, false, 6)).toBe(60_000);
+    expect(pollDelayMs(5000, 0, false, 6)).toBe(48_000);
+    expect(pollDelayMs(500, 0.5, true, 1)).toBe(4000);
+  });
+
   it('polls at most every 2 s after the stream fell back', () => {
     expect(pollDelayMs(1500, 0.5, true)).toBe(2000);
     expect(pollDelayMs(null, 1, true)).toBe(2400);
