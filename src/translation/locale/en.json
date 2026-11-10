@@ -136,6 +136,8 @@
   "queue_paused_title": "Resumes on its own",
   "queue_paused_operator": "The organiser is checking the system. Usually under 5 minutes.",
   "queue_paused_say": "No need to close or keep refreshing — it won't speed you up or slow you down.",
+  "queue_entering_title": "No queue right now.",
+  "queue_entering_body": "Taking you straight to the tickets…",
   "queue_turn_lead": "Number {{number}}, come on in.",
   "queue_turn_title": "Your turn!",
   "queue_turn_action": "Choose tickets now",

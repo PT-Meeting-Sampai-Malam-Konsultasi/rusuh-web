@@ -8,6 +8,7 @@ import AppHeader from '@presentation/components/AppHeader';
 import EventAside from '@presentation/components/EventAside';
 import TabBar from '@presentation/components/TabBar';
 
+import QueueEntering from './components/QueueEntering';
 import QueueJoining from './components/QueueJoining';
 import QueueMessage from './components/QueueMessage';
 import QueueMissed from './components/QueueMissed';
@@ -20,7 +21,16 @@ import QueueWaiting from './components/QueueWaiting';
 import styles from './queue.module.css';
 
 /** States shown in the waiting room layout; the rest are a plain message. */
-const ROOM: readonly QueueStatus[] = ['joining', 'waiting', 'prequeue', 'paused', 'sold-out', 'turn', 'missed'];
+const ROOM: readonly QueueStatus[] = [
+  'joining',
+  'waiting',
+  'prequeue',
+  'paused',
+  'sold-out',
+  'turn',
+  'missed',
+  'entering',
+];
 /** States where the buyer holds a place, so the reassurance notes apply. */
 const WITH_NOTES: readonly QueueStatus[] = ['waiting', 'prequeue', 'paused'];
 
@@ -66,6 +76,7 @@ export default function QueueScreen() {
             <h1 className={styles.heading}>{event ? `${t('queue_title')}: ${event.name}` : t('queue_title')}</h1>
             <div className={styles.column}>
               {status === 'joining' && <QueueJoining t={t} />}
+              {status === 'entering' && <QueueEntering t={t} />}
               {waiting && <QueueWaiting t={t} waiting={waiting} />}
               {status === 'prequeue' && <QueuePrequeue t={t} prequeue={prequeue} />}
               {paused && <QueuePaused t={t} paused={paused} />}
