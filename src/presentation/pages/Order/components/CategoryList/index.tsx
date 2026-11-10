@@ -8,7 +8,10 @@ interface CategoryListProps {
   categories: OrderCategoryView[];
 }
 
-/** Section 1: the categories in server order, name and what it means. Price, status and stepper come later. */
+/**
+ * Section 1: the categories in server order with name, availability label and price (stepper comes in FR-13/14-W1).
+ * DOM order name → status → price, so a sold-out row reads "Habis" before its price; the strike-through is CSS only.
+ */
 export default function CategoryList({ heading, note, categories }: CategoryListProps) {
   return (
     <section className={styles.section} aria-labelledby="order-categories-heading">
@@ -27,11 +30,17 @@ export default function CategoryList({ heading, note, categories }: CategoryList
       </div>
       <ul className={styles.list} aria-describedby={note ? 'order-categories-note' : undefined}>
         {categories.map((category) => (
-          <li key={category.id} className={styles.row}>
+          <li key={category.id} className={styles.row} data-sold-out={category.soldOut || undefined}>
             <div className={styles.name}>
               <h3 className={styles.title}>{category.name}</h3>
               {category.description && <p className={styles.description}>{category.description}</p>}
             </div>
+            {category.availabilityLabel && (
+              <span className={styles.status} data-availability={category.availability ?? undefined}>
+                {category.availabilityLabel}
+              </span>
+            )}
+            <span className={styles.price}>{category.price}</span>
           </li>
         ))}
       </ul>

@@ -49,18 +49,61 @@
   @apply list-none;
 }
 
-/* One-column grid now; price, status and stepper columns join it in FR-12/13-W1. */
+/* Phone: name and price on the first line, status under the name. From 720px: name, status, price in one line. */
 .row {
-  @apply grid items-center gap-5 border-b border-hair py-3.5;
-  grid-template-columns: minmax(0, 1fr);
+  @apply grid items-center gap-x-3 gap-y-1.5 border-b border-hair py-3.5;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'n p' 's .';
 
   @variant md {
-    @apply py-[18px];
+    @apply gap-5 py-[18px];
+
+    /* The stepper `auto` column (area "st") joins in FR-13/14-W1. */
+    grid-template-columns: minmax(0, 1fr) 120px 150px;
+    grid-template-areas: 'n s p';
   }
 }
 
 .name {
   @apply min-w-0;
+  grid-area: n;
+}
+
+/* Uppercase word; 12.5px on phones (design-system minimum, HiFi 12px). */
+.status {
+  @apply self-center font-sans text-[12.5px] font-semibold tracking-[.04em] text-ink-2 uppercase;
+  grid-area: s;
+
+  @variant md {
+    @apply text-[13px];
+  }
+}
+
+.status[data-availability='almost_gone'] {
+  @apply text-pink-ink;
+}
+
+.price {
+  @apply text-right font-sans text-base font-bold tabular-nums;
+  grid-area: p;
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+/* Sold out: the word on a plate carries the meaning; grey and strike-through only back it up. */
+.row[data-sold-out] .title,
+.row[data-sold-out] .price {
+  @apply text-ink-3;
+}
+
+.row[data-sold-out] .price {
+  @apply line-through;
+}
+
+.row[data-sold-out] .status {
+  @apply justify-self-start bg-paper-2 px-1.5 py-[3px] text-ink;
 }
 
 .title {
