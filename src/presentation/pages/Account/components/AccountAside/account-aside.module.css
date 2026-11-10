@@ -1,0 +1,36 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .ac-card: a quiet trust card (no tilt, no halftone). */
+.card {
+  @apply border-[2.5px] border-ink bg-card p-5 shadow-off-s;
+
+  @variant md {
+    @apply p-6 shadow-off;
+  }
+}
+
+.title {
+  @apply font-display text-[22px] leading-tight font-extrabold;
+  font-stretch: 75%;
+}
+
+.steps {
+  @apply mt-3.5 grid gap-3;
+  counter-reset: step;
+}
+
+.steps li {
+  @apply grid gap-2.5 text-[15px] leading-normal;
+  grid-template-columns: 30px 1fr;
+  counter-increment: step;
+
+  &::before {
+    @apply font-display text-[22px] leading-[1.1] font-extrabold text-blue-ink;
+    content: counter(step);
+    font-stretch: 75%;
+  }
+}
+
+.safe {
+  @apply mt-[18px] border-t border-hair pt-3.5 text-[13px] text-ink-2;
+}

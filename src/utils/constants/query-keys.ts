@@ -7,4 +7,5 @@ export const QUERY_KEYS = {
   QUEUE_FRONTIER: 'queue-frontier',
   QUEUE_TURN: 'queue-turn',
   QUEUE_CLAIM: 'queue-claim',
+  ME: 'me',
 } as const;

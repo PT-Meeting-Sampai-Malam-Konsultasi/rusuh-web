@@ -1,0 +1,83 @@
+@reference "../../../styles/app.css";
+
+/* Shared by the account sections (HiFi account.css .ac-blk, .blk-h, .no, .ac-rows). */
+.section {
+  @apply mt-8;
+
+  @variant md {
+    @apply mt-11;
+  }
+}
+
+.head {
+  @apply flex items-center justify-between gap-4 border-b-[2.5px] border-ink pb-3;
+}
+
+.title {
+  @apply font-display text-[26px] leading-tight font-extrabold;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply text-[40px];
+  }
+}
+
+/* The section number on an ink block. */
+.no {
+  @apply mr-2.5 inline-grid h-7 w-7 place-items-center bg-ink align-[3px] font-display text-lg text-paper;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply mr-3.5 h-9 w-9 align-[4px] text-[22px];
+  }
+}
+
+.link {
+  @apply min-h-11 font-semibold whitespace-nowrap underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-[2.5px] outline-offset-2 outline-blue;
+  }
+}
+
+.rows > div {
+  @apply grid gap-1 border-b border-hair py-3;
+
+  @variant md {
+    @apply items-baseline gap-5 py-4;
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+}
+
+.rows dt {
+  @apply text-sm font-semibold text-ink-2;
+}
+
+.rows dd {
+  @apply flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 font-display text-xl leading-tight font-bold;
+  font-stretch: 85%;
+  overflow-wrap: anywhere;
+
+  @variant md {
+    @apply text-[22px];
+  }
+}
+
+/* Plain text values ("Kode 6 digit ke email ini."). */
+.rows dd.plain {
+  @apply font-sans text-base leading-normal font-medium;
+  font-stretch: normal;
+}
+
+.missing {
+  @apply text-pink-ink;
+}
+
+.verified {
+  @apply font-sans text-xs font-semibold tracking-[0.04em] text-green uppercase;
+  font-stretch: normal;
+}
