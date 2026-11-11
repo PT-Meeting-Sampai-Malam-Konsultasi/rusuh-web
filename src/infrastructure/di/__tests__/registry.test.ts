@@ -41,6 +41,7 @@ const KEYS = {
   queueService: true,
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
+  orderTicketSelectionUseCase: true,
   joinQueueUseCase: true,
   followQueueUseCase: true,
   claimTurnUseCase: true,
@@ -111,6 +112,11 @@ describe('DI registries', () => {
     expect(typeof container.resolve('accountService').updateProfile).toBe('function');
     expect(container.resolve('requestSignInCodeUseCase')).toBe(container.resolve('requestSignInCodeUseCase'));
     expect(typeof container.resolve('verifySignInCodeUseCase').execute).toBe('function');
+  });
+
+  it('wires the order ticket selection use case as a singleton', () => {
+    expect(container.resolve('orderTicketSelectionUseCase')).toBe(container.resolve('orderTicketSelectionUseCase'));
+    expect(typeof container.resolve('orderTicketSelectionUseCase').orderLimit).toBe('function');
   });
 
   it('has every page shell import the registration of the controller it resolves', () => {

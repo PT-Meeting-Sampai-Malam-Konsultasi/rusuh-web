@@ -8,11 +8,11 @@ Writer: use-case-writer. Depends on spec 46 (`reservedUnits`). Spec 48 calls it.
 
 ## Tasks
 
-- [ ] 1. Create `src/core/use_case/booking/order-ticket-selection.use-case.ts` with the types, `ORDER_MAX_TICKETS`, `orderLimit`, `summarize`, `increment` and `decrement` [Requirement 1, Requirement 2, Requirement 3]
-- [ ] 2. Add `reconcileHolders`, `canChooseSelf` and `setHolderType` (block on `SELF_TAKEN`, profile name trimmed, `nik` untouched) to the same file [Requirement 4, Requirement 5]
-- [ ] 3. Write `src/core/use_case/booking/__tests__/order-ticket-selection.use-case.test.ts` covering every case in the Testing Strategy [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6]
-- [ ] 4. Register `orderTicketSelectionUseCase: asFunction(OrderTicketSelectionUseCase).singleton()` in `services.registry.ts`, add it to `AwilixRegistry` and to `KEYS` in `src/infrastructure/di/__tests__/registry.test.ts` [Requirement 6]
-- [ ] 5. Run the gate check [ALL]
+- [x] 1. Create `src/core/use_case/booking/order-ticket-selection.use-case.ts` with the types, `ORDER_MAX_TICKETS`, `orderLimit`, `summarize`, `increment` and `decrement` [Requirement 1, Requirement 2, Requirement 3]
+- [x] 2. Add `reconcileHolders`, `canChooseSelf` and `setHolderType` (block on `SELF_TAKEN`, profile name trimmed, `nik` untouched) to the same file [Requirement 4, Requirement 5]
+- [x] 3. Write `src/core/use_case/booking/__tests__/order-ticket-selection.use-case.test.ts` covering every case in the Testing Strategy [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6]
+- [x] 4. Register `orderTicketSelectionUseCase: asFunction(OrderTicketSelectionUseCase).singleton()` in `services.registry.ts`, add it to `AwilixRegistry` and to `KEYS` in `src/infrastructure/di/__tests__/registry.test.ts` [Requirement 6]
+- [x] 5. Run the gate check [ALL]
 
 ## Task Dependency Graph
 
