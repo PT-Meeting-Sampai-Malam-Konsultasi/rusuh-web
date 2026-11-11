@@ -6,9 +6,6 @@ const nextConfig: NextConfig = {
   output: 'export',
   // next/image has no optimizer in export mode: serve images as-is (sized, WebP/AVIF) from public/.
   images: { unoptimized: true },
-  experimental: {
-    agentFeedback: true,
-  },
   turbopack: {
     root: __dirname,
     // Tailwind runs on every CSS file. CSS Modules must stay modules (scoped class names), so they get their own
