@@ -1,9 +1,10 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Category } from '@core/entities/booking/booking.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { OrderCategoriesResult } from '@core/use_case/booking/get-order-categories.use-case';
+import { OrderTicketSelectionUseCase } from '@core/use_case/booking/order-ticket-selection.use-case';
 import { retryTransientOnce } from '@utils/query/retry';
 
 import OrderController from '../order.controller';
@@ -59,8 +60,10 @@ const err = (status: number, code: string): QueryState => ({ isError: true, erro
 describe('OrderController', () => {
   let eventOptions: Record<string, unknown>;
   let categoriesOptions: Record<string, unknown>;
+  let meOptions: Record<string, unknown>;
   let eventState: QueryState;
   let categoriesState: QueryState;
+  let meState: QueryState;
   let search: Record<string, string>;
   const eventRefetch = vi.fn();
   const categoriesRefetch = vi.fn();
@@ -74,7 +77,12 @@ describe('OrderController', () => {
 
   const deps = () => ({
     catalogService: { listEvents: vi.fn(), getEvent: vi.fn().mockResolvedValue({ data: event, status: 200 }) },
+    accountService: {
+      getMe: vi.fn().mockResolvedValue({ data: { userId: 'usr_1', email: 'nadia@example.com' }, status: 200 }),
+      updateProfile: vi.fn(),
+    },
     getOrderCategoriesUseCase: { execute: vi.fn().mockResolvedValue(okResult) },
+    orderTicketSelectionUseCase: OrderTicketSelectionUseCase(),
     admissionStore: { get: vi.fn().mockReturnValue('adm_token'), set: vi.fn(), clear: vi.fn() },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -92,6 +100,10 @@ describe('OrderController', () => {
         eventOptions = options;
         return { data: undefined, isError: false, error: null, refetch: eventRefetch, ...eventState };
       }
+      if (options.queryKey[0] === 'me') {
+        meOptions = options;
+        return { data: undefined, isError: false, error: null, refetch: vi.fn(), ...meState };
+      }
       categoriesOptions = options;
       return { data: undefined, isError: false, error: null, refetch: categoriesRefetch, ...categoriesState };
     },
@@ -103,6 +115,7 @@ describe('OrderController', () => {
     vi.clearAllMocks();
     eventState = {};
     categoriesState = {};
+    meState = {};
     search = { event: 'evt_samudra' };
     i18n.language = 'id';
   });
@@ -216,6 +229,12 @@ describe('OrderController', () => {
           availability: 'available',
           availabilityLabel: 'order_availability_available',
           soldOut: false,
+          quantity: 0,
+          selected: false,
+          canIncrement: true,
+          canDecrement: false,
+          incrementLabel: 'order_stepper_increase:{"category":"Festival"}',
+          decrementLabel: 'order_stepper_decrease:{"category":"Festival"}',
         },
         {
           id: 'cat_tribune',
@@ -225,6 +244,12 @@ describe('OrderController', () => {
           availability: 'sold_out',
           availabilityLabel: 'order_availability_sold_out',
           soldOut: true,
+          quantity: 0,
+          selected: false,
+          canIncrement: true,
+          canDecrement: false,
+          incrementLabel: 'order_stepper_increase:{"category":"Tribun"}',
+          decrementLabel: 'order_stepper_decrease:{"category":"Tribun"}',
         },
       ]);
       expect(result.current.categories[1]).not.toHaveProperty('available');
@@ -387,6 +412,363 @@ describe('OrderController', () => {
       const other = deps();
       render(other);
       expect(other.analyticsAdapter.trackPageView).toHaveBeenCalledWith('order');
+    });
+  });
+  describe('steppers', () => {
+    const ready = () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+    };
+
+    it('starts every quantity at 0 with the limit from the use case', () => {
+      ready();
+      const { result } = render();
+      expect(result.current.categories.map((c) => c.quantity)).toEqual([0, 0]);
+      expect(result.current.totalTickets).toBe(0);
+      expect(result.current.orderLimit).toBe(3);
+      expect(result.current.showHolders).toBe(false);
+      expect(result.current.holders).toEqual([]);
+    });
+
+    it('has a limit of 0 and no rows before the categories load', () => {
+      const { result } = render();
+      expect(result.current.orderLimit).toBe(0);
+      expect(result.current.categories).toEqual([]);
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.totalTickets).toBe(0);
+    });
+
+    it('adds and removes tickets per category and marks the row selected', () => {
+      ready();
+      const { result } = render();
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.categories[0]).toMatchObject({
+        quantity: 2,
+        selected: true,
+        canIncrement: true,
+        canDecrement: true,
+      });
+      expect(result.current.categories[1]).toMatchObject({ quantity: 0, selected: false, canDecrement: false });
+      expect(result.current.totalTickets).toBe(2);
+      act(() => result.current.decrement('cat_festival'));
+      expect(result.current.categories[0].quantity).toBe(1);
+      expect(result.current.totalTickets).toBe(1);
+    });
+
+    it('does not disable a sold-out category (FR-14-W1)', () => {
+      ready();
+      const { result } = render();
+      expect(result.current.categories[1]).toMatchObject({ soldOut: true, canIncrement: true });
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.categories[1].quantity).toBe(1);
+    });
+
+    it('stops at the limit across categories', () => {
+      ready();
+      const { result } = render();
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.totalTickets).toBe(3);
+      expect(result.current.categories.every((c) => !c.canIncrement)).toBe(true);
+    });
+
+    it('caps the limit at the reserved units', () => {
+      eventState = { data: event };
+      categoriesState = { data: { ...okResult, maxTicketsPerOrder: 3, reservedUnits: 2 } };
+      const { result } = render();
+      expect(result.current.orderLimit).toBe(2);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.categories.map((c) => c.canIncrement)).toEqual([false, false]);
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.totalTickets).toBe(2);
+      expect(result.current.categoryNote).toBe('order_category_note:{"count":3}');
+    });
+
+    it('ignores a decrement at 0 and an unknown category', () => {
+      ready();
+      const { result } = render();
+      const before = result.current.categories;
+      act(() => result.current.decrement('cat_festival'));
+      act(() => result.current.increment('cat_nope'));
+      expect(result.current.categories).toBe(before);
+      expect(result.current.totalTickets).toBe(0);
+    });
+
+    it('delegates to the use case and changes nothing on an unchanged result', () => {
+      ready();
+      const real = OrderTicketSelectionUseCase();
+      const useCase = {
+        ...real,
+        orderLimit: vi.fn(real.orderLimit),
+        summarize: vi.fn(real.summarize),
+        increment: vi.fn(() => ({ kind: 'unchanged' as const, reason: 'LIMIT_REACHED' as const })),
+        decrement: vi.fn(() => ({ kind: 'unchanged' as const, reason: 'NONE_TO_REMOVE' as const })),
+        reconcileHolders: vi.fn(real.reconcileHolders),
+      };
+      const d = { ...deps(), orderTicketSelectionUseCase: useCase };
+      const { result } = render(d);
+      expect(useCase.orderLimit).toHaveBeenCalledWith(okResult);
+      expect(useCase.summarize).toHaveBeenCalledWith(okResult.categories, {}, 3);
+      const before = result.current.categories;
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.decrement('cat_festival'));
+      expect(useCase.increment).toHaveBeenCalledWith(okResult.categories, {}, 'cat_festival', 3);
+      expect(useCase.decrement).toHaveBeenCalledWith(okResult.categories, {}, 'cat_festival');
+      expect(useCase.reconcileHolders).not.toHaveBeenCalled();
+      expect(result.current.categories).toBe(before);
+      expect(result.current.holders).toEqual([]);
+    });
+
+    it('keeps the quantities and retranslates the labels on a language change', () => {
+      ready();
+      const tFor = (language: string) => (key: string, params?: Record<string, unknown>) =>
+        `${language}:${key}:${String(params?.category ?? '')}`;
+      let current = { t: tFor('id'), i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.categories[0].incrementLabel).toBe('id:order_stepper_increase:Festival');
+      current = { t: tFor('en'), i18n: { language: 'en', changeLanguage } };
+      rerender();
+      expect(result.current.categories[0]).toMatchObject({
+        quantity: 1,
+        incrementLabel: 'en:order_stepper_increase:Festival',
+        decrementLabel: 'en:order_stepper_decrease:Festival',
+      });
+      expect(result.current.holders[0].title).toBe('en:order_holder_title:Festival');
+    });
+  });
+
+  describe('holders', () => {
+    const ready = () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+    };
+
+    it('shows one titled holder per ticket in slot order', () => {
+      ready();
+      const { result } = render();
+      act(() => result.current.increment('cat_tribune'));
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.showHolders).toBe(true);
+      expect(result.current.holders).toHaveLength(2);
+      expect(result.current.holders.map((h) => h.title)).toEqual([
+        'order_holder_title:{"index":1,"category":"Festival"}',
+        'order_holder_title:{"index":2,"category":"Tribun"}',
+      ]);
+      expect(result.current.holders[0]).toMatchObject({
+        key: 'cat_festival-1',
+        holderType: 'other',
+        choiceName: 'order-holder-cat_festival-1-type',
+        selfDisabled: false,
+        name: {
+          id: 'order-holder-cat_festival-1-name',
+          value: '',
+          readOnly: false,
+          hint: 'order_holder_name_hint',
+        },
+        nik: { id: 'order-holder-cat_festival-1-nik', value: '' },
+      });
+    });
+
+    it('hides the holders unless the page is ready', () => {
+      ready();
+      const { result, rerender } = render();
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.showHolders).toBe(true);
+      eventState = err(0, 'NETWORK_ERROR');
+      rerender();
+      expect(result.current.status).toBe('error');
+      expect(result.current.showHolders).toBe(false);
+    });
+
+    it('keeps typed values with their ticket when other tickets come and go', () => {
+      ready();
+      const { result } = render();
+      act(() => result.current.increment('cat_tribune'));
+      act(() => result.current.holders[0].name.onChange('Budi Santoso'));
+      act(() => result.current.holders[0].nik.onChange('3174055203960004'));
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.holders.map((h) => [h.key, h.name.value])).toEqual([
+        ['cat_festival-1', ''],
+        ['cat_tribune-1', 'Budi Santoso'],
+      ]);
+      expect(result.current.holders[1].title).toBe('order_holder_title:{"index":2,"category":"Tribun"}');
+      expect(result.current.holders[1].nik.value).toBe('3174 •••• •••• 0004');
+      act(() => result.current.decrement('cat_festival'));
+      expect(result.current.holders).toHaveLength(1);
+      expect(result.current.holders[0]).toMatchObject({
+        key: 'cat_tribune-1',
+        name: { value: 'Budi Santoso' },
+        nik: { value: '3174 •••• •••• 0004' },
+      });
+    });
+
+    it('starts a re-added ticket empty', () => {
+      ready();
+      const { result } = render();
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.holders[0].name.onChange('Budi'));
+      act(() => result.current.decrement('cat_festival'));
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.holders[0].name.value).toBe('');
+    });
+
+    it('renders an inert empty holder if a form entry is missing', () => {
+      ready();
+      const real = OrderTicketSelectionUseCase();
+      const d = { ...deps(), orderTicketSelectionUseCase: { ...real, reconcileHolders: () => [] } };
+      const { result } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      const holder = result.current.holders[0];
+      expect(holder).toMatchObject({ key: 'cat_festival-1', holderType: 'other', name: { value: '' } });
+      act(() => {
+        holder.choose('self');
+        holder.name.onChange('Budi');
+        holder.nik.onChange('3174');
+      });
+      expect(result.current.holders[0]).toMatchObject({ holderType: 'other', name: { value: '' }, nik: { value: '' } });
+    });
+  });
+
+  describe('profile', () => {
+    const ready = () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+    };
+    const withName = (fullName?: string) => {
+      meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName } };
+    };
+
+    it('loads the profile once the page is ready, without retries or focus refetches', async () => {
+      const d = deps();
+      const { rerender } = render(d);
+      expect(meOptions).toMatchObject({ queryKey: ['me'], enabled: false, retry: false, refetchOnWindowFocus: false });
+      ready();
+      rerender();
+      expect(meOptions.enabled).toBe(true);
+      await expect((meOptions.queryFn as () => Promise<unknown>)()).resolves.toEqual({
+        userId: 'usr_1',
+        email: 'nadia@example.com',
+      });
+      expect(d.accountService.getMe).toHaveBeenCalledTimes(1);
+    });
+
+    it('fills "Saya sendiri" from the profile name and blocks it on the other tickets', () => {
+      ready();
+      withName('  Nadia Saputri ');
+      const { result } = render();
+      expect(result.current.showHolderChoice).toBe(true);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      act(() => result.current.holders[0].choose('self'));
+      expect(result.current.holders[0]).toMatchObject({
+        holderType: 'self',
+        selfDisabled: false,
+        name: { value: 'Nadia Saputri', readOnly: true, hint: 'order_holder_name_hint_profile' },
+        nik: { value: '' },
+      });
+      expect(result.current.holders[1].selfDisabled).toBe(true);
+      act(() => result.current.holders[1].choose('self'));
+      expect(result.current.holders[1].holderType).toBe('other');
+      act(() => result.current.holders[0].name.onChange('Someone'));
+      expect(result.current.holders[0].name.value).toBe('Nadia Saputri');
+      act(() => result.current.holders[0].nik.onChange('3174'));
+      expect(result.current.holders[0].nik.value).toBe('3174');
+
+      act(() => result.current.holders[0].choose('other'));
+      expect(result.current.holders[0]).toMatchObject({
+        holderType: 'other',
+        name: { value: '', readOnly: false, hint: 'order_holder_name_hint' },
+        nik: { value: '3174' },
+      });
+      expect(result.current.holders[1].selfDisabled).toBe(false);
+    });
+
+    it('ignores choosing the same type again', () => {
+      ready();
+      withName('Nadia');
+      const { result } = render();
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.holders[0].choose('other'));
+      expect(result.current.holders[0].holderType).toBe('other');
+    });
+
+    it('makes a self holder editable again if the profile disappears', () => {
+      ready();
+      withName('Nadia');
+      const { result, rerender } = render();
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.holders[0].choose('self'));
+      meState = err(0, 'NETWORK_ERROR');
+      rerender();
+      expect(result.current.showHolderChoice).toBe(false);
+      expect(result.current.holders[0].name).toMatchObject({ readOnly: false, hint: 'order_holder_name_hint' });
+      act(() => result.current.holders[0].name.onChange('Nadia S'));
+      expect(result.current.holders[0].name.value).toBe('Nadia S');
+    });
+
+    it.each<[string, () => void]>([
+      ['401', () => (meState = err(401, 'UNAUTHORIZED'))],
+      ['offline', () => (meState = err(0, 'NETWORK_ERROR'))],
+      ['server error', () => (meState = err(500, 'INTERNAL_ERROR'))],
+      ['pending', () => (meState = {})],
+      ['no name', () => withName(undefined)],
+      ['a blank name', () => withName('  ')],
+    ])('hides the choice silently on %s', (_label, arrange) => {
+      ready();
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.showHolderChoice).toBe(false);
+      expect(result.current.status).toBe('ready');
+      expect(result.current.errorMessage).toBe('');
+      expect(replace).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.holders[0].choose('self'));
+      expect(result.current.holders[0].holderType).toBe('other');
+      act(() => result.current.holders[0].name.onChange('Budi'));
+      expect(result.current.holders[0].name).toMatchObject({ value: 'Budi', readOnly: false });
+    });
+  });
+
+  describe('NIK', () => {
+    it('keeps digits only, shows them while focused and masks them otherwise', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+      meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName: 'Nadia Saputri' } };
+      const d = deps();
+      const { result } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.holders[0].nik.onFocus());
+      act(() => result.current.holders[0].nik.onChange('3174 0552-0396 0004'));
+      act(() => result.current.holders[0].name.onChange('Budi Santoso'));
+      expect(result.current.holders[0].nik.value).toBe('3174055203960004');
+      act(() => result.current.holders[1].nik.onBlur());
+      expect(result.current.holders[0].nik.value).toBe('3174055203960004');
+      act(() => result.current.holders[0].nik.onBlur());
+      expect(result.current.holders[0].nik.value).toBe('3174 •••• •••• 0004');
+      act(() => result.current.holders[1].choose('self'));
+
+      const calls = JSON.stringify([
+        d.analyticsAdapter.trackEvent.mock.calls,
+        d.analyticsAdapter.reportError.mock.calls,
+        d.analyticsAdapter.trackPageView.mock.calls,
+        d.storage.set.mock.calls,
+        eventOptions.queryKey,
+        categoriesOptions.queryKey,
+        meOptions.queryKey,
+      ]);
+      for (const secret of ['3174055203960004', '0396', 'Budi', 'Nadia']) expect(calls).not.toContain(secret);
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
     });
   });
 });

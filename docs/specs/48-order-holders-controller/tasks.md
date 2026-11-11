@@ -10,13 +10,13 @@ use-case spec for `getMe` (simple GET, see design Overview).
 
 ## Tasks
 
-- [ ] 1. Create `src/utils/format/nik.ts` (`toNikDigits`, `maskNik`) and `src/utils/format/__tests__/nik.test.ts` [Requirement 5]
-- [ ] 2. Add the 15 keys from the design table to `src/translation/locale/id.json` and `en.json` [Requirement 6]
-- [ ] 3. In `src/controllers/order.controller.ts`: add `orderTicketSelectionUseCase` and `accountService` to the deps; quantities state, `orderLimit`, `summarize`, `OrderCategoryRow` rows with labels, `increment`, `decrement`, `totalTickets` [Requirement 1, Requirement 7]
-- [ ] 4. In the same file: `meQuery` (enabled when ready, `retry: false`, `refetchOnWindowFocus: false`), `showHolderChoice`, holder form (`useForm` + `zodResolver(holdersSchema)`, `useWatch`), reconcile on quantity change, `OrderHolderView`s with `choose`, name and NIK fields, focus-based masking; export `OrderHolderType` and the view types [Requirement 2, Requirement 3, Requirement 4, Requirement 5]
-- [ ] 5. Update `src/controllers/__tests__/order.controller.test.ts` per the Testing Strategy (query routing for `me`, rows, limit, holders following slots, self/other, hidden choice, NIK digits and masking, no NIK or name in analytics) [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 7]
-- [ ] 6. Add the new row and interface fields to the typed fixtures in `src/presentation/pages/Order/__tests__/index.test.tsx` and `CategoryList/__tests__/index.test.tsx` so `tsc` passes [Requirement 7]
-- [ ] 7. Run the gate check [ALL]
+- [x] 1. Create `src/utils/format/nik.ts` (`toNikDigits`, `maskNik`) and `src/utils/format/__tests__/nik.test.ts` [Requirement 5]
+- [x] 2. Add the 15 keys from the design table to `src/translation/locale/id.json` and `en.json` [Requirement 6]
+- [x] 3. In `src/controllers/order.controller.ts`: add `orderTicketSelectionUseCase` and `accountService` to the deps; quantities state, `orderLimit`, `summarize`, `OrderCategoryRow` rows with labels, `increment`, `decrement`, `totalTickets` [Requirement 1, Requirement 7]
+- [x] 4. In the same file: `meQuery` (enabled when ready, `retry: false`, `refetchOnWindowFocus: false`), `showHolderChoice`, holder form (`useForm` + `zodResolver(holdersSchema)`, `useWatch`), reconcile on quantity change, `OrderHolderView`s with `choose`, name and NIK fields, focus-based masking; export `OrderHolderType` and the view types [Requirement 2, Requirement 3, Requirement 4, Requirement 5]
+- [x] 5. Update `src/controllers/__tests__/order.controller.test.ts` per the Testing Strategy (query routing for `me`, rows, limit, holders following slots, self/other, hidden choice, NIK digits and masking, no NIK or name in analytics) [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 7]
+- [x] 6. Add the new row and interface fields to the typed fixtures in `src/presentation/pages/Order/__tests__/index.test.tsx` and `CategoryList/__tests__/index.test.tsx` so `tsc` passes [Requirement 7]
+- [x] 7. Run the gate check [ALL]
 
 ## Task Dependency Graph
 
