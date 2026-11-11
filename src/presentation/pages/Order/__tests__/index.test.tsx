@@ -30,6 +30,12 @@ const base = (): OrderControllerInterface => ({
       availability: 'available',
       availabilityLabel: 'Tersedia',
       soldOut: false,
+      quantity: 0,
+      selected: false,
+      canIncrement: true,
+      canDecrement: false,
+      incrementLabel: 'Tambah Festival A',
+      decrementLabel: 'Kurangi Festival A',
     },
     {
       id: 'cat_tb',
@@ -38,8 +44,21 @@ const base = (): OrderControllerInterface => ({
       availability: 'sold_out',
       availabilityLabel: 'Habis',
       soldOut: true,
+      quantity: 0,
+      selected: false,
+      canIncrement: true,
+      canDecrement: false,
+      incrementLabel: 'Tambah Tribun Bawah',
+      decrementLabel: 'Kurangi Tribun Bawah',
     },
   ],
+  increment: vi.fn(),
+  decrement: vi.fn(),
+  totalTickets: 0,
+  orderLimit: 3,
+  showHolders: false,
+  showHolderChoice: false,
+  holders: [],
   categoryNote: 'Maks. 3 tiket per transaksi.',
   errorMessage: '',
   retry: vi.fn(),
@@ -53,6 +72,23 @@ const base = (): OrderControllerInterface => ({
   locale: 'id',
   setLocale: vi.fn(),
 });
+
+const holder: OrderControllerInterface['holders'][number] = {
+  key: 'cat_fa-1',
+  title: 'Tiket 1 · Festival A',
+  holderType: 'self',
+  choiceName: 'order-holder-1-type',
+  selfDisabled: false,
+  choose: vi.fn(),
+  name: {
+    id: 'order-holder-1-name',
+    value: 'Nadia Saputri',
+    readOnly: true,
+    hint: 'Dari profil Anda.',
+    onChange: vi.fn(),
+  },
+  nik: { id: 'order-holder-1-nik', value: '', onChange: vi.fn(), onFocus: vi.fn(), onBlur: vi.fn() },
+};
 
 describe('OrderScreen', () => {
   beforeEach(() => {
@@ -77,6 +113,49 @@ describe('OrderScreen', () => {
     expect(screen.getByText('Maks. 3 tiket per transaksi.')).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false');
     expect(screen.queryByRole('timer')).toBeNull();
+  });
+
+  it('wires the stepper to increment / decrement', async () => {
+    controller = {
+      ...base(),
+      categories: base().categories.map((c, i) =>
+        i === 0 ? { ...c, quantity: 1, selected: true, canDecrement: true } : c,
+      ),
+    };
+    render(<OrderScreen />);
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah Festival A' }));
+    expect(controller.increment).toHaveBeenCalledWith('cat_fa');
+    await userEvent.click(screen.getByRole('button', { name: 'Kurangi Festival A' }));
+    expect(controller.decrement).toHaveBeenCalledWith('cat_fa');
+  });
+
+  it('hides the holders section until a ticket is picked', () => {
+    render(<OrderScreen />);
+    expect(screen.queryByRole('region', { name: 'order_holders_heading' })).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('shows the holders section with the choice when ready and showHolders', () => {
+    controller = { ...base(), totalTickets: 1, showHolders: true, showHolderChoice: true, holders: [holder] };
+    render(<OrderScreen />);
+    const section = screen.getByRole('region', { name: 'order_holders_heading' });
+    expect(section).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Tiket 1 · Festival A' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'order_holder_for_label' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'order_holder_name_label' })).toHaveValue('Nadia Saputri');
+  });
+
+  it('passes showHolderChoice through: no radios without it', () => {
+    controller = { ...base(), totalTickets: 1, showHolders: true, showHolderChoice: false, holders: [holder] };
+    render(<OrderScreen />);
+    expect(screen.getByRole('region', { name: 'order_holders_heading' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).toBeNull();
+  });
+
+  it('never shows the holders section outside the ready state', () => {
+    controller = { ...base(), status: 'loading', event: null, showHolders: true, holders: [holder] };
+    render(<OrderScreen />);
+    expect(screen.queryByRole('region', { name: 'order_holders_heading' })).toBeNull();
   });
 
   it('passes the language switch through', async () => {

@@ -1,18 +1,21 @@
-import type { OrderCategoryView } from '@utils/format/order-event';
+import type { OrderCategoryRow } from '@controllers/order.controller';
 
 import styles from './category-list.module.css';
 
 interface CategoryListProps {
   heading: string;
   note: string;
-  categories: OrderCategoryView[];
+  categories: OrderCategoryRow[];
+  onIncrement: (categoryId: string) => void;
+  onDecrement: (categoryId: string) => void;
 }
 
 /**
- * Section 1: the categories in server order with name, availability label and price (stepper comes in FR-13/14-W1).
- * DOM order name → status → price, so a sold-out row reads "Habis" before its price; the strike-through is CSS only.
+ * Section 1: the categories in server order with name, availability label, price and the − / count / + stepper.
+ * DOM order name → status → price → stepper, so a sold-out row reads "Habis" before its price; the strike-through is
+ * CSS only. The count span is keyed by the quantity so it remounts and replays the bump; the `output` stays mounted.
  */
-export default function CategoryList({ heading, note, categories }: CategoryListProps) {
+export default function CategoryList({ heading, note, categories, onIncrement, onDecrement }: CategoryListProps) {
   return (
     <section className={styles.section} aria-labelledby="order-categories-heading">
       <div className={styles.head}>
@@ -30,7 +33,12 @@ export default function CategoryList({ heading, note, categories }: CategoryList
       </div>
       <ul className={styles.list} aria-describedby={note ? 'order-categories-note' : undefined}>
         {categories.map((category) => (
-          <li key={category.id} className={styles.row} data-sold-out={category.soldOut || undefined}>
+          <li
+            key={category.id}
+            className={styles.row}
+            data-sold-out={category.soldOut || undefined}
+            data-selected={category.selected || undefined}
+          >
             <div className={styles.name}>
               <h3 className={styles.title}>{category.name}</h3>
               {category.description && <p className={styles.description}>{category.description}</p>}
@@ -41,6 +49,31 @@ export default function CategoryList({ heading, note, categories }: CategoryList
               </span>
             )}
             <span className={styles.price}>{category.price}</span>
+            <div className={styles.stepper}>
+              <button
+                type="button"
+                className={styles.stepButton}
+                aria-label={category.decrementLabel}
+                disabled={!category.canDecrement}
+                onClick={() => onDecrement(category.id)}
+              >
+                −
+              </button>
+              <output className={styles.count} aria-live="polite">
+                <span key={category.quantity} className={styles.countValue}>
+                  {category.quantity}
+                </span>
+              </output>
+              <button
+                type="button"
+                className={styles.stepButton}
+                aria-label={category.incrementLabel}
+                disabled={!category.canIncrement}
+                onClick={() => onIncrement(category.id)}
+              >
+                +
+              </button>
+            </div>
           </li>
         ))}
       </ul>

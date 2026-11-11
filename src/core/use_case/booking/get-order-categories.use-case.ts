@@ -14,7 +14,8 @@ export type OrderCategoriesResult =
       kind: 'ok';
       categories: Category[];
       maxTicketsPerOrder: number;
-      maxTickets: number;
+      /** Units reserved for this admission, 1–3 (ADR-0004). */
+      reservedUnits: number;
       adminFee: Money;
       /** End of the 5-minute order window (ADR-0005); the timer (FR-17-W1) uses expiresAt − serverNow. */
       expiresAt: string;
@@ -41,7 +42,7 @@ export const GetOrderCategoriesUseCase = ({
         kind: 'ok',
         categories: data.categories,
         maxTicketsPerOrder: data.maxTicketsPerOrder,
-        maxTickets: data.maxTickets,
+        reservedUnits: data.reservedUnits,
         adminFee: data.adminFee,
         expiresAt: data.expiresAt,
         serverNow: data.serverNow,

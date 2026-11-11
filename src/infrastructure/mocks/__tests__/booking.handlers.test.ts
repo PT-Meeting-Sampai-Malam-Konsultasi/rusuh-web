@@ -42,9 +42,10 @@ describe('booking mock', () => {
     expect(data.categories.map((c) => c.availability)).toEqual(['sold_out', 'available', 'almost_gone', 'available']);
     expect(data).toMatchObject({
       maxTicketsPerOrder: 3,
-      maxTickets: 3,
+      reservedUnits: 3,
       adminFee: { amount: 10000, currency: 'IDR' },
     });
+    expect(data).not.toHaveProperty('maxTickets');
     expect(data.serverNow).toBe(NOW.toISOString());
     expect(Date.parse(data.expiresAt) - Date.parse(data.serverNow)).toBe(300_000);
   });
