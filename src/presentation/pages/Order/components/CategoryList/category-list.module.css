@@ -49,18 +49,17 @@
   @apply list-none;
 }
 
-/* Phone: name and price on the first line, status under the name. From 720px: name, status, price in one line. */
+/* Phone: name and price on the first line, status and stepper on the second.
+   From 720px: name, status, price, stepper in one line. */
 .row {
   @apply grid items-center gap-x-3 gap-y-1.5 border-b border-hair py-3.5;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'n p' 's .';
+  grid-template-areas: 'n p' 's st';
 
   @variant md {
     @apply gap-5 py-[18px];
-
-    /* The stepper `auto` column (area "st") joins in FR-13/14-W1. */
-    grid-template-columns: minmax(0, 1fr) 120px 150px;
-    grid-template-areas: 'n s p';
+    grid-template-columns: minmax(0, 1fr) 120px 150px auto;
+    grid-template-areas: 'n s p st';
   }
 }
 
@@ -123,11 +122,75 @@
   }
 }
 
+/* Stepper: Figma 129×45 box, − (42×40) · count (40×40) · + (42×40), 2.5px ink border on card. */
+.stepper {
+  @apply inline-flex justify-self-end border-[2.5px] border-ink bg-card;
+  grid-area: st;
+}
+
+/* Drawn 42×40; the ::before extends the hit area to at least 44×44. */
+.stepButton {
+  @apply relative grid h-10 w-[42px] cursor-pointer place-items-center font-sans text-2xl leading-none font-semibold text-ink;
+
+  &::before {
+    @apply absolute content-[''];
+    inset: -2px -1px;
+  }
+
+  &:hover:not(:disabled) {
+    @apply bg-paper-2;
+  }
+
+  &:active:not(:disabled) {
+    @apply bg-hair;
+  }
+
+  &:focus-visible {
+    @apply z-10 outline-3 outline-offset-2 outline-blue;
+  }
+
+  &:disabled {
+    @apply cursor-not-allowed text-ink-3;
+  }
+}
+
+.count {
+  @apply grid h-10 w-10 place-items-center border-x-[2.5px] border-ink font-display text-[23px] leading-none font-extrabold tabular-nums;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply text-[26px];
+  }
+}
+
+.countValue {
+  @apply inline-block;
+}
+
+/* Selected: name in pink-ink, count box pink with white figures (the number stays, so not colour alone). */
+.row[data-selected] .title {
+  @apply text-pink-ink;
+}
+
+.row[data-selected] .count {
+  @apply bg-pink text-white;
+}
+
 /* Rises 60ms after the event header. */
 @media (prefers-reduced-motion: no-preference) {
   .section {
     animation: rise 0.45s var(--ease-print) both;
     animation-delay: 180ms;
+  }
+
+  .countValue {
+    animation: bump 450ms var(--ease-click);
+  }
+}
+
+@keyframes bump {
+  30% {
+    transform: translateY(-0.06em);
   }
 }
 

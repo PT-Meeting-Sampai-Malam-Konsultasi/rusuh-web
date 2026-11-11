@@ -6,6 +6,7 @@ import '@infrastructure/di/controllers/order';
 import FlowHeader from '@presentation/components/FlowHeader';
 
 import CategoryList from './components/CategoryList';
+import HolderList from './components/HolderList';
 import OrderEventHeader from './components/OrderEventHeader';
 import OrderMessage from './components/OrderMessage';
 import OrderSkeleton from './components/OrderSkeleton';
@@ -17,6 +18,11 @@ export default function OrderScreen() {
     status,
     event,
     categories,
+    increment,
+    decrement,
+    showHolders,
+    showHolderChoice,
+    holders,
     categoryNote,
     errorMessage,
     retry,
@@ -66,10 +72,17 @@ export default function OrderScreen() {
           )}
           {status === 'ready' && event && <OrderEventHeader event={event} />}
           {status === 'ready' && (
-            <CategoryList heading={t('order_category_heading')} note={categoryNote} categories={categories} />
+            <CategoryList
+              heading={t('order_category_heading')}
+              note={categoryNote}
+              categories={categories}
+              onIncrement={increment}
+              onDecrement={decrement}
+            />
           )}
+          {status === 'ready' && showHolders && <HolderList t={t} showChoice={showHolderChoice} holders={holders} />}
         </div>
-        {/* Summary aside: FR-13-W1 / FR-14-W1 */}
+        {/* Summary aside: deferred (FR-14-W1 and the hold) */}
       </main>
     </div>
   );

@@ -50,7 +50,8 @@
 .note,
 .name,
 .description,
-.price {
+.price,
+.stepper {
   @apply block bg-paper-2;
 
   @media (prefers-reduced-motion: no-preference) {
@@ -114,16 +115,16 @@
   }
 }
 
-/* Same grid as CategoryList rows: price top right on phones, in the last column from 720px. */
+/* Same grid as CategoryList rows: price top right and stepper under it on phones; price then stepper from 720px. */
 .row {
   @apply grid items-center gap-x-3 gap-y-1.5 border-b border-hair py-3.5;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'n p' 'd .';
+  grid-template-areas: 'n p' 'd st';
 
   @variant md {
     @apply gap-x-5 py-[18px];
-    grid-template-columns: minmax(0, 1fr) 120px 150px;
-    grid-template-areas: 'n . p' 'd . p';
+    grid-template-columns: minmax(0, 1fr) 120px 150px auto;
+    grid-template-areas: 'n . p st' 'd . p st';
   }
 }
 
@@ -144,6 +145,11 @@
 .price {
   @apply h-5 w-24 justify-self-end;
   grid-area: p;
+}
+
+.stepper {
+  @apply h-[45px] w-[129px] justify-self-end;
+  grid-area: st;
 }
 
 @keyframes pulse {

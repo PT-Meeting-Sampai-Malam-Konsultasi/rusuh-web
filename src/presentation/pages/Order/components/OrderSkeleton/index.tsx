@@ -9,7 +9,8 @@ interface OrderSkeletonProps {
 
 const ROWS = [0, 1, 2, 3];
 
-/** Same layout as the loaded page: thumb and two lines, the section heading, four category rows with a price placeholder. */
+/** Same layout as the loaded page: thumb and two lines, the section heading, four category rows with price and
+ * stepper placeholders. */
 export default function OrderSkeleton({ label, withHeader = false }: OrderSkeletonProps) {
   const content = (
     <div className={styles.skeleton} role="status">
@@ -31,6 +32,7 @@ export default function OrderSkeleton({ label, withHeader = false }: OrderSkelet
             <span className={styles.name} />
             <span className={styles.description} />
             <span className={styles.price} />
+            <span className={styles.stepper} />
           </span>
         ))}
       </div>

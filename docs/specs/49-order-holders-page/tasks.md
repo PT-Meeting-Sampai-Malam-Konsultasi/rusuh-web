@@ -10,12 +10,12 @@ Figma holder block; the profile-NIK card is a recorded decision, not built.
 
 ## Tasks
 
-- [ ] 1. `CategoryList/index.tsx`: add `onIncrement` / `onDecrement` props and `OrderCategoryRow` type; render the stepper after the price with labelled buttons, `disabled` from `canIncrement` / `canDecrement`, `output aria-live="polite"` with the keyed count span; `data-selected` on the `li` [Requirement 1]
-- [ ] 2. `CategoryList/category-list.module.css`: phone grid `"n p" "s st"`, `md` grid `minmax(0,1fr) 120px 150px auto` / `"n s p st"` (replace the FR-13/14-W1 comment); stepper, step button (hit area ≥ 44×44), count, selected and bump styles [Requirement 1, Requirement 2]
-- [ ] 3. Create `HolderList/index.tsx` and `holder-list.module.css`: section head with badge "2" and note, one block per holder with `h3`, radiogroup of native radios (hidden when `showChoice` is false), name and NIK `TextField`s; segment states, phone stack / desktop side-by-side layout, rise-in animation [Requirement 3, Requirement 4, Requirement 5]
-- [ ] 4. Shell `src/presentation/pages/Order/index.tsx`: pass `increment` / `decrement` to `CategoryList`, render `HolderList` when `status === 'ready' && showHolders`; `OrderSkeleton`: stepper placeholder per row and matching grid [Requirement 3, Requirement 6]
-- [ ] 5. Tests: update `CategoryList`, `OrderSkeleton` and shell tests; write `HolderList/__tests__/index.test.tsx` (ID and EN renders) per the Testing Strategy [Requirement 7]
-- [ ] 6. Run the gate check and compare with the Figma frames at 390 and 1440, ID and EN [ALL]
+- [x] 1. `CategoryList/index.tsx`: add `onIncrement` / `onDecrement` props and `OrderCategoryRow` type; render the stepper after the price with labelled buttons, `disabled` from `canIncrement` / `canDecrement`, `output aria-live="polite"` with the keyed count span; `data-selected` on the `li` [Requirement 1]
+- [x] 2. `CategoryList/category-list.module.css`: phone grid `"n p" "s st"`, `md` grid `minmax(0,1fr) 120px 150px auto` / `"n s p st"` (replace the FR-13/14-W1 comment); stepper, step button (hit area ≥ 44×44), count, selected and bump styles [Requirement 1, Requirement 2]
+- [x] 3. Create `HolderList/index.tsx` and `holder-list.module.css`: section head with badge "2" and note, one block per holder with `h3`, radiogroup of native radios (hidden when `showChoice` is false), name and NIK `TextField`s; segment states, phone stack / desktop side-by-side layout, rise-in animation [Requirement 3, Requirement 4, Requirement 5]
+- [x] 4. Shell `src/presentation/pages/Order/index.tsx`: pass `increment` / `decrement` to `CategoryList`, render `HolderList` when `status === 'ready' && showHolders`; `OrderSkeleton`: stepper placeholder per row and matching grid [Requirement 3, Requirement 6]
+- [x] 5. Tests: update `CategoryList`, `OrderSkeleton` and shell tests; write `HolderList/__tests__/index.test.tsx` (ID and EN renders) per the Testing Strategy [Requirement 7]
+- [x] 6. Run the gate check and compare with the Figma frames at 390 and 1440, ID and EN [ALL]
 
 ## Task Dependency Graph
 

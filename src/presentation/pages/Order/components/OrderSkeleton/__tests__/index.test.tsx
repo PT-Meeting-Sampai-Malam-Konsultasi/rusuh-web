@@ -17,7 +17,7 @@ describe('OrderSkeleton', () => {
     expect(screen.getByRole('status')).toHaveTextContent('');
   });
 
-  it('draws four hidden category rows, each with a price placeholder, and announces nothing else', () => {
+  it('draws four hidden category rows, each with price and stepper placeholders, and announces nothing else', () => {
     const { container } = render(<OrderSkeleton label="Memuat…" />);
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent(/^Memuat…$/);
@@ -25,7 +25,8 @@ describe('OrderSkeleton', () => {
     expect(section.children).toHaveLength(5);
     Array.from(section.children)
       .slice(1)
-      .forEach((row) => expect(row.children).toHaveLength(3));
-    expect(container.querySelector('li, ul')).toBeNull();
+      .forEach((row) => expect(row.children).toHaveLength(4));
+    expect(container.querySelector('li, ul, button, output')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });
