@@ -22,7 +22,7 @@ const response = (eventId = 'evt_1'): GetCategoriesResponse => ({
     },
   ],
   maxTicketsPerOrder: 4,
-  maxTickets: 2,
+  reservedUnits: 2,
   adminFee: { amount: 5_000, currency: 'IDR' },
   expiresAt: '2026-11-09T03:05:00Z',
   serverNow: '2026-11-09T03:00:00Z',
@@ -55,12 +55,13 @@ describe('GetOrderCategoriesUseCase', () => {
       kind: 'ok',
       categories: snapshot.categories,
       maxTicketsPerOrder: 4,
-      maxTickets: 2,
+      reservedUnits: 2,
       adminFee: { amount: 5_000, currency: 'IDR' },
       expiresAt: '2026-11-09T03:05:00Z',
       serverNow: '2026-11-09T03:00:00Z',
     });
     expect(result).not.toHaveProperty('eventId');
+    expect(result).not.toHaveProperty('maxTickets');
     expect(data).toEqual(snapshot);
     expect(bookingService.getCategories).toHaveBeenCalledTimes(1);
     expect(bookingService.getCategories).toHaveBeenCalledWith('evt_1', 'adm_tok');

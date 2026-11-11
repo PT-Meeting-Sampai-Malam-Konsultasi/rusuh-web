@@ -41,7 +41,7 @@ const okResult: OrderCategoriesResult = {
   kind: 'ok',
   categories: [festival, tribune],
   maxTicketsPerOrder: 3,
-  maxTickets: 3,
+  reservedUnits: 3,
   adminFee: { amount: 5000, currency: 'IDR' },
   expiresAt: '2026-11-09T03:05:00Z',
   serverNow: '2026-11-09T03:00:00Z',
