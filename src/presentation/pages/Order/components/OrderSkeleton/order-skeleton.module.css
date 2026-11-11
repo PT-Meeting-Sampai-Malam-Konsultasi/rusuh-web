@@ -49,7 +49,8 @@
 .heading,
 .note,
 .name,
-.description {
+.description,
+.price {
   @apply block bg-paper-2;
 
   @media (prefers-reduced-motion: no-preference) {
@@ -113,16 +114,22 @@
   }
 }
 
+/* Same grid as CategoryList rows: price top right on phones, in the last column from 720px. */
 .row {
-  @apply flex flex-col gap-1.5 border-b border-hair py-3.5;
+  @apply grid items-center gap-x-3 gap-y-1.5 border-b border-hair py-3.5;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'n p' 'd .';
 
   @variant md {
-    @apply py-[18px];
+    @apply gap-x-5 py-[18px];
+    grid-template-columns: minmax(0, 1fr) 120px 150px;
+    grid-template-areas: 'n . p' 'd . p';
   }
 }
 
 .name {
   @apply h-5 w-40;
+  grid-area: n;
 
   @variant md {
     @apply h-6;
@@ -131,6 +138,12 @@
 
 .description {
   @apply h-3.5 w-64 max-w-full;
+  grid-area: d;
+}
+
+.price {
+  @apply h-5 w-24 justify-self-end;
+  grid-area: p;
 }
 
 @keyframes pulse {

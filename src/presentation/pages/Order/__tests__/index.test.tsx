@@ -22,8 +22,23 @@ const base = (): OrderControllerInterface => ({
     metaLine: 'Sab, 12 Des 2026 · 19.00 WIB · Stadion Utama GBK, Jakarta',
   },
   categories: [
-    { id: 'cat_fa', name: 'Festival A', description: 'Berdiri · paling dekat panggung' },
-    { id: 'cat_tb', name: 'Tribun Bawah' },
+    {
+      id: 'cat_fa',
+      name: 'Festival A',
+      description: 'Berdiri · paling dekat panggung',
+      price: 'Rp 1.250.000',
+      availability: 'available',
+      availabilityLabel: 'Tersedia',
+      soldOut: false,
+    },
+    {
+      id: 'cat_tb',
+      name: 'Tribun Bawah',
+      price: 'Rp 850.000',
+      availability: 'sold_out',
+      availabilityLabel: 'Habis',
+      soldOut: true,
+    },
   ],
   categoryNote: 'Maks. 3 tiket per transaksi.',
   errorMessage: '',
@@ -57,6 +72,8 @@ describe('OrderScreen', () => {
       'Festival A',
       'Tribun Bawah',
     ]);
+    expect(screen.getByText('Rp 1.250.000')).toBeInTheDocument();
+    expect(screen.getByText('Habis')).toBeInTheDocument();
     expect(screen.getByText('Maks. 3 tiket per transaksi.')).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false');
     expect(screen.queryByRole('timer')).toBeNull();

@@ -27,7 +27,15 @@ const festival: Category = {
   price: { amount: 450000, currency: 'IDR' },
   availability: 'available',
 };
-const tribune: Category = { ...festival, categoryId: 'cat_tribune', name: 'Tribun', description: undefined };
+const tribune: Category = {
+  ...festival,
+  categoryId: 'cat_tribune',
+  name: 'Tribun',
+  description: undefined,
+  price: { amount: 1250000, currency: 'IDR' },
+  availability: 'sold_out',
+  available: 0,
+};
 
 const okResult: OrderCategoriesResult = {
   kind: 'ok',
@@ -200,11 +208,79 @@ describe('OrderController', () => {
         metaLine: 'Sab, 12 Des 2026 · 19.00 WIB · Stadion Utama GBK, Jakarta',
       });
       expect(result.current.categories).toEqual([
-        { id: 'cat_festival', name: 'Festival', description: 'Berdiri' },
-        { id: 'cat_tribune', name: 'Tribun', description: undefined },
+        {
+          id: 'cat_festival',
+          name: 'Festival',
+          description: 'Berdiri',
+          price: 'Rp 450.000',
+          availability: 'available',
+          availabilityLabel: 'order_availability_available',
+          soldOut: false,
+        },
+        {
+          id: 'cat_tribune',
+          name: 'Tribun',
+          description: undefined,
+          price: 'Rp 1.250.000',
+          availability: 'sold_out',
+          availabilityLabel: 'order_availability_sold_out',
+          soldOut: true,
+        },
       ]);
+      expect(result.current.categories[1]).not.toHaveProperty('available');
       expect(result.current.categoryNote).toBe('order_category_note:{"count":3}');
       expect(result.current.errorMessage).toBe('');
+    });
+  });
+
+  describe('category views', () => {
+    it('reformats prices and retranslates labels on a language change without a refetch', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+      const translations: Record<string, Record<string, string>> = {
+        id: { order_availability_available: 'Tersedia', order_availability_sold_out: 'Habis' },
+        en: { order_availability_available: 'Available', order_availability_sold_out: 'Sold out' },
+      };
+      const tFor = (language: string) => (key: string) => translations[language][key] ?? key;
+      let current = { t: tFor('id'), i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      expect(result.current.categories.map((c) => [c.price, c.availabilityLabel])).toEqual([
+        ['Rp 450.000', 'Tersedia'],
+        ['Rp 1.250.000', 'Habis'],
+      ]);
+
+      current = { t: tFor('en'), i18n: { language: 'en', changeLanguage } };
+      rerender();
+      expect(result.current.categories.map((c) => [c.price, c.availabilityLabel])).toEqual([
+        ['Rp 450,000', 'Available'],
+        ['Rp 1,250,000', 'Sold out'],
+      ]);
+      expect(categoriesRefetch).not.toHaveBeenCalled();
+      expect(categoriesOptions).not.toHaveProperty('refetchInterval');
+    });
+
+    it('keeps the same views while the result, locale and t do not change', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+      const { result, rerender } = render();
+      const first = result.current.categories;
+      rerender();
+      expect(result.current.categories).toBe(first);
+    });
+
+    it('shows no label for an unknown availability', () => {
+      eventState = { data: event };
+      categoriesState = {
+        data: { ...okResult, categories: [{ ...festival, availability: 'paused' as never }] },
+      };
+      const { result } = render();
+      expect(result.current.categories[0]).toMatchObject({
+        price: 'Rp 450.000',
+        availability: null,
+        availabilityLabel: '',
+        soldOut: false,
+      });
     });
   });
 

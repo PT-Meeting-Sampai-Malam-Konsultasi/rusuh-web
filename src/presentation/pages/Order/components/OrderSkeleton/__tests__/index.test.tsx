@@ -16,4 +16,16 @@ describe('OrderSkeleton', () => {
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('status')).toHaveTextContent('');
   });
+
+  it('draws four hidden category rows, each with a price placeholder, and announces nothing else', () => {
+    const { container } = render(<OrderSkeleton label="Memuat…" />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(/^Memuat…$/);
+    const section = status.querySelectorAll('[aria-hidden="true"]')[1];
+    expect(section.children).toHaveLength(5);
+    Array.from(section.children)
+      .slice(1)
+      .forEach((row) => expect(row.children).toHaveLength(3));
+    expect(container.querySelector('li, ul')).toBeNull();
+  });
 });
