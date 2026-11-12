@@ -72,6 +72,7 @@ const base = (): OrderControllerInterface => ({
   homeHref: '/',
   locale: 'id',
   setLocale: vi.fn(),
+  allHoldersVerified: false,
 });
 
 const holder: OrderControllerInterface['holders'][number] = {
@@ -87,8 +88,18 @@ const holder: OrderControllerInterface['holders'][number] = {
     readOnly: true,
     hint: 'Dari profil Anda.',
     onChange: vi.fn(),
+    onBlur: vi.fn(),
   },
-  nik: { id: 'order-holder-1-nik', value: '', onChange: vi.fn(), onFocus: vi.fn(), onBlur: vi.fn() },
+  nik: {
+    id: 'order-holder-1-nik',
+    value: '',
+    onChange: vi.fn(),
+    onFocus: vi.fn(),
+    onBlur: vi.fn(),
+    checking: false,
+    canRecheck: false,
+    recheck: vi.fn(),
+  },
 };
 
 /** The limit region: the one atomic status (each stepper `output` is an implicit status too). */

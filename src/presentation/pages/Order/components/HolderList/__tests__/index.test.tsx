@@ -25,8 +25,18 @@ const holder = (index: number, overrides: Partial<OrderHolderView> = {}): OrderH
     readOnly: false,
     hint: 'Dicetak di e-tiket.',
     onChange: vi.fn(),
+    onBlur: vi.fn(),
   },
-  nik: { id: `order-holder-${index}-nik`, value: '', onChange: vi.fn(), onFocus: vi.fn(), onBlur: vi.fn() },
+  nik: {
+    id: `order-holder-${index}-nik`,
+    value: '',
+    onChange: vi.fn(),
+    onFocus: vi.fn(),
+    onBlur: vi.fn(),
+    checking: false,
+    canRecheck: false,
+    recheck: vi.fn(),
+  },
   ...overrides,
 });
 
@@ -39,6 +49,7 @@ const holders = (): OrderHolderView[] => [
       readOnly: true,
       hint: 'Dari profil Anda.',
       onChange: vi.fn(),
+      onBlur: vi.fn(),
     },
   }),
   holder(2, { selfDisabled: true, title: 'Tiket 2 · Festival B' }),
@@ -135,6 +146,9 @@ describe('HolderList', () => {
         onChange: vi.fn(),
         onFocus: vi.fn(),
         onBlur: vi.fn(),
+        checking: false,
+        canRecheck: false,
+        recheck: vi.fn(),
       },
     });
     render(<HolderList t={t} showChoice={false} holders={[one]} />);

@@ -11,12 +11,12 @@ translation keys.
 
 ## Tasks
 
-- [ ] 1. In `src/controllers/order.controller.ts`: add `validateAttendeeUseCase` and `useMutationTanstack` to `OrderControllerDeps`; add `name.onBlur`, `nik.error/valid/checking/canRecheck/recheck` and `allHoldersVerified` to the interfaces; update the `nik` schema comment [Requirement 1, Requirement 7]
-- [ ] 2. In the same file: `checks` and `touchedNik` state, the `nikCheck` mutation (`retry: false`, `onMutate`, `onSuccess` with redirect, analytics and stale guard, `onError` with stale guard), `startCheck` / `dropRun`, triggers on NIK blur, name blur, "self" choice and `recheck`, resets on value/type change and in `applyQuantities` [Requirement 2, Requirement 3, Requirement 5, Requirement 6]
-- [ ] 3. In the same file: derive each holder's field state in the `holders` `useMemo` per the field-state table (local check first, then the matching run), translate the messages, compute `allHoldersVerified` [Requirement 1, Requirement 4, Requirement 6]
-- [ ] 4. Update `src/presentation/pages/Order/__tests__/index.test.tsx` (`allHoldersVerified`) and the holder fixture in `HolderList/__tests__/index.test.tsx` (new required fields) so `tsc --noEmit` passes [Requirement 7]
-- [ ] 5. Add `describe('NIK checks')` to `src/controllers/__tests__/order.controller.test.ts` per the Testing Strategy (13 field-state rows, triggers, token at call time, concurrent slots, stale responses, resets, removal, recheck, redirect, analytics, privacy, language rerender) [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6, Requirement 7]
-- [ ] 6. Run the gate check [ALL]
+- [x] 1. In `src/controllers/order.controller.ts`: add `validateAttendeeUseCase` and `useMutationTanstack` to `OrderControllerDeps`; add `name.onBlur`, `nik.error/valid/checking/canRecheck/recheck` and `allHoldersVerified` to the interfaces; update the `nik` schema comment [Requirement 1, Requirement 7]
+- [x] 2. In the same file: `checks` and `touchedNik` state, the `nikCheck` mutation (`retry: false`, `onMutate`, `onSuccess` with redirect, analytics and stale guard, `onError` with stale guard), `startCheck` / `dropRun`, triggers on NIK blur, name blur, "self" choice and `recheck`, resets on value/type change and in `applyQuantities` [Requirement 2, Requirement 3, Requirement 5, Requirement 6]
+- [x] 3. In the same file: derive each holder's field state in the `holders` `useMemo` per the field-state table (local check first, then the matching run), translate the messages, compute `allHoldersVerified` [Requirement 1, Requirement 4, Requirement 6]
+- [x] 4. Update `src/presentation/pages/Order/__tests__/index.test.tsx` (`allHoldersVerified`) and the holder fixture in `HolderList/__tests__/index.test.tsx` (new required fields) so `tsc --noEmit` passes [Requirement 7]
+- [x] 5. Add `describe('NIK checks')` to `src/controllers/__tests__/order.controller.test.ts` per the Testing Strategy (13 field-state rows, triggers, token at call time, concurrent slots, stale responses, resets, removal, recheck, redirect, analytics, privacy, language rerender) [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6, Requirement 7]
+- [x] 6. Run the gate check [ALL]
 
 ## Task Dependency Graph
 
