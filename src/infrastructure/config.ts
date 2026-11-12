@@ -20,6 +20,11 @@ export interface AppConfig {
   sentryTracesSampleRate: number;
   /** Share of errors that keep a session replay, 0–1 (replay only buffers, and never on the waiting room). */
   sentryReplayOnErrorRate: number;
+  /**
+   * Send `X-Request-ID` on API calls (NFR-09-W1). Off until every API's CORS allows the header: a browser blocks a
+   * call whose preflight does not list it.
+   */
+  requestIdHeader: boolean;
 }
 
 export type RawEnv = Record<keyof AppConfig, string | undefined>;
@@ -38,6 +43,7 @@ export const readEnv = (): RawEnv => ({
   sentryEnvironment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
   sentryTracesSampleRate: process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   sentryReplayOnErrorRate: process.env.NEXT_PUBLIC_SENTRY_REPLAY_ON_ERROR_RATE,
+  requestIdHeader: process.env.NEXT_PUBLIC_REQUEST_ID_HEADER,
 });
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -77,5 +83,6 @@ export function createConfig(env: RawEnv = readEnv()): AppConfig {
     sentryEnvironment: optionalEnv(env.sentryEnvironment, 'development'),
     sentryTracesSampleRate: rateEnv(env.sentryTracesSampleRate, 0.05),
     sentryReplayOnErrorRate: rateEnv(env.sentryReplayOnErrorRate, 0.1),
+    requestIdHeader: boolEnv(env.requestIdHeader),
   };
 }

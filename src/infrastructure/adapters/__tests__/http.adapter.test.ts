@@ -84,6 +84,14 @@ describe('createHttpAdapter', () => {
     expect(REQUEST_ID_HEADER).toBe('X-Request-ID');
   });
 
+  it('sends no X-Request-ID when switched off', async () => {
+    const transport = ok({});
+    const http = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport, sendRequestId: false });
+    await http.post('/b', {});
+    const [[config]] = (transport as ReturnType<typeof vi.fn>).mock.calls as [InternalAxiosRequestConfig][];
+    expect(config.headers.has(REQUEST_ID_HEADER)).toBe(false);
+  });
+
   it('keeps the request ID on the replay after a session refresh, and puts it on the error', async () => {
     const seen: unknown[] = [];
     let calls = 0;
