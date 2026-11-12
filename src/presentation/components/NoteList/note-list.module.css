@@ -8,6 +8,13 @@
   }
 }
 
+/* With a fourth cell: three notes, then a 270px column (HiFi .wr-notes). */
+.withAside {
+  @variant md {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 270px;
+  }
+}
+
 .note {
   @apply pt-3.5;
 
@@ -35,4 +42,11 @@
 
 .body {
   @apply mt-1.5 max-w-[300px] text-sm text-ink-2;
+}
+
+/* The fourth cell ends flush with the rule above it. */
+.aside {
+  @variant md {
+    @apply pr-0;
+  }
 }

@@ -38,6 +38,15 @@ const base = (): QueueControllerInterface => ({
   prequeue: null,
   paused: null,
   turn: null,
+  leave: {
+    open: false,
+    body: 'Nomor 19.700 akan dilepas',
+    leaving: false,
+    ask: vi.fn(),
+    stay: vi.fn(),
+    confirm: vi.fn(),
+  },
+  left: null,
   claimNow: vi.fn(),
   queueAgain: vi.fn(),
   errorMessage: '',
@@ -225,5 +234,43 @@ describe('QueueScreen', () => {
     expect(screen.getByText('queue_entering_body')).toBeInTheDocument();
     expect(screen.queryByRole('timer')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'queue_notes_label' })).not.toBeInTheDocument();
+  });
+
+  it('opens the leave confirm from the notes, and offers staying first (FR-04-W2)', async () => {
+    const { rerender } = render(<QueueScreen />);
+    await userEvent.click(screen.getByRole('button', { name: 'queue_leave_link' }));
+    expect(controller.leave!.ask).toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    controller = { ...base(), leave: { ...base().leave!, open: true } };
+    rerender(<QueueScreen />);
+    const dialog = screen.getByRole('dialog', { name: 'queue_leave_title' });
+    expect(dialog).toHaveTextContent('Nomor 19.700 akan dilepas');
+    const [stay, leave] = within(dialog).getAllByRole('button');
+    expect(stay).toHaveTextContent('queue_leave_stay');
+    expect(stay).toHaveFocus();
+    expect(leave).toHaveTextContent('queue_leave_confirm');
+    await userEvent.click(leave);
+    expect(controller.leave!.confirm).toHaveBeenCalled();
+    await userEvent.click(stay);
+    await userEvent.keyboard('{Escape}');
+    expect(controller.leave!.stay).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows the left view with "Antre lagi" and other events', async () => {
+    controller = {
+      ...base(),
+      status: 'left',
+      waiting: null,
+      leave: null,
+      left: { lead: 'Nomor 19.700 sudah dilepas.', body: 'Tiket PELITA masih dijual.' },
+    };
+    render(<QueueScreen />);
+    expect(screen.getByText('Nomor 19.700 sudah dilepas.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'queue_left_title' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'queue_notes_label' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'queue_other_events' })).toHaveAttribute('href', '/');
+    await userEvent.click(screen.getByRole('button', { name: /queue_missed_action/ }));
+    expect(controller.queueAgain).toHaveBeenCalled();
   });
 });
