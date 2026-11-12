@@ -73,6 +73,8 @@ const base = (): OrderControllerInterface => ({
   locale: 'id',
   setLocale: vi.fn(),
   allHoldersVerified: false,
+  timer: null,
+  timeUp: false,
 });
 
 const holder: OrderControllerInterface['holders'][number] = {
