@@ -3,7 +3,8 @@ import type { Category } from '@core/entities/booking/booking.entity';
 /** `createBooking.tickets.maxItems` (N-1, ADR-0007): never more than 3 tickets per order. */
 export const ORDER_MAX_TICKETS = 3;
 
-export type SelectableCategory = Pick<Category, 'categoryId' | 'name'>;
+/** Widened (FR-14): the stock caps need availability and the optional snapshot count. */
+export type SelectableCategory = Pick<Category, 'categoryId' | 'name' | 'availability' | 'available'>;
 
 /** Tickets per categoryId; a missing key is 0. */
 export type TicketQuantities = Readonly<Record<string, number>>;
@@ -33,10 +34,14 @@ export interface TicketSlot {
 
 export interface TicketSelection {
   total: number;
-  /** One per category, server order. */
+  /** One per category, server order. canIncrement reflects the order limit and the category cap. */
   lines: TicketLine[];
   /** Category server order, then ordinal. */
   slots: TicketSlot[];
+  /** limit > 0 && total >= limit: every "+" is off because of the order limit. */
+  limitReached: boolean;
+  /** limit < ORDER_MAX_TICKETS: the limit is a smaller reservation (ADR-0004) or a lower policy value. */
+  limitBelowMax: boolean;
 }
 
 export type HolderType = 'self' | 'other';
@@ -51,7 +56,10 @@ export interface HolderEntry {
 
 export type ChangeQuantityResult =
   | { kind: 'changed'; quantities: TicketQuantities }
-  | { kind: 'unchanged'; reason: 'LIMIT_REACHED' | 'NONE_TO_REMOVE' | 'UNKNOWN_CATEGORY' };
+  | {
+      kind: 'unchanged';
+      reason: 'LIMIT_REACHED' | 'NONE_TO_REMOVE' | 'UNKNOWN_CATEGORY' | 'SOLD_OUT' | 'STOCK_REACHED';
+    };
 
 export type SetHolderTypeResult =
   | { kind: 'changed'; holders: HolderEntry[] }
@@ -100,9 +108,15 @@ const totalOf = (categories: readonly SelectableCategory[], quantities: TicketQu
 const isKnown = (categories: readonly SelectableCategory[], categoryId: string): boolean =>
   categories.some((category) => category.categoryId === categoryId);
 
+/** Sold out → 0; valid snapshot count → that count; otherwise no cap (the hold re-checks stock). */
+const capOf = (category: SelectableCategory): number => {
+  if (category.availability === 'sold_out') return 0;
+  return isValidCount(category.available) ? category.available : Number.POSITIVE_INFINITY;
+};
+
 const emptyEntry = (slotKey: string): HolderEntry => ({ slotKey, holderType: 'other', fullName: '', nik: '' });
 
-/** No dependencies: pure order rules (FR-13, ADR-0004, ADR-0007). */
+/** No dependencies: pure order rules (FR-13, FR-14, ADR-0004, ADR-0007). */
 export const OrderTicketSelectionUseCase = (): OrderTicketSelectionUseCaseInterface => ({
   orderLimit: ({ maxTicketsPerOrder, reservedUnits }) =>
     Math.min(ORDER_MAX_TICKETS, ...[maxTicketsPerOrder, reservedUnits].filter(isValidCount)),
@@ -112,24 +126,38 @@ export const OrderTicketSelectionUseCase = (): OrderTicketSelectionUseCaseInterf
     const lines: TicketLine[] = [];
     const slots: TicketSlot[] = [];
     let index = 0;
-    for (const { categoryId, name } of categories) {
+    for (const category of categories) {
+      const { categoryId, name } = category;
       const quantity = quantityOf(quantities, categoryId);
-      lines.push({ categoryId, quantity, canIncrement: total < limit, canDecrement: quantity > 0 });
+      lines.push({
+        categoryId,
+        quantity,
+        canIncrement: total < limit && quantity < capOf(category),
+        canDecrement: quantity > 0,
+      });
       for (let ordinal = 1; ordinal <= quantity; ordinal += 1) {
         index += 1;
         slots.push({ key: `${categoryId}-${ordinal}`, categoryId, categoryName: name, ordinal, index });
       }
     }
-    return { total, lines, slots };
+    return {
+      total,
+      lines,
+      slots,
+      limitReached: limit > 0 && total >= limit,
+      limitBelowMax: limit < ORDER_MAX_TICKETS,
+    };
   },
 
   increment: (categories, quantities, categoryId, limit) => {
-    if (!isKnown(categories, categoryId)) return { kind: 'unchanged', reason: 'UNKNOWN_CATEGORY' };
+    // Check order (FR-14): UNKNOWN_CATEGORY → SOLD_OUT → LIMIT_REACHED → STOCK_REACHED.
+    const category = categories.find((candidate) => candidate.categoryId === categoryId);
+    if (!category) return { kind: 'unchanged', reason: 'UNKNOWN_CATEGORY' };
+    if (category.availability === 'sold_out') return { kind: 'unchanged', reason: 'SOLD_OUT' };
     if (totalOf(categories, quantities) >= limit) return { kind: 'unchanged', reason: 'LIMIT_REACHED' };
-    return {
-      kind: 'changed',
-      quantities: { ...quantities, [categoryId]: quantityOf(quantities, categoryId) + 1 },
-    };
+    const quantity = quantityOf(quantities, categoryId);
+    if (quantity >= capOf(category)) return { kind: 'unchanged', reason: 'STOCK_REACHED' };
+    return { kind: 'changed', quantities: { ...quantities, [categoryId]: quantity + 1 } };
   },
 
   decrement: (categories, quantities, categoryId) => {

@@ -81,6 +81,14 @@ export interface OrderHolderView {
   nik: OrderHolderNikField;
 }
 
+/** The line under the category list when the order limit is reached (HiFi `.limit`). */
+export interface OrderLimitNotice {
+  /** "3/3": tickets picked / order limit. */
+  count: string;
+  /** "Batas 3 tiket tercapai. Kurangi satu untuk ganti kategori." or the reservation variant. */
+  message: string;
+}
+
 export interface OrderControllerInterface {
   t: TFunction;
   status: OrderStatus;
@@ -99,7 +107,9 @@ export interface OrderControllerInterface {
   showHolderChoice: boolean;
   /** One per ticket, slot order; empty when totalTickets is 0. */
   holders: OrderHolderView[];
-  /** "Maks. 3 tiket per transaksi. Tanpa nomor kursi — masuk sesuai kategori."; '' until loaded. */
+  /** Non-null only when status is 'ready' and the order limit is reached. */
+  limitNotice: OrderLimitNotice | null;
+  /** "Maks. {{count}} tiket per transaksi. …" with count = orderLimit; '' until loaded. */
   categoryNote: string;
   /** Translated; '' unless status is 'error'. */
   errorMessage: string;
@@ -315,6 +325,19 @@ const OrderController = ({
     [orderTicketSelectionUseCase, formApi, selection.slots, holderValues, focusedNik, profileName, showHolderChoice, t],
   );
 
+  const limitNotice = useMemo<OrderLimitNotice | null>(
+    () =>
+      status === 'ready' && selection.limitReached
+        ? {
+            count: `${selection.total}/${limit}`,
+            message: t(selection.limitBelowMax ? 'order_limit_reached_reserved' : 'order_limit_reached', {
+              count: limit,
+            }),
+          }
+        : null,
+    [status, selection, limit, t],
+  );
+
   const errorCode = (eventError ?? categoriesError)?.code;
   const errorMessage =
     status === 'error' && errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
@@ -343,7 +366,8 @@ const OrderController = ({
     showHolders: status === 'ready' && selection.total >= 1,
     showHolderChoice,
     holders,
-    categoryNote: ok ? t('order_category_note', { count: ok.maxTicketsPerOrder }) : '',
+    limitNotice,
+    categoryNote: ok ? t('order_category_note', { count: limit }) : '',
     errorMessage,
     retry: () => {
       if (eventQuery.isError) void eventQuery.refetch();

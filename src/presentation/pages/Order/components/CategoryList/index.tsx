@@ -1,4 +1,4 @@
-import type { OrderCategoryRow } from '@controllers/order.controller';
+import type { OrderCategoryRow, OrderLimitNotice } from '@controllers/order.controller';
 
 import styles from './category-list.module.css';
 
@@ -8,14 +8,24 @@ interface CategoryListProps {
   categories: OrderCategoryRow[];
   onIncrement: (categoryId: string) => void;
   onDecrement: (categoryId: string) => void;
+  /** Non-null when the order limit is reached: "3/3" + message. */
+  limitNotice: OrderLimitNotice | null;
 }
 
 /**
  * Section 1: the categories in server order with name, availability label, price and the − / count / + stepper.
  * DOM order name → status → price → stepper, so a sold-out row reads "Habis" before its price; the strike-through is
  * CSS only. The count span is keyed by the quantity so it remounts and replays the bump; the `output` stays mounted.
+ * The limit region stays mounted (empty when `limitNotice` is null) so the line is announced when it is inserted.
  */
-export default function CategoryList({ heading, note, categories, onIncrement, onDecrement }: CategoryListProps) {
+export default function CategoryList({
+  heading,
+  note,
+  categories,
+  onIncrement,
+  onDecrement,
+  limitNotice,
+}: CategoryListProps) {
   return (
     <section className={styles.section} aria-labelledby="order-categories-heading">
       <div className={styles.head}>
@@ -77,6 +87,13 @@ export default function CategoryList({ heading, note, categories, onIncrement, o
           </li>
         ))}
       </ul>
+      <div role="status" aria-atomic="true">
+        {limitNotice && (
+          <p className={styles.limit}>
+            <b className={styles.limitCount}>{limitNotice.count}</b> <span>{limitNotice.message}</span>
+          </p>
+        )}
+      </div>
     </section>
   );
 }
