@@ -147,4 +147,23 @@ describe('i18n instance', () => {
     );
     await i18n.changeLanguage('id');
   });
+
+  it("has the time's-up sheet copy in both locales (FR-18-W1)", async () => {
+    expect(i18n.t('order_time_up_stamp')).toBe('Waktu habis');
+    expect(i18n.t('order_time_up_title')).toBe('5 menit sudah lewat.');
+    expect(i18n.t('order_time_up_body')).toBe(
+      'Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi.',
+    );
+    expect(i18n.t('order_time_up_queue_again')).toBe('Antre lagi');
+    expect(i18n.t('action_back_home')).toBe('Ke beranda');
+    await i18n.changeLanguage('en');
+    expect(i18n.t('order_time_up_stamp')).toBe("Time's up");
+    expect(i18n.t('order_time_up_title')).toBe('Your 5 minutes are up.');
+    expect(i18n.t('order_time_up_body')).toBe(
+      "Your picks weren't saved and your place went to the next number. Queue again to try once more.",
+    );
+    expect(i18n.t('order_time_up_queue_again')).toBe('Queue again');
+    expect(i18n.t('action_back_home')).toBe('Go home');
+    await i18n.changeLanguage('id');
+  });
 });

@@ -11,6 +11,7 @@ import HolderList from './components/HolderList';
 import OrderEventHeader from './components/OrderEventHeader';
 import OrderMessage from './components/OrderMessage';
 import OrderSkeleton from './components/OrderSkeleton';
+import OrderTimeUpSheet from './components/OrderTimeUpSheet';
 import styles from './order.module.css';
 
 export default function OrderScreen() {
@@ -34,6 +35,7 @@ export default function OrderScreen() {
     locale,
     setLocale,
     timer,
+    timeUpSheet,
   } = container.resolve<OrderControllerInterface>('orderController');
 
   return (
@@ -89,6 +91,7 @@ export default function OrderScreen() {
         </div>
         {/* Summary aside: deferred (FR-14-W1 and the hold) */}
       </main>
+      {timeUpSheet && <OrderTimeUpSheet sheet={timeUpSheet} />}
     </div>
   );
 }

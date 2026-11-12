@@ -111,6 +111,24 @@ export interface OrderTimerView {
   label: string;
 }
 
+/** The time's-up sheet (FR-18-W1): what OrderTimeUpSheet shows. Texts are translated. */
+export interface OrderTimeUpView {
+  /** "Waktu habis" / "Time's up". */
+  stamp: string;
+  /** "5 menit sudah lewat." / "Your 5 minutes are up." */
+  title: string;
+  /** "Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi." */
+  body: string;
+  /** "Antre lagi" / "Queue again" (the arrow is drawn by the sheet, aria-hidden). */
+  queueAgainLabel: string;
+  /** "Ke beranda" / "Go home". */
+  homeLabel: string;
+  /** ROUTES.HOME. */
+  homeHref: string;
+  /** Tracks queue_rejoin and replaces the page with /queue?event=<id>: the waiting room joins at the back. */
+  queueAgain: () => void;
+}
+
 export interface OrderControllerInterface {
   t: TFunction;
   status: OrderStatus;
@@ -147,8 +165,13 @@ export interface OrderControllerInterface {
   allHoldersVerified: boolean;
   /** Null unless status is 'ready' and the answer's expiresAt / serverNow are valid dates. */
   timer: OrderTimerView | null;
-  /** The order window has run out (seconds left is 0). Exposed for FR-18-W1; nothing reacts to it yet. */
+  /**
+   * The order window has run out on this page visit: true from the first render at zero, then latched (stays true
+   * whatever status does later). Drives timeUpSheet.
+   */
   timeUp: boolean;
+  /** Non-null exactly when timeUp. */
+  timeUpSheet: OrderTimeUpView | null;
 }
 
 type OrderControllerDeps = Pick<
@@ -158,6 +181,7 @@ type OrderControllerDeps = Pick<
   | 'getOrderCategoriesUseCase'
   | 'orderTicketSelectionUseCase'
   | 'validateAttendeeUseCase'
+  | 'endOrderWindowUseCase'
   | 'admissionStore'
   | 'analyticsAdapter'
   | 'storage'
@@ -221,6 +245,7 @@ const OrderController = ({
   getOrderCategoriesUseCase,
   orderTicketSelectionUseCase,
   validateAttendeeUseCase,
+  endOrderWindowUseCase,
   admissionStore,
   analyticsAdapter,
   storage,
@@ -250,11 +275,15 @@ const OrderController = ({
     retry: retryTransientOnce,
   });
 
+  // Latched the first render the order window is at zero (FR-18-W1); never reset while mounted.
+  const [expired, setExpired] = useState(false);
+
   // The token is read at fetch time and never put in the key; gcTime 0: the snapshot belongs to one admission.
   const categoriesQuery = useQueryTanstack<OrderCategoriesResult, HttpError>({
     queryKey: [QUERY_KEYS.CATEGORIES, eventId, locale],
     queryFn: () => getOrderCategoriesUseCase.execute({ eventId, admissionToken: admissionStore.get(eventId) }),
-    enabled: hasEventId,
+    // Off after expiry: a language switch then keeps the placeholder instead of fetching with a cleared token.
+    enabled: hasEventId && !expired,
     gcTime: 0,
     retry: retryTransientOnce,
     placeholderData: (previous) => previous,
@@ -605,6 +634,21 @@ const OrderController = ({
     return () => clearInterval(id);
   }, [ticking]);
 
+  // A render-time update (as the anchor above), so the sheet shows in the same frame as "0:00"; the guard stops a loop.
+  const windowOver = status === 'ready' && secondsLeft === 0;
+  if (windowOver && !expired) setExpired(true);
+
+  // Once per visit: end the window on this device and block every later admission-invalid redirect (the buyer leaves
+  // through the sheet). The use case is synchronous and local (spec 61), not async work for TanStack.
+  const ended = useRef(false);
+  useEffect(() => {
+    if (!expired || ended.current) return;
+    ended.current = true;
+    redirected.current = true;
+    endOrderWindowUseCase.execute(eventId);
+    analyticsAdapter.trackEvent('order_time_up', { eventId, tickets: selection.total });
+  }, [expired, endOrderWindowUseCase, analyticsAdapter, eventId, selection.total]);
+
   const errorCode = (eventError ?? categoriesError)?.code;
   const errorMessage =
     status === 'error' && errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
@@ -653,7 +697,21 @@ const OrderController = ({
       status === 'ready' && secondsLeft !== null
         ? { seconds: Math.floor(secondsLeft), label: t('order_timer_label') }
         : null,
-    timeUp: status === 'ready' && secondsLeft === 0,
+    timeUp: expired,
+    timeUpSheet: expired
+      ? {
+          stamp: t('order_time_up_stamp'),
+          title: t('order_time_up_title'),
+          body: t('order_time_up_body'),
+          queueAgainLabel: t('order_time_up_queue_again'),
+          homeLabel: t('action_back_home'),
+          homeHref: ROUTES.HOME,
+          queueAgain: () => {
+            analyticsAdapter.trackEvent('queue_rejoin', { eventId, from: 'order' });
+            router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
+          },
+        }
+      : null,
   };
 };
 
