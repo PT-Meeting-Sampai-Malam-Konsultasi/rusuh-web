@@ -12,6 +12,8 @@ describe('AppFooter', () => {
       'footer_privacy',
       'footer_refund',
       'footer_help',
+      'footer_cookies',
     ]);
+    expect(screen.getByRole('link', { name: 'footer_cookies' })).toHaveAttribute('href', '#cookie-settings');
   });
 });

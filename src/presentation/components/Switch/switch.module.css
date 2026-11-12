@@ -1,0 +1,33 @@
+@reference "../../../styles/app.css";
+
+/* HiFi consent.css .switch: a square knob on an ink track when on. */
+.switch {
+  @apply inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-semibold;
+}
+
+.input {
+  @apply relative h-[30px] w-[52px] flex-none cursor-pointer appearance-none border-[2.5px] border-ink bg-card;
+
+  &::after {
+    @apply absolute top-[3px] left-[3px] size-[19px] bg-ink content-[''];
+    transition: transform 0.15s var(--ease-print);
+  }
+
+  &:checked {
+    @apply bg-ink;
+  }
+
+  &:checked::after {
+    @apply translate-x-[22px] bg-paper;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input::after {
+    transition: none;
+  }
+}

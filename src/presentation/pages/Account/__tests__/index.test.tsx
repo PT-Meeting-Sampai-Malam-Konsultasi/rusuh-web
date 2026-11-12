@@ -32,6 +32,7 @@ const base = (): AccountControllerInterface => ({
   retry: vi.fn(),
   locale: 'id',
   setLocale: vi.fn(),
+  privacy: null,
   nav: [{ href: '/account', label: 'nav_account', icon: 'account', current: true, desktop: true }],
 });
 
@@ -76,6 +77,18 @@ describe('AccountScreen', () => {
     render(<AccountScreen />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('account_hero_fallback');
     expect(screen.getByText('account_name_missing')).toBeInTheDocument();
+  });
+
+  it('shows the analytics switch only while analytics is on', async () => {
+    render(<AccountScreen />);
+    expect(screen.queryByRole('region', { name: /account_section_privacy/ })).not.toBeInTheDocument();
+    const setAnalytics = vi.fn();
+    controller = { ...base(), privacy: { analytics: true, setAnalytics } };
+    render(<AccountScreen />);
+    const toggle = screen.getByRole('switch', { name: 'account_privacy_label' });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    expect(setAnalytics).toHaveBeenCalledWith(false);
   });
 
   it('shows a skeleton while loading', () => {

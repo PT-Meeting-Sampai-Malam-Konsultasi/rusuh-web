@@ -4,6 +4,7 @@ import type { useTranslation } from 'react-i18next';
 
 import type { AdmissionStoreProtocol } from '@core/protocols/admission-store.protocol';
 import type { AnalyticsProtocol } from '@core/protocols/analytics.protocol';
+import type { AnalyticsConsent, ConsentStoreProtocol } from '@core/protocols/consent-store.protocol';
 import type { DeviceTokenStoreProtocol } from '@core/protocols/device-token-store.protocol';
 import type { FileSaverProtocol } from '@core/protocols/file-saver.protocol';
 import type { PrinterProtocol } from '@core/protocols/printer.protocol';
@@ -67,6 +68,15 @@ export interface PopupErrorApi {
 export interface NetworkStatusApi {
   isOnline: boolean;
 }
+/** The analytics cookie choice (NFR-09-W2). */
+export interface ConsentApi {
+  /** NEXT_PUBLIC_ANALYTICS_ENABLED: without it there is no banner, no settings and no Privacy section. */
+  enabled: boolean;
+  /** null: not asked yet (or the choice is over a year old). */
+  analytics: AnalyticsConsent | null;
+  setAnalytics: (granted: boolean) => void;
+  openSettings: () => void;
+}
 
 /**
  * Single source of truth for everything in the container. Every key here MUST have a container.register() call in
@@ -81,6 +91,7 @@ export interface AwilixRegistry {
   admissionStore: AdmissionStoreProtocol;
   deviceTokenStore: DeviceTokenStoreProtocol;
   queuePlaceStore: QueuePlaceStoreProtocol;
+  consentStore: ConsentStoreProtocol;
   turnstile: TurnstileProtocol;
   analyticsAdapter: AnalyticsProtocol;
   queueHttp: HttpProtocol;
@@ -107,6 +118,7 @@ export interface AwilixRegistry {
   useNetworkStatus: () => NetworkStatusApi;
   /** True while the tab is in front (`visibilitychange`). */
   usePageVisible: () => boolean;
+  useConsent: () => ConsentApi;
 
   // services
   accountService: AccountServiceInterface;

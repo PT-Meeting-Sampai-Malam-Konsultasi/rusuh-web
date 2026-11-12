@@ -10,11 +10,12 @@ import TabBar from '@presentation/components/TabBar';
 
 import styles from './account.module.css';
 import AccountAside from './components/AccountAside';
+import AccountPrivacy from './components/AccountPrivacy';
 import AccountProfile from './components/AccountProfile';
 import AccountSignIn from './components/AccountSignIn';
 
 export default function AccountScreen() {
-  const { t, status, profile, nameForm, signOut, signingOut, errorMessage, retry, locale, setLocale, nav } =
+  const { t, status, profile, nameForm, signOut, signingOut, errorMessage, retry, locale, setLocale, privacy, nav } =
     container.resolve<AccountControllerInterface>('accountController');
 
   return (
@@ -49,6 +50,7 @@ export default function AccountScreen() {
                 </header>
                 <AccountProfile t={t} name={profile.name} form={nameForm} />
                 <AccountSignIn t={t} email={profile.email} />
+                {privacy && <AccountPrivacy t={t} analytics={privacy.analytics} onChange={privacy.setAnalytics} />}
                 <div className={styles.out}>
                   <Button variant="secondary" onClick={signOut} busy={signingOut}>
                     {t('account_sign_out')}

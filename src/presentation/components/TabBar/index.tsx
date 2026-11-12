@@ -35,7 +35,7 @@ const ICONS: Record<NavLink['icon'], ReactNode> = {
 /** Phone-only bottom tab bar (the app look below 720px). */
 export default function TabBar({ label, nav }: TabBarProps) {
   return (
-    <nav className={styles.tabbar} aria-label={label}>
+    <nav className={styles.tabbar} aria-label={label} data-tabbar="">
       {nav.map((item) => (
         <Link key={item.href} className={styles.tab} href={item.href} aria-current={item.current ? 'page' : undefined}>
           <svg

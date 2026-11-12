@@ -1,0 +1,18 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi consent.css .ac-privacy. */
+.row {
+  @apply mt-5 grid max-w-[640px] items-start gap-x-6 gap-y-1.5;
+
+  @variant md {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+.label {
+  @apply text-[15px] leading-normal font-semibold;
+}
+
+.hint {
+  @apply mt-1 block text-[13px] font-normal text-ink-2;
+}

@@ -16,6 +16,7 @@ const env: RawEnv = {
   sentryEnvironment: undefined,
   sentryTracesSampleRate: undefined,
   sentryReplayOnErrorRate: undefined,
+  analyticsEnabled: undefined,
 };
 
 describe('config', () => {
@@ -52,6 +53,12 @@ describe('config', () => {
         sentryReplayOnErrorRate: '0',
       }),
     ).toMatchObject({ sentryEnvironment: 'staging', sentryTracesSampleRate: 1, sentryReplayOnErrorRate: 0 });
+  });
+
+  it('keeps product analytics off unless switched on', () => {
+    expect(createConfig(env).analyticsEnabled).toBe(false);
+    expect(createConfig({ ...env, analyticsEnabled: 'true' }).analyticsEnabled).toBe(true);
+    expect(createConfig({ ...env, analyticsEnabled: 'false' }).analyticsEnabled).toBe(false);
   });
 
   it('accepts sample rates between 0 and 1 only', () => {

@@ -24,6 +24,7 @@ describe('AccountController', () => {
   const changeLanguage = vi.fn();
   const i18n = { language: 'id', changeLanguage };
   const t = vi.fn((key: string) => key);
+  let consent: { enabled: boolean; analytics: 'granted' | 'denied' | null; setAnalytics: ReturnType<typeof vi.fn> };
 
   const deps = () => ({
     accountService: {
@@ -48,6 +49,7 @@ describe('AccountController', () => {
     useRouterNext: () => router,
     useLoading: () => ({ isLoading: false, toggleLoading }),
     usePopupError: () => ({ openPopupError, closePopupError: vi.fn() }),
+    useConsent: () => consent,
   });
 
   const render = (d = deps()) => renderHook(() => AccountController(d as never));
@@ -58,6 +60,7 @@ describe('AccountController', () => {
     vi.clearAllMocks();
     queryState = {};
     i18n.language = 'id';
+    consent = { enabled: false, analytics: null, setAnalytics: vi.fn() };
   });
 
   it('reads who is signed in and tracks the page once', async () => {
@@ -166,6 +169,17 @@ describe('AccountController', () => {
     run('signOut', 'onError', { status: 0, code: 'SOMETHING', message: 'x' });
     expect(openPopupError).toHaveBeenCalledWith({ message: 'error_unknown_error' });
     expect(toggleLoading).toHaveBeenCalledTimes(3);
+  });
+
+  it('offers the analytics switch only while analytics is on', () => {
+    expect(render().result.current.privacy).toBeNull();
+    consent = { enabled: true, analytics: 'granted', setAnalytics: vi.fn() };
+    const { result } = render();
+    expect(result.current.privacy?.analytics).toBe(true);
+    result.current.privacy?.setAnalytics(false);
+    expect(consent.setAnalytics).toHaveBeenCalledWith(false);
+    consent = { ...consent, analytics: null };
+    expect(render().result.current.privacy?.analytics).toBe(false);
   });
 
   it('switches language and remembers it', () => {

@@ -37,6 +37,8 @@ export interface AccountControllerInterface {
   retry: () => void;
   locale: FormatLocale;
   setLocale: (locale: FormatLocale) => void;
+  /** The analytics cookie switch (NFR-09-W2); null while NEXT_PUBLIC_ANALYTICS_ENABLED is off. */
+  privacy: { analytics: boolean; setAnalytics: (granted: boolean) => void } | null;
   nav: NavItem[];
 }
 
@@ -54,6 +56,7 @@ type AccountControllerDeps = Pick<
   | 'useRouterNext'
   | 'useLoading'
   | 'usePopupError'
+  | 'useConsent'
 >;
 
 const nameSchema = z.object({
@@ -78,6 +81,7 @@ const AccountController = ({
   useRouterNext,
   useLoading,
   usePopupError,
+  useConsent,
 }: AccountControllerDeps): AccountControllerInterface => {
   const { t, i18n } = useTranslation();
   const locale: FormatLocale = i18n.language === 'en' ? 'en' : 'id';
@@ -85,6 +89,7 @@ const AccountController = ({
   const queryClient = useQueryClientTanstack();
   const { toggleLoading } = useLoading();
   const { openPopupError } = usePopupError();
+  const consent = useConsent();
   const [editing, setEditing] = useState(false);
   const [nameError, setNameError] = useState('');
 
@@ -182,6 +187,9 @@ const AccountController = ({
       storage.set(STORAGE_KEYS.LANGUAGE, next);
       void i18n.changeLanguage(next);
     },
+    privacy: consent.enabled
+      ? { analytics: consent.analytics === 'granted', setAnalytics: consent.setAnalytics }
+      : null,
     nav: mainNav(t, 'account'),
   };
 };

@@ -20,6 +20,8 @@ export interface AppConfig {
   sentryTracesSampleRate: number;
   /** Share of errors that keep a session replay, 0–1 (replay only buffers, and never on the waiting room). */
   sentryReplayOnErrorRate: number;
+  /** Product analytics (NFR-09-W2): the consent banner and settings, and later GA4. Off unless set to true. */
+  analyticsEnabled: boolean;
 }
 
 export type RawEnv = Record<keyof AppConfig, string | undefined>;
@@ -38,6 +40,7 @@ export const readEnv = (): RawEnv => ({
   sentryEnvironment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
   sentryTracesSampleRate: process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   sentryReplayOnErrorRate: process.env.NEXT_PUBLIC_SENTRY_REPLAY_ON_ERROR_RATE,
+  analyticsEnabled: process.env.NEXT_PUBLIC_ANALYTICS_ENABLED,
 });
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -77,5 +80,6 @@ export function createConfig(env: RawEnv = readEnv()): AppConfig {
     sentryEnvironment: optionalEnv(env.sentryEnvironment, 'development'),
     sentryTracesSampleRate: rateEnv(env.sentryTracesSampleRate, 0.05),
     sentryReplayOnErrorRate: rateEnv(env.sentryReplayOnErrorRate, 0.1),
+    analyticsEnabled: boolEnv(env.analyticsEnabled),
   };
 }
