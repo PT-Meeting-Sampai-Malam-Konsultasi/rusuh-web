@@ -74,4 +74,24 @@ describe('i18n instance', () => {
     expect(i18n.t('action_retry')).toBe('Try again');
     await i18n.changeLanguage('id');
   });
+
+  it('picks the singular and plural of the order limit lines', async () => {
+    expect(i18n.t('order_limit_reached', { count: 3 })).toBe(
+      'Batas 3 tiket tercapai. Kurangi satu untuk ganti kategori.',
+    );
+    expect(i18n.t('order_limit_reached_reserved', { count: 2 })).toBe(
+      'Kuota giliran Anda 2 tiket. Kurangi satu untuk ganti kategori.',
+    );
+    await i18n.changeLanguage('en');
+    expect(i18n.t('order_limit_reached', { count: 3 })).toBe(
+      "You've hit the 3-ticket limit. Remove one to switch category.",
+    );
+    expect(i18n.t('order_limit_reached_reserved', { count: 1 })).toBe(
+      'Your turn holds 1 ticket. Remove one to switch category.',
+    );
+    expect(i18n.t('order_limit_reached_reserved', { count: 2 })).toBe(
+      'Your turn holds 2 tickets. Remove one to switch category.',
+    );
+    await i18n.changeLanguage('id');
+  });
 });

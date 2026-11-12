@@ -48,6 +48,16 @@ const okResult: OrderCategoriesResult = {
   serverNow: '2026-11-09T03:00:00Z',
 };
 
+/** Tribun with stock left: the stepper and holder tests pick from two open categories. */
+const tribuneOpen: Category = {
+  categoryId: 'cat_tribune',
+  name: 'Tribun',
+  seating: 'seated',
+  price: { amount: 1250000, currency: 'IDR' },
+  availability: 'available',
+};
+const openResult: OrderCategoriesResult = { ...okResult, categories: [festival, tribuneOpen] };
+
 type Err = { status: number; code: string; message: string };
 interface QueryState {
   data?: unknown;
@@ -246,7 +256,7 @@ describe('OrderController', () => {
           soldOut: true,
           quantity: 0,
           selected: false,
-          canIncrement: true,
+          canIncrement: false,
           canDecrement: false,
           incrementLabel: 'order_stepper_increase:{"category":"Tribun"}',
           decrementLabel: 'order_stepper_decrease:{"category":"Tribun"}',
@@ -417,7 +427,7 @@ describe('OrderController', () => {
   describe('steppers', () => {
     const ready = () => {
       eventState = { data: event };
-      categoriesState = { data: okResult };
+      categoriesState = { data: openResult };
     };
 
     it('starts every quantity at 0 with the limit from the use case', () => {
@@ -456,12 +466,15 @@ describe('OrderController', () => {
       expect(result.current.totalTickets).toBe(1);
     });
 
-    it('does not disable a sold-out category (FR-14-W1)', () => {
-      ready();
+    it('disables both buttons on a sold-out category at 0 (FR-14-W1)', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
       const { result } = render();
-      expect(result.current.categories[1]).toMatchObject({ soldOut: true, canIncrement: true });
+      expect(result.current.categories[1]).toMatchObject({ soldOut: true, canIncrement: false, canDecrement: false });
+      const before = result.current.categories;
       act(() => result.current.increment('cat_tribune'));
-      expect(result.current.categories[1].quantity).toBe(1);
+      expect(result.current.categories).toBe(before);
+      expect(result.current.totalTickets).toBe(0);
     });
 
     it('stops at the limit across categories', () => {
@@ -477,7 +490,7 @@ describe('OrderController', () => {
 
     it('caps the limit at the reserved units', () => {
       eventState = { data: event };
-      categoriesState = { data: { ...okResult, maxTicketsPerOrder: 3, reservedUnits: 2 } };
+      categoriesState = { data: { ...openResult, maxTicketsPerOrder: 3, reservedUnits: 2 } };
       const { result } = render();
       expect(result.current.orderLimit).toBe(2);
       act(() => result.current.increment('cat_festival'));
@@ -485,7 +498,7 @@ describe('OrderController', () => {
       expect(result.current.categories.map((c) => c.canIncrement)).toEqual([false, false]);
       act(() => result.current.increment('cat_festival'));
       expect(result.current.totalTickets).toBe(2);
-      expect(result.current.categoryNote).toBe('order_category_note:{"count":3}');
+      expect(result.current.categoryNote).toBe('order_category_note:{"count":2}');
     });
 
     it('ignores a decrement at 0 and an unknown category', () => {
@@ -511,13 +524,13 @@ describe('OrderController', () => {
       };
       const d = { ...deps(), orderTicketSelectionUseCase: useCase };
       const { result } = render(d);
-      expect(useCase.orderLimit).toHaveBeenCalledWith(okResult);
-      expect(useCase.summarize).toHaveBeenCalledWith(okResult.categories, {}, 3);
+      expect(useCase.orderLimit).toHaveBeenCalledWith(openResult);
+      expect(useCase.summarize).toHaveBeenCalledWith(openResult.categories, {}, 3);
       const before = result.current.categories;
       act(() => result.current.increment('cat_festival'));
       act(() => result.current.decrement('cat_festival'));
-      expect(useCase.increment).toHaveBeenCalledWith(okResult.categories, {}, 'cat_festival', 3);
-      expect(useCase.decrement).toHaveBeenCalledWith(okResult.categories, {}, 'cat_festival');
+      expect(useCase.increment).toHaveBeenCalledWith(openResult.categories, {}, 'cat_festival', 3);
+      expect(useCase.decrement).toHaveBeenCalledWith(openResult.categories, {}, 'cat_festival');
       expect(useCase.reconcileHolders).not.toHaveBeenCalled();
       expect(result.current.categories).toBe(before);
       expect(result.current.holders).toEqual([]);
@@ -543,10 +556,139 @@ describe('OrderController', () => {
     });
   });
 
+  describe('stepper limits', () => {
+    const soldOut: Category = {
+      ...tribuneOpen,
+      categoryId: 'cat_vip',
+      name: 'VIP',
+      availability: 'sold_out',
+      available: 0,
+    };
+    const lastOne: Category = { ...tribuneOpen, availability: 'almost_gone', available: 1 };
+    const withCategories = (categories: Category[], extra: Partial<OrderCategoriesResult> = {}) => {
+      eventState = { data: event };
+      categoriesState = { data: { ...okResult, categories, ...extra } };
+    };
+
+    it('leaves everything unchanged on a sold-out row and tracks nothing', () => {
+      withCategories([festival, soldOut]);
+      const d = deps();
+      const { result } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.categories[1]).toMatchObject({ quantity: 0, canIncrement: false, canDecrement: false });
+      const rows = result.current.categories;
+      const holders = result.current.holders;
+      act(() => result.current.increment('cat_vip'));
+      expect(result.current.totalTickets).toBe(1);
+      expect(result.current.categories).toBe(rows);
+      expect(result.current.holders).toBe(holders);
+      expect(result.current.limitNotice).toBeNull();
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+    });
+
+    it('stops a row at its snapshot stock while the others stay open', () => {
+      withCategories([festival, lastOne]);
+      const { result } = render();
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.totalTickets).toBe(1);
+      expect(result.current.categories.map((c) => c.canIncrement)).toEqual([true, false]);
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.categories[1].quantity).toBe(1);
+      expect(result.current.limitNotice).toBeNull();
+    });
+
+    it('keeps a stale pick removable after a refetch reports it sold out', () => {
+      withCategories([festival, tribuneOpen]);
+      const { result, rerender } = render();
+      act(() => result.current.increment('cat_tribune'));
+      act(() => result.current.increment('cat_tribune'));
+      categoriesState = {
+        data: { ...okResult, categories: [festival, { ...tribuneOpen, availability: 'sold_out', available: 0 }] },
+      };
+      rerender();
+      expect(result.current.categories[1]).toMatchObject({ quantity: 2, canIncrement: false, canDecrement: true });
+      act(() => result.current.decrement('cat_tribune'));
+      expect(result.current.categories[1]).toMatchObject({ quantity: 1, canIncrement: false, canDecrement: true });
+      expect(result.current.holders).toHaveLength(1);
+    });
+
+    it('shows no notice below the limit and the HiFi line at 3', () => {
+      withCategories([festival, tribuneOpen]);
+      const d = deps();
+      const { result } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.limitNotice).toBeNull();
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.limitNotice).toEqual({ count: '3/3', message: 'order_limit_reached:{"count":3}' });
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.totalTickets).toBe(3);
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
+      act(() => result.current.decrement('cat_tribune'));
+      expect(result.current.limitNotice).toBeNull();
+    });
+
+    it.each([
+      [2, '2/2'],
+      [1, '1/1'],
+    ])('uses the reservation line when the turn holds %i', (reservedUnits, count) => {
+      withCategories([festival, tribuneOpen], { reservedUnits });
+      const { result } = render();
+      for (let i = 0; i < reservedUnits; i += 1) act(() => result.current.increment('cat_festival'));
+      expect(result.current.limitNotice).toEqual({
+        count,
+        message: `order_limit_reached_reserved:{"count":${reservedUnits}}`,
+      });
+      expect(result.current.categoryNote).toBe(`order_category_note:{"count":${reservedUnits}}`);
+    });
+
+    it('shows no notice when the limit is 0', () => {
+      withCategories([festival, tribuneOpen], { reservedUnits: 0 });
+      const { result } = render();
+      expect(result.current.orderLimit).toBe(0);
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.totalTickets).toBe(0);
+      expect(result.current.limitNotice).toBeNull();
+    });
+
+    it('shows no notice unless the page is ready', () => {
+      withCategories([festival, tribuneOpen], { reservedUnits: 1 });
+      const { result, rerender } = render();
+      act(() => result.current.increment('cat_festival'));
+      expect(result.current.limitNotice).not.toBeNull();
+      eventState = err(0, 'NETWORK_ERROR');
+      rerender();
+      expect(result.current.status).toBe('error');
+      expect(result.current.limitNotice).toBeNull();
+      eventState = {};
+      rerender();
+      expect(result.current.status).toBe('loading');
+      expect(result.current.limitNotice).toBeNull();
+    });
+
+    it('keeps the quantities and retranslates the notice on a language change', () => {
+      withCategories([festival, tribuneOpen], { reservedUnits: 2 });
+      const tFor = (language: string) => (key: string, params?: Record<string, unknown>) =>
+        `${language}:${key}:${String(params?.count ?? '')}`;
+      let current = { t: tFor('id'), i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.limitNotice).toEqual({ count: '2/2', message: 'id:order_limit_reached_reserved:2' });
+      current = { t: tFor('en'), i18n: { language: 'en', changeLanguage } };
+      rerender();
+      expect(result.current.totalTickets).toBe(2);
+      expect(result.current.limitNotice).toEqual({ count: '2/2', message: 'en:order_limit_reached_reserved:2' });
+      expect(result.current.categoryNote).toBe('en:order_category_note:2');
+    });
+  });
+
   describe('holders', () => {
     const ready = () => {
       eventState = { data: event };
-      categoriesState = { data: okResult };
+      categoriesState = { data: openResult };
     };
 
     it('shows one titled holder per ticket in slot order', () => {
@@ -638,7 +780,7 @@ describe('OrderController', () => {
   describe('profile', () => {
     const ready = () => {
       eventState = { data: event };
-      categoriesState = { data: okResult };
+      categoriesState = { data: openResult };
     };
     const withName = (fullName?: string) => {
       meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName } };
