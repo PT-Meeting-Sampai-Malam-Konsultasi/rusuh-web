@@ -14,7 +14,8 @@ interface HolderListProps {
 
 /**
  * Section 2: one block per ticket with the "Saya sendiri / Orang lain" choice (native radios, so arrow keys skip the
- * disabled "Saya sendiri"), the KTP name and the NIK. ADR-0007: no profile-NIK card, no "save NIK to profile".
+ * disabled "Saya sendiri"), the KTP name and the NIK with its check states (FR-15-W1: error, Dukcapil tick,
+ * "checking" status and "Periksa lagi"). ADR-0007: no profile-NIK card, no "save NIK to profile".
  */
 export default function HolderList({ t, showChoice, holders }: HolderListProps) {
   return (
@@ -78,20 +79,40 @@ export default function HolderList({ t, showChoice, holders }: HolderListProps) 
                 readOnly={holder.name.readOnly}
                 autoComplete="off"
                 onChange={(e) => holder.name.onChange(e.currentTarget.value)}
+                onBlur={holder.name.onBlur}
               />
-              <TextField
-                id={holder.nik.id}
-                label={t('order_holder_nik_label')}
-                placeholder={t('order_holder_nik_placeholder')}
-                hint={t('order_holder_nik_hint')}
-                value={holder.nik.value}
-                inputMode="numeric"
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(e) => holder.nik.onChange(e.currentTarget.value)}
-                onFocus={holder.nik.onFocus}
-                onBlur={holder.nik.onBlur}
-              />
+              <div className={styles.nikCell}>
+                <TextField
+                  id={holder.nik.id}
+                  label={t('order_holder_nik_label')}
+                  placeholder={t('order_holder_nik_placeholder')}
+                  hint={holder.nik.checking ? t('order_nik_checking') : t('order_holder_nik_hint')}
+                  error={holder.nik.error}
+                  valid={holder.nik.valid}
+                  aria-busy={holder.nik.checking || undefined}
+                  value={holder.nik.value}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => holder.nik.onChange(e.currentTarget.value)}
+                  onFocus={holder.nik.onFocus}
+                  onBlur={holder.nik.onBlur}
+                />
+                {/* Polite, always mounted: announces "checking" and "valid"; errors go through the field's alert. */}
+                <p className={styles.srOnly} role="status">
+                  {holder.nik.checking ? t('order_nik_checking') : (holder.nik.valid ?? '')}
+                </p>
+                {holder.nik.canRecheck && (
+                  <button
+                    type="button"
+                    className={styles.recheck}
+                    aria-describedby={`${holder.nik.id}-message`}
+                    onClick={holder.nik.recheck}
+                  >
+                    {t('order_nik_recheck')}
+                  </button>
+                )}
+              </div>
             </div>
           </li>
         ))}

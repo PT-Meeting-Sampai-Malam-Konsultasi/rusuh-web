@@ -20,5 +20,6 @@ describe('resolveScenario', () => {
     expect(resolveScenario('?mock=near_front', null)).toBe('near_front');
     expect(resolveScenario('?mock=far_back', null)).toBe('far_back');
     expect(resolveScenario('?mock=no_queue', null)).toBe('no_queue');
+    expect(resolveScenario('?mock=dukcapil_down', null)).toBe('dukcapil_down');
   });
 });

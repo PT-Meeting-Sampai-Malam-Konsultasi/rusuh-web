@@ -121,8 +121,42 @@
   @apply grid gap-[18px];
 
   @variant md {
-    @apply grid-cols-2 gap-x-7 gap-y-[22px];
+    /* items-start: a taller NIK cell (error + "Periksa lagi") must not stretch the name field beside it. */
+    @apply grid-cols-2 items-start gap-x-7 gap-y-[22px];
   }
+}
+
+/* NIK field + its live region + "Periksa lagi": one grid cell, so the 2-column layout from 720px is unchanged. */
+.nikCell {
+  @apply grid content-start gap-2.5;
+}
+
+/* Quiet secondary action in the trust zone: ink = actions, no offset shadow, no print effect. */
+.recheck {
+  @apply min-h-11 cursor-pointer justify-self-start border-[2.5px] border-ink bg-card px-3.5 font-sans text-sm font-semibold text-ink;
+  transition:
+    background-color 120ms,
+    transform 90ms var(--ease-click);
+
+  &:hover {
+    @apply bg-paper-2;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  &:active {
+    @apply translate-y-px;
+  }
+
+  &:disabled {
+    @apply cursor-not-allowed bg-paper-2 text-ink-3;
+  }
+}
+
+.srOnly {
+  @apply sr-only;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -135,5 +169,11 @@
   from {
     transform: translateY(10px);
     opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recheck {
+    transition: none;
   }
 }

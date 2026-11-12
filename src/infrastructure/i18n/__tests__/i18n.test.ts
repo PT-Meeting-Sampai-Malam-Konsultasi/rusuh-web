@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { ValidateAttendeeUseCase } from '@core/use_case/booking/validate-attendee.use-case';
 import en from '@translation/locale/en.json';
 import id from '@translation/locale/id.json';
+
+import { toNikDigits } from '@utils/format/nik';
 
 import i18n, { LOCALES } from '../index';
 
@@ -57,6 +60,31 @@ describe('translations', () => {
     expect(missing).toEqual([]);
   });
 
+  it('has the NIK check keys in both locales (FR-15-W1)', () => {
+    const keys = [
+      'order_nik_incomplete',
+      'order_nik_invalid_structure',
+      'order_nik_duplicate',
+      'order_nik_checking',
+      'order_nik_valid',
+      'order_nik_use_another',
+      'order_nik_rate_limited_one',
+      'order_nik_rate_limited_other',
+      'order_nik_rate_limited_later',
+      'order_nik_unavailable',
+      'order_nik_recheck',
+    ];
+    expect(keys.filter((k) => !(k in id))).toEqual([]);
+    expect(keys.filter((k) => !(k in en))).toEqual([]);
+  });
+
+  it('uses a NIK hint example that passes the structure rule in both locales', () => {
+    const useCase = ValidateAttendeeUseCase({ bookingService: {} as never });
+    for (const hint of [id.order_holder_nik_hint, en.order_holder_nik_hint]) {
+      expect(useCase.checkNik(toNikDigits(hint), [])).toEqual({ kind: 'ok' });
+    }
+  });
+
   it('uses flat snake_case keys with non-empty values', () => {
     for (const [k, v] of Object.entries(id)) {
       expect(k).toMatch(/^[a-z0-9_]+$/);
@@ -91,6 +119,26 @@ describe('i18n instance', () => {
     );
     expect(i18n.t('order_limit_reached_reserved', { count: 2 })).toBe(
       'Your turn holds 2 tickets. Remove one to switch category.',
+    );
+    await i18n.changeLanguage('id');
+  });
+
+  it('interpolates the NIK duplicate line and picks the rate-limit plural', async () => {
+    expect(i18n.t('order_nik_duplicate', { index: 1 })).toBe(
+      'NIK ini sudah dipakai di Tiket 1. Setiap tiket butuh NIK orang yang berbeda.',
+    );
+    expect(i18n.t('order_nik_rate_limited', { count: 60 })).toBe(
+      'Terlalu banyak percobaan untuk tiket ini. Coba lagi dalam 60 detik.',
+    );
+    await i18n.changeLanguage('en');
+    expect(i18n.t('order_nik_duplicate', { index: 1 })).toBe(
+      "This NIK is already on Ticket 1. Each ticket needs a different person's NIK.",
+    );
+    expect(i18n.t('order_nik_rate_limited', { count: 1 })).toBe(
+      'Too many tries for this ticket. Try again in 1 second.',
+    );
+    expect(i18n.t('order_nik_rate_limited', { count: 60 })).toBe(
+      'Too many tries for this ticket. Try again in 60 seconds.',
     );
     await i18n.changeLanguage('id');
   });

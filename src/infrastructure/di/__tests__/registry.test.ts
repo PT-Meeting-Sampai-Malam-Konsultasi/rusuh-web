@@ -45,6 +45,7 @@ const KEYS = {
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
   orderTicketSelectionUseCase: true,
+  validateAttendeeUseCase: true,
   joinQueueUseCase: true,
   followQueueUseCase: true,
   claimTurnUseCase: true,
@@ -130,6 +131,12 @@ describe('DI registries', () => {
     expect(typeof container.resolve('getMyOrdersUseCase').execute).toBe('function');
     expect(typeof container.resolve('getETicketUseCase').execute).toBe('function');
     expect(typeof container.resolve('printer').print).toBe('function');
+  });
+
+  it('wires the validate attendee use case as a singleton', () => {
+    expect(container.resolve('validateAttendeeUseCase')).toBe(container.resolve('validateAttendeeUseCase'));
+    expect(typeof container.resolve('validateAttendeeUseCase').checkNik).toBe('function');
+    expect(typeof container.resolve('validateAttendeeUseCase').execute).toBe('function');
   });
 
   it('wires the order ticket selection use case as a singleton', () => {

@@ -1,4 +1,4 @@
-// Booking types, matching rusuh-documentation/api/openapi.yaml (Category, getCategories).
+// Booking types, matching rusuh-documentation/api/openapi.yaml (Category, getCategories, validateAttendee).
 import type { Money } from '@core/entities/catalog/catalog.entity';
 
 /** No seat numbers: entry by category (T-11). */
@@ -94,4 +94,23 @@ export interface Booking {
   paymentMethod?: PaymentMethod | null;
   createdAt: string;
   serverNow: string;
+}
+
+/** `validateAttendee` body: one ticket holder (ADR-0007). */
+export interface ValidateAttendeeRequest {
+  /** 0-based ticket position in the order, 0–2; the server rate-limits per field of each order (C-6). */
+  fieldIndex: number;
+  /** As on the KTP; Dukcapil checks it together with the NIK. */
+  fullName: string;
+  /** 16 digits (`^[0-9]{16}$`). Never logged. */
+  nik: string;
+}
+
+export interface ValidateAttendeeResponse {
+  /** Short-lived token the hold requires per attendee (FR-16+). */
+  validationToken: string;
+  /** Server mask, e.g. `************1234`. */
+  nikMasked: string;
+  /** End of the validation token's life (server time, ISO). */
+  expiresAt: string;
 }

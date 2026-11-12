@@ -1,4 +1,10 @@
-import type { Booking, GetCategoriesResponse, ListMyTicketsResponse } from '@core/entities/booking/booking.entity';
+import type {
+  Booking,
+  GetCategoriesResponse,
+  ListMyTicketsResponse,
+  ValidateAttendeeRequest,
+  ValidateAttendeeResponse,
+} from '@core/entities/booking/booking.entity';
 import type { HttpResponse } from '@core/protocols/http.protocol';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 
@@ -20,6 +26,16 @@ export interface BookingServiceInterface {
    * Not built in v1 (Apidog: NON-V1, LLD-02): the e-ticket page prints to PDF instead. Kept for when it ships.
    */
   downloadTickets: (bookingId: string) => Promise<HttpResponse<Blob>>;
+  /**
+   * `POST /events/{eventId}/attendees/validate`: one ticket holder's name + NIK against format, Dukcapil and the
+   * one-seat-per-NIK rule (ADR-0007). Needs a live admission token (403 ADMISSION_INVALID) and a session.
+   * 409 NIK_SEAT_TAKEN / DUPLICATE_NIK, 422 NIK_INVALID, 429 RATE_LIMITED (Retry-After), 503 DUKCAPIL_UNAVAILABLE.
+   */
+  validateAttendee: (
+    eventId: string,
+    admissionToken: string,
+    body: ValidateAttendeeRequest,
+  ) => Promise<HttpResponse<ValidateAttendeeResponse>>;
 }
 
 export const BookingService = ({ coreHttp }: Pick<AwilixRegistry, 'coreHttp'>): BookingServiceInterface => ({
@@ -34,4 +50,10 @@ export const BookingService = ({ coreHttp }: Pick<AwilixRegistry, 'coreHttp'>): 
       headers: { Accept: 'application/pdf' },
       responseType: 'blob',
     }),
+  validateAttendee: (eventId, admissionToken, body) =>
+    coreHttp.post<ValidateAttendeeResponse, ValidateAttendeeRequest>(
+      `events/${encodeURIComponent(eventId)}/attendees/validate`,
+      body,
+      { headers: { [ADMISSION_TOKEN_HEADER]: admissionToken } },
+    ),
 });

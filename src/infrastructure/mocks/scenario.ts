@@ -17,6 +17,8 @@ export const MOCK_SCENARIOS = [
   'far_back',
   /** FR-05: nobody ahead, so the buyer goes straight to the order page. */
   'no_queue',
+  /** FR-15: the Dukcapil circuit is open: every NIK check answers 503 DUKCAPIL_UNAVAILABLE. */
+  'dukcapil_down',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];

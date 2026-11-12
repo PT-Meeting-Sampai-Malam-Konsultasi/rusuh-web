@@ -17,6 +17,19 @@ export const problem = (status: number, code: string, title: string) =>
     { status, headers: { 'Content-Type': 'application/problem+json' } },
   );
 
+/** Problem with extra members (`retryAfter`, `attemptsLeft`, …) and optional headers (`Retry-After`). */
+export const problemWith = (
+  status: number,
+  code: string,
+  title: string,
+  extra: Record<string, unknown>,
+  headers: Record<string, string> = {},
+) =>
+  HttpResponse.json(
+    { type: 'about:blank', title, status, code, ...extra },
+    { status, headers: { 'Content-Type': 'application/problem+json', ...headers } },
+  );
+
 /** Shared failure scenarios for every handler; null means "answer normally". */
 export async function failure(scenario: MockScenario) {
   if (scenario === 'offline') return HttpResponse.error();

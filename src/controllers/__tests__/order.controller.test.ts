@@ -5,6 +5,10 @@ import type { Category } from '@core/entities/booking/booking.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { OrderCategoriesResult } from '@core/use_case/booking/get-order-categories.use-case';
 import { OrderTicketSelectionUseCase } from '@core/use_case/booking/order-ticket-selection.use-case';
+import {
+  ValidateAttendeeUseCase,
+  type ValidateAttendeeResult,
+} from '@core/use_case/booking/validate-attendee.use-case';
 import { retryTransientOnce } from '@utils/query/retry';
 
 import OrderController from '../order.controller';
@@ -84,6 +88,9 @@ describe('OrderController', () => {
   const t = vi.fn((key: string, params?: Record<string, unknown>) =>
     params ? `${key}:${JSON.stringify(params)}` : key,
   );
+  const mutate = vi.fn();
+  let mutationOptions: Record<string, (...args: never[]) => unknown>;
+  const { checkNik } = ValidateAttendeeUseCase({ bookingService: {} as never });
 
   const deps = () => ({
     catalogService: { listEvents: vi.fn(), getEvent: vi.fn().mockResolvedValue({ data: event, status: 200 }) },
@@ -93,6 +100,7 @@ describe('OrderController', () => {
     },
     getOrderCategoriesUseCase: { execute: vi.fn().mockResolvedValue(okResult) },
     orderTicketSelectionUseCase: OrderTicketSelectionUseCase(),
+    validateAttendeeUseCase: { checkNik, execute: vi.fn() },
     admissionStore: { get: vi.fn().mockReturnValue('adm_token'), set: vi.fn(), clear: vi.fn() },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -104,6 +112,10 @@ describe('OrderController', () => {
     },
     useTranslation: () => ({ t, i18n }),
     useRouterNext: () => router,
+    useMutationTanstack: (options: Record<string, (...args: never[]) => unknown>) => {
+      mutationOptions = options;
+      return { mutate, isPending: false };
+    },
     useSearchParamsNext: () => ({ get: (key: string) => search[key] ?? null }),
     useQueryTanstack: (options: { queryKey: unknown[] } & Record<string, unknown>) => {
       if (options.queryKey[0] === 'event') {
@@ -911,6 +923,442 @@ describe('OrderController', () => {
       expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
       expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
       expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
+    });
+  });
+
+  describe('NIK checks', () => {
+    /** Structurally valid KTP NIKs (province 31/32, day 41–71, month 01–12, serial ≠ 0000). */
+    const NIK_A = '3174055203960004';
+    const NIK_B = '3174055203960001';
+    const NIK_C = '3201014101900002';
+    const BAD_STRUCTURE = '0074055203960004';
+    type Hook = { result: { current: ReturnType<typeof OrderController> } };
+    type Vars = { slotKey: string; fieldIndex: number; fullName: string; nik: string };
+
+    const ready = (fullName?: string) => {
+      eventState = { data: event };
+      categoriesState = { data: openResult };
+      if (fullName) meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName } };
+    };
+    const holder = (hook: Hook, i: number) => hook.result.current.holders[i];
+    /** Types a name and a NIK, then leaves the NIK field (blur). */
+    const fill = (hook: Hook, i: number, name: string, nik: string) => {
+      act(() => holder(hook, i).name.onChange(name));
+      act(() => holder(hook, i).nik.onFocus());
+      act(() => holder(hook, i).nik.onChange(nik));
+      act(() => holder(hook, i).nik.onBlur());
+    };
+    const lastVars = () => mutate.mock.calls.at(-1)?.[0] as Vars;
+    const start = (v: Vars) => act(() => void mutationOptions.onMutate(v as never));
+    const settle = (result: ValidateAttendeeResult, v: Vars) =>
+      act(() => void mutationOptions.onSuccess(result as never, v as never));
+    const fail = (code: string, v: Vars) =>
+      act(() => void mutationOptions.onError({ status: 0, code, message: 'raw' } as never, v as never));
+    /** Fills ticket i and runs the whole check with `result`. */
+    const checked = (hook: Hook, i: number, name: string, nik: string, result: ValidateAttendeeResult) => {
+      fill(hook, i, name, nik);
+      const v = lastVars();
+      start(v);
+      settle(result, v);
+      return v;
+    };
+    const validResult: ValidateAttendeeResult = {
+      kind: 'valid',
+      validationToken: 'vt_secret',
+      nikMasked: '3174********0004',
+      expiresAt: '2026-11-09T03:10:00Z',
+    };
+    const one = () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      return hook;
+    };
+
+    it('starts idle with no message and is not verified', () => {
+      const hook = one();
+      expect(holder(hook, 0).nik).toMatchObject({ checking: false, canRecheck: false });
+      expect(holder(hook, 0).nik.error).toBeUndefined();
+      expect(holder(hook, 0).nik.valid).toBeUndefined();
+      expect(hook.result.current.allHoldersVerified).toBe(false);
+      act(() => holder(hook, 0).nik.recheck());
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('runs the mutation without retries and without the loading overlay', () => {
+      one();
+      expect(mutationOptions.retry).toBe(false);
+    });
+
+    it.each([
+      ['incomplete', '3174', 'order_nik_incomplete'],
+      ['invalid-structure', BAD_STRUCTURE, 'order_nik_invalid_structure'],
+    ])('shows the %s error only after a blur and while not focused', (_kind, nik, key) => {
+      const hook = one();
+      act(() => holder(hook, 0).name.onChange('Budi'));
+      act(() => holder(hook, 0).nik.onFocus());
+      act(() => holder(hook, 0).nik.onChange(nik));
+      expect(holder(hook, 0).nik.error).toBeUndefined();
+      act(() => holder(hook, 0).nik.onBlur());
+      expect(holder(hook, 0).nik.error).toBe(key);
+      expect(holder(hook, 0).nik.canRecheck).toBe(false);
+      act(() => holder(hook, 0).nik.onFocus());
+      expect(holder(hook, 0).nik.error).toBeUndefined();
+      act(() => holder(hook, 0).nik.onBlur());
+      expect(holder(hook, 0).nik.error).toBe(key);
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('shows no message for an empty NIK after a blur', () => {
+      const hook = one();
+      act(() => holder(hook, 0).name.onChange('Budi'));
+      act(() => holder(hook, 0).nik.onBlur());
+      expect(holder(hook, 0).nik.error).toBeUndefined();
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it('flags a repeated NIK on the later ticket at once, even while focused, and clears it when the first changes', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => holder(hook, 0).nik.onChange(NIK_A));
+      act(() => holder(hook, 1).name.onChange('Budi'));
+      act(() => holder(hook, 1).nik.onFocus());
+      act(() => holder(hook, 1).nik.onChange(NIK_A));
+      expect(holder(hook, 1).nik.error).toBe('order_nik_duplicate:{"index":1}');
+      expect(holder(hook, 0).nik.error).toBeUndefined();
+      act(() => holder(hook, 1).nik.onBlur());
+      expect(mutate).not.toHaveBeenCalled();
+      act(() => holder(hook, 0).nik.onChange(NIK_B));
+      expect(holder(hook, 1).nik.error).toBeUndefined();
+    });
+
+    it('lets a local duplicate win over a stored valid result', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      checked(hook, 1, 'Budi', NIK_A, validResult);
+      expect(holder(hook, 1).nik.valid).toBe('order_nik_valid');
+      act(() => holder(hook, 0).nik.onChange(NIK_A));
+      expect(holder(hook, 1).nik).toMatchObject({ error: 'order_nik_duplicate:{"index":1}', valid: undefined });
+      expect(hook.result.current.allHoldersVerified).toBe(false);
+    });
+
+    it('checks on NIK blur with the slot field index, once per value pair', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_tribune'));
+      fill(hook, 1, 'Budi Santoso', NIK_A);
+      expect(mutate).toHaveBeenCalledTimes(1);
+      expect(mutate).toHaveBeenCalledWith({
+        slotKey: 'cat_tribune-1',
+        fieldIndex: 1,
+        fullName: 'Budi Santoso',
+        nik: NIK_A,
+      });
+      start(lastVars());
+      expect(holder(hook, 1).nik).toMatchObject({ checking: true, canRecheck: false, error: undefined });
+      act(() => holder(hook, 1).nik.onBlur());
+      act(() => holder(hook, 1).name.onBlur());
+      act(() => holder(hook, 1).nik.recheck());
+      expect(mutate).toHaveBeenCalledTimes(1);
+      settle(validResult, lastVars());
+      act(() => holder(hook, 1).nik.onBlur());
+      act(() => holder(hook, 1).name.onBlur());
+      expect(mutate).toHaveBeenCalledTimes(1);
+    });
+
+    it('checks on name blur once the NIK is locally ok, never with a blank name', () => {
+      const hook = one();
+      act(() => holder(hook, 0).nik.onChange(NIK_A));
+      act(() => holder(hook, 0).nik.onBlur());
+      act(() => holder(hook, 0).name.onChange('   '));
+      act(() => holder(hook, 0).name.onBlur());
+      expect(mutate).not.toHaveBeenCalled();
+      act(() => holder(hook, 0).name.onChange('Budi'));
+      act(() => holder(hook, 0).name.onBlur());
+      expect(mutate).toHaveBeenCalledWith({ slotKey: 'cat_festival-1', fieldIndex: 0, fullName: 'Budi', nik: NIK_A });
+    });
+
+    it('checks when "Saya sendiri" fills the profile name, and drops the run on a type change', () => {
+      ready('Nadia Saputri');
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => holder(hook, 0).choose('self'));
+      expect(mutate).not.toHaveBeenCalled();
+      act(() => holder(hook, 0).nik.onChange(NIK_A));
+      act(() => holder(hook, 0).choose('other'));
+      act(() => holder(hook, 0).choose('self'));
+      expect(mutate).toHaveBeenCalledTimes(1);
+      const v = lastVars();
+      expect(v).toEqual({ slotKey: 'cat_festival-1', fieldIndex: 0, fullName: 'Nadia Saputri', nik: NIK_A });
+      start(v);
+      settle(validResult, v);
+      expect(holder(hook, 0).nik.valid).toBe('order_nik_valid');
+      act(() => holder(hook, 0).choose('other'));
+      expect(holder(hook, 0).nik.valid).toBeUndefined();
+      act(() => holder(hook, 0).name.onChange('Nadia Saputri'));
+      expect(holder(hook, 0).nik.valid).toBeUndefined();
+      expect(holder(hook, 0).nik.checking).toBe(false);
+    });
+
+    it('reads the admission token at call time and never puts it in the variables', async () => {
+      const d = deps();
+      d.admissionStore.get.mockReturnValue('adm-1');
+      d.validateAttendeeUseCase.execute.mockResolvedValue(validResult);
+      ready();
+      const hook = render(d);
+      act(() => hook.result.current.increment('cat_festival'));
+      fill(hook, 0, 'Budi', NIK_A);
+      const v = lastVars();
+      expect(JSON.stringify(v)).not.toContain('adm-1');
+      expect(d.admissionStore.get).not.toHaveBeenCalled();
+      await expect(mutationOptions.mutationFn(v as never)).resolves.toEqual(validResult);
+      expect(d.admissionStore.get).toHaveBeenCalledWith('evt_samudra');
+      expect(d.validateAttendeeUseCase.execute).toHaveBeenCalledWith({
+        eventId: 'evt_samudra',
+        admissionToken: 'adm-1',
+        fieldIndex: 0,
+        fullName: 'Budi',
+        nik: NIK_A,
+      });
+    });
+
+    it.each<[string, ValidateAttendeeResult, { error?: string; valid?: string; canRecheck: boolean }]>([
+      ['valid', validResult, { valid: 'order_nik_valid', canRecheck: false }],
+      ['nik-invalid', { kind: 'nik-invalid' }, { error: 'error_nik_invalid', canRecheck: false }],
+      [
+        'seat-taken',
+        { kind: 'seat-taken' },
+        { error: 'error_nik_seat_taken order_nik_use_another', canRecheck: false },
+      ],
+      ['duplicate', { kind: 'duplicate' }, { error: 'error_duplicate_nik', canRecheck: false }],
+      [
+        'rate-limited with seconds',
+        { kind: 'rate-limited', retryAfterSeconds: 60 },
+        { error: 'order_nik_rate_limited:{"count":60}', canRecheck: true },
+      ],
+      [
+        'rate-limited without seconds',
+        { kind: 'rate-limited', retryAfterSeconds: null },
+        { error: 'order_nik_rate_limited_later', canRecheck: true },
+      ],
+      ['unavailable', { kind: 'unavailable' }, { error: 'order_nik_unavailable', canRecheck: true }],
+    ])('shows the %s answer under the field and tracks its outcome', (_label, answer, expected) => {
+      const d = deps();
+      ready();
+      const hook = render(d);
+      act(() => hook.result.current.increment('cat_festival'));
+      checked(hook, 0, 'Budi', NIK_A, answer);
+      expect(holder(hook, 0).nik).toMatchObject({ checking: false, ...expected });
+      if (!expected.error) expect(holder(hook, 0).nik.error).toBeUndefined();
+      if (!expected.valid) expect(holder(hook, 0).nik.valid).toBeUndefined();
+      expect(hook.result.current.allHoldersVerified).toBe(answer.kind === 'valid');
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledTimes(1);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('order_nik_checked', { outcome: answer.kind });
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['UNAUTHORIZED', 'error_unauthorized'],
+      ['SOMETHING_NEW', 'error_unknown_error'],
+    ])('maps an unclassified %s failure to a field error, without popup or analytics', (code, key) => {
+      const d = deps();
+      ready();
+      const hook = render(d);
+      act(() => hook.result.current.increment('cat_festival'));
+      fill(hook, 0, 'Budi', NIK_A);
+      const v = lastVars();
+      start(v);
+      fail(code, v);
+      expect(holder(hook, 0).nik).toMatchObject({ error: key, canRecheck: true, checking: false });
+      expect(holder(hook, 0).nik.error).not.toContain('raw');
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it('rechecks a retryable failure with the current values, and only then', () => {
+      const hook = one();
+      checked(hook, 0, 'Budi', NIK_A, { kind: 'unavailable' });
+      expect(mutate).toHaveBeenCalledTimes(1);
+      act(() => holder(hook, 0).nik.recheck());
+      expect(mutate).toHaveBeenCalledTimes(2);
+      const v = lastVars();
+      expect(v).toEqual({ slotKey: 'cat_festival-1', fieldIndex: 0, fullName: 'Budi', nik: NIK_A });
+      start(v);
+      expect(holder(hook, 0).nik).toMatchObject({ checking: true, canRecheck: false });
+      act(() => holder(hook, 0).nik.recheck());
+      expect(mutate).toHaveBeenCalledTimes(2);
+      settle({ kind: 'nik-invalid' }, v);
+      act(() => holder(hook, 0).nik.recheck());
+      expect(mutate).toHaveBeenCalledTimes(2);
+    });
+
+    it('gives each of two concurrent checks its own result', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      fill(hook, 0, 'Budi', NIK_A);
+      const first = lastVars();
+      start(first);
+      fill(hook, 1, 'Sari', NIK_B);
+      const second = lastVars();
+      start(second);
+      expect(hook.result.current.holders.map((h) => h.nik.checking)).toEqual([true, true]);
+      settle({ kind: 'seat-taken' }, second);
+      expect(holder(hook, 0).nik.checking).toBe(true);
+      expect(holder(hook, 1).nik.error).toBe('error_nik_seat_taken order_nik_use_another');
+      settle(validResult, first);
+      expect(holder(hook, 0).nik.valid).toBe('order_nik_valid');
+      expect(holder(hook, 1).nik.error).toBe('error_nik_seat_taken order_nik_use_another');
+    });
+
+    it('ignores answers for values that have since changed', () => {
+      const hook = one();
+      fill(hook, 0, 'Budi', NIK_A);
+      const v = lastVars();
+      start(v);
+      act(() => holder(hook, 0).nik.onChange(NIK_B));
+      expect(holder(hook, 0).nik.checking).toBe(false);
+      settle(validResult, v);
+      expect(holder(hook, 0).nik.valid).toBeUndefined();
+      fail('UNAUTHORIZED', v);
+      expect(holder(hook, 0).nik.error).toBeUndefined();
+      act(() => holder(hook, 0).nik.onChange(NIK_A));
+      expect(holder(hook, 0).nik).toMatchObject({ checking: false, valid: undefined, error: undefined });
+
+      act(() => holder(hook, 0).nik.onBlur());
+      const again = lastVars();
+      start(again);
+      act(() => holder(hook, 0).name.onChange('Budi S'));
+      settle(validResult, again);
+      expect(holder(hook, 0).nik.valid).toBeUndefined();
+      act(() => holder(hook, 0).name.onChange('Budi'));
+      expect(holder(hook, 0).nik.valid).toBeUndefined();
+    });
+
+    it('keeps the result when a change leaves the values the same', () => {
+      const hook = one();
+      checked(hook, 0, 'Budi', NIK_A, validResult);
+      act(() => holder(hook, 0).nik.onChange(`${NIK_A}x`));
+      act(() => holder(hook, 0).name.onChange('Budi'));
+      expect(holder(hook, 0).nik.valid).toBe('order_nik_valid');
+    });
+
+    it('drops the run and touched flag of a removed ticket', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      checked(hook, 0, 'Budi', NIK_A, validResult);
+      fill(hook, 1, 'Sari', '3174');
+      expect(holder(hook, 1).nik.error).toBe('order_nik_incomplete');
+      act(() => hook.result.current.decrement('cat_festival'));
+      act(() => hook.result.current.decrement('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => holder(hook, 0).name.onChange('Budi'));
+      act(() => holder(hook, 0).nik.onChange(NIK_A));
+      act(() => holder(hook, 1).nik.onChange('3174'));
+      expect(holder(hook, 0).nik).toMatchObject({ valid: undefined, checking: false });
+      expect(holder(hook, 1).nik.error).toBeUndefined();
+    });
+
+    it('keeps the run of a ticket that stays when another is removed', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_tribune'));
+      checked(hook, 1, 'Budi', NIK_A, validResult);
+      act(() => hook.result.current.decrement('cat_festival'));
+      expect(holder(hook, 0).nik.valid).toBe('order_nik_valid');
+      expect(hook.result.current.allHoldersVerified).toBe(true);
+    });
+
+    it('goes back to the waiting room once on admission-invalid, with no event or message', () => {
+      const d = deps();
+      ready();
+      const hook = render(d);
+      act(() => hook.result.current.increment('cat_festival'));
+      fill(hook, 0, 'Budi', NIK_A);
+      const v = lastVars();
+      start(v);
+      settle({ kind: 'admission-invalid' }, v);
+      settle({ kind: 'admission-invalid' }, v);
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(holder(hook, 0).nik).toMatchObject({ error: undefined, valid: undefined });
+    });
+
+    it('is verified only when every holder is valid (Data Models example)', () => {
+      ready();
+      const hook = render();
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_tribune'));
+      checked(hook, 0, 'Nadia', NIK_A, validResult);
+      act(() => holder(hook, 1).nik.onFocus());
+      act(() => holder(hook, 1).nik.onChange(NIK_A));
+      expect(hook.result.current.holders.map((h) => [h.nik.valid, h.nik.error])).toEqual([
+        ['order_nik_valid', undefined],
+        [undefined, 'order_nik_duplicate:{"index":1}'],
+        [undefined, undefined],
+      ]);
+      expect(hook.result.current.allHoldersVerified).toBe(false);
+      checked(hook, 1, 'Sari', NIK_B, validResult);
+      expect(hook.result.current.allHoldersVerified).toBe(false);
+      checked(hook, 2, 'Dewi', NIK_C, validResult);
+      expect(hook.result.current.allHoldersVerified).toBe(true);
+      act(() => holder(hook, 2).name.onChange('Dewi A'));
+      expect(hook.result.current.allHoldersVerified).toBe(false);
+    });
+
+    it('retranslates every message on a language change without checking again', () => {
+      ready();
+      let current = { t: (key: string) => `id:${key}`, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const hook = renderHook(() => OrderController(d as never));
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      checked(hook, 0, 'Budi', NIK_A, validResult);
+      checked(hook, 1, 'Sari', NIK_B, { kind: 'unavailable' });
+      expect(mutate).toHaveBeenCalledTimes(2);
+      current = { t: (key: string) => `en:${key}`, i18n: { language: 'en', changeLanguage } };
+      hook.rerender();
+      expect(holder(hook, 0).nik.valid).toBe('en:order_nik_valid');
+      expect(holder(hook, 1).nik.error).toBe('en:order_nik_unavailable');
+      expect(mutate).toHaveBeenCalledTimes(2);
+    });
+
+    it('never passes a NIK, name or token to analytics', () => {
+      const d = deps();
+      ready();
+      const hook = render(d);
+      act(() => hook.result.current.increment('cat_festival'));
+      act(() => hook.result.current.increment('cat_festival'));
+      checked(hook, 0, 'Budi Santoso', NIK_A, validResult);
+      const v = (() => {
+        fill(hook, 1, 'Sari Dewi', NIK_B);
+        return lastVars();
+      })();
+      start(v);
+      fail('UNAUTHORIZED', v);
+      const calls = JSON.stringify([
+        d.analyticsAdapter.trackEvent.mock.calls,
+        d.analyticsAdapter.reportError.mock.calls,
+        d.analyticsAdapter.trackPageView.mock.calls,
+      ]);
+      for (const secret of [NIK_A, NIK_B, 'Budi', 'Sari', 'vt_secret', 'adm_token', '0004']) {
+        expect(calls).not.toContain(secret);
+      }
+      expect(d.analyticsAdapter.trackEvent.mock.calls).toEqual([['order_nik_checked', { outcome: 'valid' }]]);
     });
   });
 });
