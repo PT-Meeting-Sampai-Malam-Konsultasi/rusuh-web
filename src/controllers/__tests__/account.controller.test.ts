@@ -148,7 +148,7 @@ describe('AccountController', () => {
     run('saveName', 'onError', { status: 401, code: 'UNAUTHORIZED', message: 'x' });
     expect(router.replace).toHaveBeenCalledWith('/login?next=%2Faccount');
     run('saveName', 'onError', { status: 503, code: 'INTERNAL_ERROR', message: 'x', requestId: '3f2a9c1e-7b4d-4e2a' });
-    expect(openPopupError).toHaveBeenCalledWith({ message: 'error_internal', reference: '3f2a9c1e' });
+    expect(openPopupError).toHaveBeenCalledWith({ message: 'error_internal', reference: '3f2a9c1e-7b4d-4e2a' });
     expect(toggleLoading).toHaveBeenCalledTimes(3);
   });
 

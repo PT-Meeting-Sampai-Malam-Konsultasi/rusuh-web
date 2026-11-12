@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import Button from '@presentation/components/Button';
 
@@ -11,8 +11,11 @@ interface ErrorPopupProps {
   title?: string;
   message: string;
   closeLabel: string;
-  /** "Kode bantuan: 3f2a9c1e", already translated; nothing when empty. */
-  reference?: string;
+  /**
+   * "Kode bantuan: 3f2a9c1e" (translated), the full request ID it copies, and the copy button's labels; nothing when
+   * the error has no request ID.
+   */
+  reference?: { label: string; value: string; copyLabel: string; copiedLabel: string };
   actionLabel?: string;
   onAction?: () => void;
   onClose: () => void;
@@ -30,6 +33,25 @@ export default function ErrorPopup({
   onClose,
 }: ErrorPopupProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
+  const copied = !!reference && copiedValue === reference.value;
+
+  // "Tersalin" shows for a moment, then the button reads as before.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopiedValue(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const copy = async () => {
+    if (!reference) return;
+    try {
+      await navigator.clipboard.writeText(reference.value);
+      setCopiedValue(reference.value);
+    } catch {
+      // No clipboard (an old browser, a blocked permission): the code stays on screen to read out.
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +81,21 @@ export default function ErrorPopup({
         <p id="error-popup-message" className={styles.message}>
           {message}
         </p>
-        {reference && <p className={styles.reference}>{reference}</p>}
+        {reference && (
+          <p className={styles.reference}>
+            <button
+              type="button"
+              className={styles.copy}
+              onClick={() => void copy()}
+              aria-label={`${reference.label}. ${reference.copyLabel}`}
+            >
+              <span className={styles.code}>{reference.label}</span>
+              <span className={styles.hint} aria-live="polite">
+                {copied ? `✓ ${reference.copiedLabel}` : reference.copyLabel}
+              </span>
+            </button>
+          </p>
+        )}
         <div className={styles.actions}>
           {actionLabel && onAction && (
             <Button

@@ -54,7 +54,10 @@ export interface PopupErrorInput {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
-  /** "Kode bantuan" for support: the short request ID that finds the backend log line (NFR-09-W1). */
+  /**
+   * The request's full `X-Request-ID` (NFR-09-W1): the popup shows its first 8 characters as "Kode bantuan" and copies
+   * the whole ID, which finds the backend log line.
+   */
   reference?: string;
 }
 export interface PopupErrorApi {

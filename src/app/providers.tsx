@@ -15,6 +15,7 @@ import LoadingOverlay from '@presentation/components/LoadingOverlay';
 import MockBadge from '@presentation/components/MockBadge';
 import OfflineBanner from '@presentation/components/OfflineBanner';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
+import { supportCode } from '@utils/format/support';
 
 // Wiring only: register the container once, before any provider renders. No service calls here.
 registerAll();
@@ -75,7 +76,16 @@ function GlobalOverlays() {
         actionLabel={popup?.actionLabel}
         onAction={popup?.onAction}
         closeLabel={t('action_close')}
-        reference={popup?.reference ? t('error_reference', { code: popup.reference }) : undefined}
+        reference={
+          popup?.reference
+            ? {
+                label: t('error_reference', { code: supportCode(popup.reference) }),
+                value: popup.reference,
+                copyLabel: t('error_reference_copy'),
+                copiedLabel: t('error_reference_copied'),
+              }
+            : undefined
+        }
         onClose={closePopupError}
       />
     </>

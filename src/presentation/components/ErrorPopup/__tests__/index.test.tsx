@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,13 +20,51 @@ describe('ErrorPopup', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it('shows the support code under the message only when there is one', () => {
+  const reference = {
+    label: 'Kode bantuan: 3f2a9c1e',
+    value: '3f2a9c1e-7b4d-4e2a-9c1e-1234567890ab',
+    copyLabel: 'Salin',
+    copiedLabel: 'Tersalin',
+  };
+
+  it('shows the short support code under the message only when there is one', () => {
     const { rerender } = render(
-      <ErrorPopup open message="Gangguan." reference="Kode bantuan: 3f2a9c1e" closeLabel="Tutup" onClose={vi.fn()} />,
+      <ErrorPopup open message="Gangguan." reference={reference} closeLabel="Tutup" onClose={vi.fn()} />,
     );
-    expect(screen.getByText('Kode bantuan: 3f2a9c1e')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kode bantuan: 3f2a9c1e. Salin' })).toHaveTextContent(
+      'Kode bantuan: 3f2a9c1eSalin',
+    );
     rerender(<ErrorPopup open message="Gangguan." closeLabel="Tutup" onClose={vi.fn()} />);
     expect(screen.queryByText(/Kode bantuan/)).toBeNull();
+  });
+
+  it('copies the full request ID, says so for a moment, and keeps the close button focused', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(<ErrorPopup open message="Gangguan." reference={reference} closeLabel="Tutup" onClose={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Tutup' })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole('button', { name: /Kode bantuan/ }));
+    expect(writeText).toHaveBeenCalledWith('3f2a9c1e-7b4d-4e2a-9c1e-1234567890ab');
+    expect(screen.getByText('✓ Tersalin')).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.queryByText('✓ Tersalin')).toBeNull();
+    expect(screen.getByText('Salin')).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it('leaves the code on screen when the clipboard is not available', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn(async () => Promise.reject(new Error('denied'))) },
+      configurable: true,
+    });
+    render(<ErrorPopup open message="Gangguan." reference={reference} closeLabel="Tutup" onClose={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: /Kode bantuan/ }));
+    expect(screen.queryByText('✓ Tersalin')).toBeNull();
+    expect(screen.getByText('Kode bantuan: 3f2a9c1e')).toBeInTheDocument();
   });
 
   it('runs the action and then closes', async () => {
