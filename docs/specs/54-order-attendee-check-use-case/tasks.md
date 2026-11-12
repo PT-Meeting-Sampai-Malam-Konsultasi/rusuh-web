@@ -10,12 +10,12 @@ use-case-writer. Depends on spec 53; spec 55 consumes it.
 
 ## Tasks
 
-- [ ] 1. Move `retryAfterOf` from `request-sign-in-code.use-case.ts` to `src/core/use_case/shared/retry-after.ts` and import it back (no behaviour change) [Requirement 6]
-- [ ] 2. Write `src/core/use_case/booking/validate-attendee.use-case.ts`: `NIK_LENGTH`, `NikCheck`, `checkNik` with the stated order and the lenient structure rule (TSDoc: the server is the authority) [Requirement 1, Requirement 2, Requirement 5]
-- [ ] 3. In the same file: `ValidateAttendeeInput`, `ValidateAttendeeResult`, `execute` (token guard, trimmed name, one retry on a transient failure, classification, rethrow of anything else) and the `ValidateAttendeeUseCase` factory [Requirement 3, Requirement 4, Requirement 5, Requirement 6]
-- [ ] 4. Register `validateAttendeeUseCase: asFunction(ValidateAttendeeUseCase).singleton()` in `services.registry.ts`, add it to `AwilixRegistry` and to `KEYS` in `registry.test.ts` [Requirement 6]
-- [ ] 5. Write `src/core/use_case/booking/__tests__/validate-attendee.use-case.test.ts` per the Testing Strategy (both `checkNik` tables, seeded structure property, every `execute` row, call counts, rethrow identity, no NIK/name in results) [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5]
-- [ ] 6. Run the gate check [ALL]
+- [x] 1. Move `retryAfterOf` from `request-sign-in-code.use-case.ts` to `src/core/use_case/shared/retry-after.ts` and import it back (no behaviour change) [Requirement 6]
+- [x] 2. Write `src/core/use_case/booking/validate-attendee.use-case.ts`: `NIK_LENGTH`, `NikCheck`, `checkNik` with the stated order and the lenient structure rule (TSDoc: the server is the authority) [Requirement 1, Requirement 2, Requirement 5]
+- [x] 3. In the same file: `ValidateAttendeeInput`, `ValidateAttendeeResult`, `execute` (token guard, trimmed name, one retry on a transient failure, classification, rethrow of anything else) and the `ValidateAttendeeUseCase` factory [Requirement 3, Requirement 4, Requirement 5, Requirement 6]
+- [x] 4. Register `validateAttendeeUseCase: asFunction(ValidateAttendeeUseCase).singleton()` in `services.registry.ts`, add it to `AwilixRegistry` and to `KEYS` in `registry.test.ts` [Requirement 6]
+- [x] 5. Write `src/core/use_case/booking/__tests__/validate-attendee.use-case.test.ts` per the Testing Strategy (both `checkNik` tables, seeded structure property, every `execute` row, call counts, rethrow identity, no NIK/name in results) [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5]
+- [x] 6. Run the gate check [ALL]
 
 ## Task Dependency Graph
 
