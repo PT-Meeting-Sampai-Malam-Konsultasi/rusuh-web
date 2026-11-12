@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   output: 'export',
   // next/image has no optimizer in export mode: serve images as-is (sized, WebP/AVIF) from public/.
   images: { unoptimized: true },
+  // NFR-09-W1: CI builds source maps (SOURCE_MAPS=true), uploads them to Sentry, then deletes them before deploying,
+  // so production stack traces are readable without serving the maps. Build-time switch only: not app config.
+  productionBrowserSourceMaps: process.env.SOURCE_MAPS === 'true',
   turbopack: {
     root: __dirname,
     // Tailwind runs on every CSS file. CSS Modules must stay modules (scoped class names), so they get their own
