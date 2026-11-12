@@ -317,5 +317,17 @@
   "ticket_calendar_outlook": "Outlook",
   "ticket_calendar_ics": "Apple / lainnya (.ics)",
   "ticket_calendar_link_note": "Bawa KTP asli dengan NIK yang sama seperti di tiket. QR tiket ada di Tiket Saya.",
-  "ticket_print_note": "Bawa KTP asli dengan NIK yang sama seperti di tiket. QR ini hanya bisa dipindai sekali."
+  "ticket_print_note": "Bawa KTP asli dengan NIK yang sama seperti di tiket. QR ini hanya bisa dipindai sekali.",
+  "queue_leave_link": "Keluar dari antrian",
+  "queue_leave_app_note": "Di aplikasi, kami kirim notifikasi saat giliran Anda dekat.",
+  "queue_leave_title": "Keluar dari antrian?",
+  "queue_leave_body": "Nomor {{seq}} akan dilepas dan tidak bisa dipakai lagi. Kalau nanti antre lagi, Anda mulai dari belakang — sekarang ada {{ahead}} orang di depan Anda.",
+  "queue_leave_body_no_number": "Tempat Anda di antrian akan dilepas. Kalau nanti antre lagi, Anda mendapat nomor baru di belakang antrian.",
+  "queue_leave_stay": "Tetap antre",
+  "queue_leave_confirm": "Ya, keluar",
+  "queue_left_lead": "Nomor {{seq}} sudah dilepas.",
+  "queue_left_lead_no_number": "Tempat Anda sudah dilepas.",
+  "queue_left_title": "Anda keluar dari antrian.",
+  "queue_left_body": "Tiket {{event}} masih dijual. Kalau berubah pikiran, antre lagi kapan saja — Anda mendapat nomor baru di belakang antrian.",
+  "queue_left_body_no_event": "Tiket masih dijual. Kalau berubah pikiran, antre lagi kapan saja — Anda mendapat nomor baru di belakang antrian."
 }

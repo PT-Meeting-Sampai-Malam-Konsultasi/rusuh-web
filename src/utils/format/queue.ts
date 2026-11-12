@@ -18,7 +18,9 @@ export type QueueStatus =
   | 'turn'
   | 'missed'
   /** FR-05: no queue at all; on the way to the order page. */
-  | 'entering';
+  | 'entering'
+  /** FR-04-W2: the buyer gave the number up ("Keluar dari antrian"); the controller sets it. */
+  | 'left';
 
 /** Which waiting room view to show for the join answer (App Flow 4.2). */
 export function queueStatusFor(hasEventId: boolean, result: JoinQueueResult | undefined, failed: boolean): QueueStatus {

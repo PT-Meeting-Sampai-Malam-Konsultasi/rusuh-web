@@ -81,6 +81,11 @@ describe('QueueController', () => {
   let eventsState: QueryState;
   let search: string;
   const refetch = vi.fn();
+  let leaveMutation: Record<string, (...args: never[]) => unknown>;
+  const leaveMutate = vi.fn();
+  let leavePending: boolean;
+  const toggleLoading = vi.fn();
+  const openPopupError = vi.fn();
   const changeLanguage = vi.fn();
   const i18n = { language: 'id', changeLanguage };
   const t = vi.fn((key: string, params?: Record<string, unknown>) =>
@@ -102,6 +107,13 @@ describe('QueueController', () => {
     },
     useRouterNext: () => router,
     usePageVisible: () => visible,
+    leaveQueueUseCase: { execute: vi.fn().mockResolvedValue({ kind: 'left' }) },
+    useMutationTanstack: (options: Record<string, (...args: never[]) => unknown>) => {
+      leaveMutation = options;
+      return { mutate: leaveMutate, isPending: leavePending };
+    },
+    useLoading: () => ({ isLoading: false, toggleLoading }),
+    usePopupError: () => ({ openPopupError, closePopupError: vi.fn() }),
     getHomeEventsUseCase: { execute: vi.fn().mockResolvedValue('events') },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -128,6 +140,7 @@ describe('QueueController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     search = 'event=evt_pelita';
+    leavePending = false;
     joinState = {};
     frontierState = {};
     claimState = {};
@@ -732,6 +745,95 @@ describe('QueueController', () => {
       expect(result.current.turn?.claiming).toBe(false);
       result.current.claimNow();
       expect(refetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('leaving the queue (FR-04-W2)', () => {
+    it('offers the link while holding a place, with the number and the people ahead in the confirm', () => {
+      joinState = { data: place() };
+      eventsState = { data: EVENTS };
+      const { result } = render();
+      expect(result.current.leave).toMatchObject({
+        open: false,
+        leaving: false,
+        body: 'queue_leave_body:{"seq":"19.700","ahead":"1.248"}',
+      });
+      act(() => result.current.leave!.ask());
+      expect(result.current.leave!.open).toBe(true);
+      act(() => result.current.leave!.stay());
+      expect(result.current.leave!.open).toBe(false);
+    });
+
+    it('says the place is given up without a number before the draw, and offers no link without a place', () => {
+      joinState = {
+        data: place({ state: 'preopen', seq: null, served: null, position: null, opensAt: '2026-11-09T03:09:00Z' }),
+      };
+      expect(render().result.current.leave?.body).toBe('queue_leave_body_no_number');
+      joinState = { data: { kind: 'sold-out' } };
+      expect(render().result.current.leave).toBeNull();
+    });
+
+    it('leaves with the loading overlay, stops following the line, and shows the left view', async () => {
+      const d = deps();
+      joinState = { data: place() };
+      eventsState = { data: EVENTS };
+      const { result } = render(d);
+      act(() => result.current.leave!.ask());
+      act(() => result.current.leave!.confirm());
+      expect(leaveMutate).toHaveBeenCalledWith(19700);
+      await leaveMutation.mutationFn();
+      expect(d.leaveQueueUseCase.execute).toHaveBeenCalledWith('evt_pelita');
+      act(() => {
+        leaveMutation.onSuccess({ kind: 'left' } as never, 19700 as never);
+      });
+      expect(result.current.status).toBe('left');
+      expect(result.current.leave).toBeNull();
+      expect(result.current.left).toEqual({
+        lead: 'queue_left_lead:{"seq":"19.700"}',
+        body: 'queue_left_body:{"event":"PELITA"}',
+      });
+      expect(frontierOptions.enabled).toBe(false);
+      expect(claimOptions.enabled).toBe(false);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_leave', { eventId: 'evt_pelita' });
+      expect(toggleLoading).toHaveBeenCalledTimes(2);
+      expect(result.current.event?.kicker).toBe('queue_kicker_open');
+
+      // "Antre lagi": a new number at the back.
+      act(() => result.current.queueAgain());
+      expect(result.current.status).toBe('waiting');
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    it('words the left view without a number or the event', () => {
+      joinState = { data: place({ state: 'preopen', seq: null, served: null, position: null }) };
+      eventsState = {};
+      const { result } = render();
+      act(() => {
+        leaveMutation.onSuccess({ kind: 'left' } as never, null as never);
+      });
+      expect(result.current.left).toEqual({
+        lead: 'queue_left_lead_no_number',
+        body: 'queue_left_body_no_event',
+      });
+    });
+
+    it('closes the confirm and shows the error when leaving fails; the place is kept', () => {
+      joinState = { data: place() };
+      leavePending = true;
+      const { result } = render();
+      expect(result.current.leave!.leaving).toBe(true);
+      act(() => result.current.leave!.ask());
+      act(() => {
+        leaveMutation.onError({ status: 0, code: 'NETWORK_ERROR', message: 'x' } as never);
+      });
+      expect(openPopupError).toHaveBeenCalledWith({ message: 'error_unknown_error' });
+      expect(result.current.leave!.open).toBe(false);
+      expect(result.current.status).toBe('waiting');
+      act(() => {
+        leaveMutation.onError({ status: 429, code: 'RATE_LIMITED', message: 'x' } as never);
+      });
+      expect(openPopupError).toHaveBeenLastCalledWith({ message: 'error_rate_limited' });
+      expect(toggleLoading).toHaveBeenCalledTimes(2);
     });
   });
 });

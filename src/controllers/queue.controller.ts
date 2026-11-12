@@ -11,6 +11,7 @@ import {
   type FrontierResult,
 } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
+import type { LeaveQueueResult } from '@core/use_case/queue/leave-queue.use-case';
 import { holdWaitEstimate, waitEstimate, type WaitEstimate } from '@core/use_case/queue/wait-estimate';
 import type { ClaimTurnResult, TurnWindowResult } from '@core/use_case/queue/claim-turn.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
@@ -85,6 +86,27 @@ export interface QueueTurnView {
   signInHref: string | null;
 }
 
+/** "Keluar dari antrian" (FR-04-W2): the link under the number, and the confirm sheet it opens. */
+export interface QueueLeaveView {
+  open: boolean;
+  /** "Nomor 19.700 akan dilepas … sekarang ada 1.248 orang di depan Anda." (no number yet before the draw). */
+  body: string;
+  leaving: boolean;
+  ask: () => void;
+  /** "Tetap antre": the primary, easy choice. */
+  stay: () => void;
+  /** "Ya, keluar". */
+  confirm: () => void;
+}
+
+/** After leaving: stays on the waiting room; "Antre lagi" (queueAgain) gives a new number at the back. */
+export interface QueueLeftView {
+  /** "Nomor 19.700 sudah dilepas." */
+  lead: string;
+  /** "Tiket SAMUDRA masih dijual. …" */
+  body: string;
+}
+
 export interface QueueControllerInterface {
   t: TFunction;
   status: QueueStatus;
@@ -93,9 +115,12 @@ export interface QueueControllerInterface {
   prequeue: QueuePrequeueView | null;
   paused: QueuePausedView | null;
   turn: QueueTurnView | null;
+  /** Null unless the buyer holds a place (waiting, pre-queue, paused). */
+  leave: QueueLeaveView | null;
+  left: QueueLeftView | null;
   /** "Pilih tiket sekarang": claim at once. */
   claimNow: () => void;
-  /** "Antre lagi" after a missed turn: a new number at the back. */
+  /** "Antre lagi" after a missed turn or leaving: a new number at the back. */
   queueAgain: () => void;
   /** Translated; '' unless status is 'error'. */
   errorMessage: string;
@@ -111,16 +136,20 @@ type QueueControllerDeps = Pick<
   | 'joinQueueUseCase'
   | 'followQueueUseCase'
   | 'claimTurnUseCase'
+  | 'leaveQueueUseCase'
   | 'getHomeEventsUseCase'
   | 'analyticsAdapter'
   | 'storage'
   | 'ERROR_CODE_MAP'
   | 'useTranslation'
   | 'useQueryTanstack'
+  | 'useMutationTanstack'
   | 'useQueryClientTanstack'
   | 'useSearchParamsNext'
   | 'useRouterNext'
   | 'usePageVisible'
+  | 'useLoading'
+  | 'usePopupError'
 >;
 
 /** Same query as Home, so arriving from Home shows the poster at once. */
@@ -130,16 +159,20 @@ const QueueController = ({
   joinQueueUseCase,
   followQueueUseCase,
   claimTurnUseCase,
+  leaveQueueUseCase,
   getHomeEventsUseCase,
   analyticsAdapter,
   storage,
   ERROR_CODE_MAP,
   useTranslation,
   useQueryTanstack,
+  useMutationTanstack,
   useQueryClientTanstack,
   useSearchParamsNext,
   useRouterNext,
   usePageVisible,
+  useLoading,
+  usePopupError,
 }: QueueControllerDeps): QueueControllerInterface => {
   const { t, i18n } = useTranslation();
   const locale: FormatLocale = i18n.language === 'en' ? 'en' : 'id';
@@ -179,6 +212,12 @@ const QueueController = ({
   const result = joinQuery.data;
   const joined = result?.kind === 'joined' ? result.place : null;
 
+  // FR-04-W2: the confirm sheet, and the number given up (kept for "Nomor 19.700 sudah dilepas."). Leaving stops
+  // every queue call below; "Antre lagi" clears it with a new join.
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leftSeq, setLeftSeq] = useState<number | null | undefined>(undefined);
+  const left = leftSeq !== undefined;
+
   // FR-07: after the join, follow the line by polling the frontier; near the front the stream takes over (ADR-0015).
   const [streaming, setStreaming] = useState(false);
   const [fellBack, setFellBack] = useState(false);
@@ -186,7 +225,7 @@ const QueueController = ({
   const connectFailures = useRef(0);
   /** `errorUpdateCount` at the last successful poll: the polls failed in a row since then set the backoff (NFR-01). */
   const errorsAtLastPoll = useRef(0);
-  const following = !!joined && joined.seq !== null;
+  const following = !!joined && joined.seq !== null && !left;
 
   const frontierQuery = useQueryTanstack<FrontierResult, HttpError>({
     queryKey: [QUERY_KEYS.QUEUE_FRONTIER, eventId],
@@ -221,7 +260,7 @@ const QueueController = ({
   // Both queries are keyed by the number, so "Antre lagi" starts clean with the new one.
   const router = useRouterNext();
   const visible = usePageVisible();
-  const atTurn = !!place?.turnReached && place.state === 'open';
+  const atTurn = !!place?.turnReached && place.state === 'open' && !left;
   // FR-05: the join answer itself is at the turn, so there is no queue: straight on, no turn screen or 60 s timer.
   const skipping =
     joined?.state === 'open' && joined.seq !== null && joined.served !== null && joined.served >= joined.seq;
@@ -284,6 +323,7 @@ const QueueController = ({
       : null;
   const admitted = claim?.kind === 'admitted';
   const status = ((): QueueStatus => {
+    if (left) return 'left';
     if (claim?.kind === 'sold-out' || turnWindow?.kind === 'sold-out') return 'sold-out';
     if (!atTurn) return baseStatus;
     if (claim?.kind === 'missed' || turnWindow?.kind === 'missed' || (turnSeconds === 0 && !admitted)) return 'missed';
@@ -371,6 +411,7 @@ const QueueController = ({
     if (!summary) return null;
     const kickers: Partial<Record<QueueStatus, string>> = {
       waiting: t('queue_kicker_open'),
+      left: t('queue_kicker_open'),
       turn: t('queue_kicker_open'),
       missed: t('queue_kicker_open'),
       entering: t('queue_kicker_open'),
@@ -431,6 +472,50 @@ const QueueController = ({
     operator: t('queue_paused_operator'),
   };
 
+  const { toggleLoading } = useLoading();
+  const { openPopupError } = usePopupError();
+  const leaveMutation = useMutationTanstack<LeaveQueueResult, HttpError, number | null>({
+    mutationFn: () => {
+      toggleLoading();
+      return leaveQueueUseCase.execute(eventId);
+    },
+    onSuccess: (_, seq) => {
+      toggleLoading();
+      setLeaveOpen(false);
+      setLeftSeq(seq);
+      analyticsAdapter.trackEvent('queue_leave', { eventId });
+    },
+    onError: (error) => {
+      toggleLoading();
+      setLeaveOpen(false);
+      openPopupError({ message: t(ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) });
+    },
+  });
+  const holdsPlace = status === 'waiting' || status === 'prequeue' || status === 'paused';
+  const placeSeq = place?.seq ?? null;
+  const leave: QueueLeaveView | null = holdsPlace
+    ? {
+        open: leaveOpen,
+        body:
+          placeSeq !== null && position !== null
+            ? t('queue_leave_body', { seq: formatCount(placeSeq, locale), ahead: formatCount(position, locale) })
+            : t('queue_leave_body_no_number'),
+        leaving: leaveMutation.isPending,
+        ask: () => setLeaveOpen(true),
+        stay: () => setLeaveOpen(false),
+        confirm: () => leaveMutation.mutate(placeSeq),
+      }
+    : null;
+  const leftView = left
+    ? {
+        lead:
+          leftSeq === null || leftSeq === undefined
+            ? t('queue_left_lead_no_number')
+            : t('queue_left_lead', { seq: formatCount(leftSeq, locale) }),
+        body: summary ? t('queue_left_body', { event: summary.name.toUpperCase() }) : t('queue_left_body_no_event'),
+      }
+    : null;
+
   const errorCode = joinQuery.error?.code;
   const errorMessage =
     status === 'error' && errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
@@ -450,6 +535,8 @@ const QueueController = ({
               (summary?.state === 'temporarily_full' ? t('home_temporarily_full_note') : t('queue_paused_operator')),
           }
         : null,
+    leave,
+    left: leftView,
     turn:
       status === 'turn' && place?.seq != null
         ? {
@@ -465,6 +552,7 @@ const QueueController = ({
     },
     queueAgain: () => {
       analyticsAdapter.trackEvent('queue_rejoin', { eventId });
+      setLeftSeq(undefined);
       rejoinNext.current = true;
       void joinQuery.refetch();
     },
