@@ -76,12 +76,23 @@
   transform: rotate(-2deg);
 }
 
+/* Artwork lies under the printed text; the halftone is left off it. */
 .image {
-  @apply block h-full w-full object-cover;
+  @apply absolute inset-0 -z-10 block h-full w-full object-cover;
 }
 
-.srOnly {
-  @apply sr-only;
+/* Darkens the lower half, where the title and plates sit, so they read on any artwork. */
+.wash {
+  @apply pointer-events-none absolute inset-0 -z-10;
+  background: linear-gradient(180deg, rgb(20 20 20 / 15%) 0%, rgb(20 20 20 / 25%) 45%, rgb(20 20 20 / 75%) 100%);
+}
+
+.withImage {
+  --fg: #fff;
+
+  &::before {
+    @apply hidden;
+  }
 }
 
 /* Card poster: phone thumbnail first, full card from 720px. */

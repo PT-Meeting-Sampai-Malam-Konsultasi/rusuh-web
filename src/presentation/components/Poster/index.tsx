@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+
 import styles from './poster.module.css';
 
 export type PosterTone = 'blue' | 'pink' | 'paper' | 'ink';
@@ -32,7 +36,11 @@ const IMAGE_SIZE = {
   stub: [260, 200],
 } as const;
 
-/** Screen-printed event poster: halftone, condensed title, tilted subtitle plate. Generated when there is no artwork. */
+/**
+ * Screen-printed event poster: halftone, condensed title, tilted subtitle plate, as the HiFi draws it. The text is
+ * always printed; event artwork, when the API has some, lies under it with a dark wash so the title stays readable. An
+ * image that fails to load (a 403, a removed file) is dropped, and the printed poster stands on its own.
+ */
 export default function Poster({
   tone,
   size,
@@ -46,43 +54,54 @@ export default function Poster({
   loading = 'lazy',
   className,
 }: PosterProps) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const [width, height] = IMAGE_SIZE[size];
   const thumb = size === 'thumb';
+  const artwork = imageUrl && imageUrl !== failedUrl ? imageUrl : null;
   return (
-    <div className={[styles.poster, styles[tone], styles[size], className].filter(Boolean).join(' ')}>
-      {imageUrl ? (
+    <div
+      className={[styles.poster, styles[tone], styles[size], artwork && styles.withImage, className]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {artwork && (
         <>
-          {/* Event artwork from the API: next/image has no optimizer in export mode. */}
+          {/* Event artwork from the API: next/image has no optimizer in export mode. Decorative: the text says it all. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className={styles.image} src={imageUrl} alt="" width={width} height={height} loading={loading} />
-          <Title className={styles.srOnly} id={titleId}>
-            {title}
-          </Title>
+          <img
+            className={styles.image}
+            src={artwork}
+            alt=""
+            width={width}
+            height={height}
+            loading={loading}
+            onError={() => setFailedUrl(artwork)}
+          />
+          <span className={styles.wash} aria-hidden="true" />
         </>
-      ) : (
-        <div className={styles.inner}>
-          {kicker && !thumb && <span className={styles.kicker}>{kicker}</span>}
-          {size === 'hero' && (
-            <svg className={styles.waves} viewBox="0 0 400 150" aria-hidden="true">
-              <g fill="none" strokeWidth="9" strokeLinecap="square">
-                <path d="M0 30 q50 -34 100 0 t100 0 t100 0 t100 0" className={styles.waveA} />
-                <path d="M0 72 q50 -34 100 0 t100 0 t100 0 t100 0" className={styles.waveB} />
-                <path d="M0 114 q50 -34 100 0 t100 0 t100 0 t100 0" className={styles.waveA} />
-              </g>
-            </svg>
-          )}
-          <Title className={styles.title} id={titleId}>
-            {title.toUpperCase()}
-          </Title>
-          {subtitle && !thumb && <span className={styles.subtitle}>{subtitle}</span>}
-          {meta && !thumb && (
-            <div className={styles.meta}>
-              <b>{meta.date}</b>
-              <span>{meta.place}</span>
-            </div>
-          )}
-        </div>
       )}
+      <div className={styles.inner}>
+        {kicker && !thumb && <span className={styles.kicker}>{kicker}</span>}
+        {size === 'hero' && !artwork && (
+          <svg className={styles.waves} viewBox="0 0 400 150" aria-hidden="true">
+            <g fill="none" strokeWidth="9" strokeLinecap="square">
+              <path d="M0 30 q50 -34 100 0 t100 0 t100 0 t100 0" className={styles.waveA} />
+              <path d="M0 72 q50 -34 100 0 t100 0 t100 0 t100 0" className={styles.waveB} />
+              <path d="M0 114 q50 -34 100 0 t100 0 t100 0 t100 0" className={styles.waveA} />
+            </g>
+          </svg>
+        )}
+        <Title className={styles.title} id={titleId}>
+          {title.toUpperCase()}
+        </Title>
+        {subtitle && !thumb && <span className={styles.subtitle}>{subtitle}</span>}
+        {meta && !thumb && (
+          <div className={styles.meta}>
+            <b>{meta.date}</b>
+            <span>{meta.place}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
