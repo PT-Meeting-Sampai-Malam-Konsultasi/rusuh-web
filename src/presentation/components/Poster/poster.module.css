@@ -224,3 +224,62 @@
     --title-size: 19px;
   }
 }
+
+/* Tile: a My tickets card, 4:5, slightly tilted (HiFi .tl-poster). */
+.tile {
+  @apply w-full self-start;
+  aspect-ratio: 4 / 5;
+  box-shadow: 3px 3px 0 var(--color-ink);
+  transform: rotate(-1.2deg);
+  --title-size: 16px;
+  --subtitle-size: 9px;
+
+  .inner {
+    @apply justify-end p-1.5;
+  }
+
+  .subtitle {
+    @apply mt-1;
+    padding: 2px 3px 1px;
+  }
+
+  @variant md {
+    box-shadow: 4px 4px 0 var(--color-ink);
+    --title-size: 30px;
+    --subtitle-size: 12px;
+
+    .inner {
+      @apply p-2.5;
+    }
+
+    .subtitle {
+      @apply mt-1.5;
+      padding: 3px 5px 2px;
+    }
+  }
+}
+
+/* Stub: the poster end of an e-ticket (HiFi .stub-a): kicker on top, title and category at the bottom. */
+.stub {
+  @apply h-[120px] w-full;
+  --title-size: 40px;
+  --subtitle-size: 15px;
+
+  .inner {
+    @apply px-[18px] py-4;
+  }
+
+  .title {
+    @apply mt-auto;
+  }
+
+  .subtitle {
+    @apply mt-2;
+  }
+
+  @variant md {
+    @apply h-full;
+    --title-size: 52px;
+    --subtitle-size: 18px;
+  }
+}

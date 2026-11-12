@@ -5,7 +5,10 @@ import type { useTranslation } from 'react-i18next';
 import type { AdmissionStoreProtocol } from '@core/protocols/admission-store.protocol';
 import type { AnalyticsProtocol } from '@core/protocols/analytics.protocol';
 import type { DeviceTokenStoreProtocol } from '@core/protocols/device-token-store.protocol';
+import type { FileSaverProtocol } from '@core/protocols/file-saver.protocol';
+import type { PrinterProtocol } from '@core/protocols/printer.protocol';
 import type { HttpProtocol } from '@core/protocols/http.protocol';
+import type { QrEncoderProtocol } from '@core/protocols/qr-encoder.protocol';
 import type { QueuePlaceStoreProtocol } from '@core/protocols/queue-place-store.protocol';
 import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
@@ -27,12 +30,16 @@ import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-h
 import type { ClaimTurnUseCaseInterface } from '@core/use_case/queue/claim-turn.use-case';
 import type { FollowQueueUseCaseInterface } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
+import type { GetETicketUseCaseInterface } from '@core/use_case/ticket/get-e-ticket.use-case';
+import type { GetMyOrdersUseCaseInterface } from '@core/use_case/ticket/get-my-orders.use-case';
 import type { AccountControllerInterface } from '@controllers/account.controller';
 import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { LoginControllerInterface } from '@controllers/login.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { OrderControllerInterface } from '@controllers/order.controller';
 import type { QueueControllerInterface } from '@controllers/queue.controller';
+import type { TicketDetailControllerInterface } from '@controllers/ticket-detail.controller';
+import type { TicketsControllerInterface } from '@controllers/tickets.controller';
 import type { AppConfig } from '@infrastructure/config';
 
 /** Shapes of the context hooks (implemented in src/contexts, scaffold step 5). */
@@ -72,6 +79,10 @@ export interface AwilixRegistry {
   queueHttp: HttpProtocol;
   coreHttp: HttpProtocol;
   queueStream: QueueStreamProtocol;
+  fileSaver: FileSaverProtocol;
+  printer: PrinterProtocol;
+  /** Registered by the e-ticket page only (di/controllers/ticket-detail.ts): the QR library loads with that page. */
+  qrEncoder: QrEncoderProtocol;
 
   // infrastructure: framework hooks (controllers never import these directly)
   useTranslation: typeof useTranslation;
@@ -109,6 +120,8 @@ export interface AwilixRegistry {
   signOutUseCase: SignOutUseCaseInterface;
   requestSignInCodeUseCase: RequestSignInCodeUseCaseInterface;
   verifySignInCodeUseCase: VerifySignInCodeUseCaseInterface;
+  getMyOrdersUseCase: GetMyOrdersUseCaseInterface;
+  getETicketUseCase: GetETicketUseCaseInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;
@@ -120,6 +133,8 @@ export interface AwilixRegistry {
   notFoundController: NotFoundControllerInterface;
   orderController: OrderControllerInterface;
   queueController: QueueControllerInterface;
+  ticketDetailController: TicketDetailControllerInterface;
+  ticketsController: TicketsControllerInterface;
 
   // services, use cases and more controllers are added here by /add-feature
 }

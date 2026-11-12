@@ -10,3 +10,10 @@
     @apply right-4 bottom-4 left-auto;
   }
 }
+
+/* Paper gets the content only (the e-ticket prints to PDF). */
+@media print {
+  .badge {
+    @apply hidden;
+  }
+}

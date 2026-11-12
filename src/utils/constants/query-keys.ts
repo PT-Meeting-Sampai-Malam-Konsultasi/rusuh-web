@@ -8,4 +8,6 @@ export const QUERY_KEYS = {
   QUEUE_TURN: 'queue-turn',
   QUEUE_CLAIM: 'queue-claim',
   ME: 'me',
+  MY_ORDERS: 'my-orders',
+  BOOKING: 'booking',
 } as const;

@@ -21,6 +21,8 @@ export interface RequestConfig {
   withCredentials?: boolean;
   /** Reject a 401 as it is, without refreshing the session first (the auth calls themselves). */
   skipRefresh?: boolean;
+  /** 'blob' for a file (the tickets PDF); JSON otherwise. */
+  responseType?: 'blob';
 }
 
 export interface HttpProtocol {

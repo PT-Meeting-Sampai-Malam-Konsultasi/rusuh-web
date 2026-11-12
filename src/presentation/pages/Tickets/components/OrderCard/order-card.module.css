@@ -1,0 +1,170 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .tl-card: poster | event and stubs | date and action; on phones the date row wraps under the card. */
+.card {
+  @apply grid border-[2.5px] border-ink bg-card p-3.5;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 14px 16px;
+  box-shadow: var(--shadow-off-s);
+
+  @variant md {
+    @apply gap-6 p-[22px];
+    grid-template-columns: 112px minmax(0, 1fr) 190px;
+    box-shadow: var(--shadow-off);
+  }
+
+  @variant lg {
+    @apply gap-8;
+    grid-template-columns: 132px minmax(0, 1fr) 220px;
+  }
+}
+
+.poster {
+  @apply block self-start;
+}
+
+.card:nth-child(even) .poster > * {
+  transform: rotate(1deg);
+}
+
+.info {
+  @apply flex min-w-0 flex-col items-start gap-1.5;
+
+  @variant md {
+    @apply gap-2;
+  }
+}
+
+.title {
+  @apply mt-1 font-display text-[19px] leading-[1.05] font-bold;
+  font-stretch: 85%;
+
+  a {
+    @apply no-underline;
+  }
+
+  a:hover {
+    @apply underline decoration-2 underline-offset-4;
+  }
+
+  @variant md {
+    @apply text-[26px];
+  }
+}
+
+.meta {
+  @apply text-[13px] text-ink-2;
+
+  @variant md {
+    @apply text-sm;
+  }
+}
+
+/* Each ticket as a tiny stub: category over the holder's name. */
+.stubs {
+  @apply mt-1.5 flex list-none flex-wrap gap-1.5;
+
+  li {
+    @apply grid gap-px border-[1.5px] border-dashed border-ink-3 bg-paper px-2 pt-[5px] pb-1 text-xs leading-[1.3];
+  }
+
+  b {
+    @apply text-[11px] leading-[1.2] font-semibold tracking-[0.05em] text-blue-ink uppercase;
+  }
+
+  @variant md {
+    @apply gap-2;
+
+    li {
+      @apply px-3 pt-[7px] pb-1.5 text-[13px];
+    }
+  }
+}
+
+.order {
+  @apply mt-auto pt-1 text-[13px] text-ink-2;
+
+  b {
+    @apply font-semibold text-ink tabular-nums;
+  }
+
+  @variant md {
+    @apply pt-2.5 text-sm;
+  }
+}
+
+.nowrap {
+  @apply whitespace-nowrap;
+}
+
+/* The date as the one loud thing; the action under it (beside it on phones). */
+.when {
+  @apply col-span-full flex flex-row flex-wrap items-center gap-x-3.5 gap-y-2.5 border-t border-hair pt-3;
+
+  @variant md {
+    @apply col-span-1 flex-col items-stretch gap-2 border-t-0 border-l pt-0 pl-7;
+  }
+}
+
+.date {
+  @apply flex items-baseline gap-2;
+}
+
+.day {
+  @apply font-display text-[40px] leading-[0.8] font-extrabold tabular-nums;
+  font-stretch: 75%;
+  letter-spacing: -0.02em;
+
+  @variant md {
+    @apply text-[60px];
+  }
+
+  @variant lg {
+    @apply text-[72px];
+  }
+}
+
+.month {
+  @apply font-display text-lg leading-none font-bold uppercase;
+  font-stretch: 85%;
+
+  @variant md {
+    @apply text-2xl;
+  }
+}
+
+.left {
+  @apply text-sm font-semibold text-pink-ink;
+}
+
+.action {
+  @apply ml-auto;
+
+  @variant md {
+    @apply mt-auto ml-0;
+  }
+}
+
+/* Past orders follow, dimmed. */
+.past {
+  @apply border-ink-3 bg-paper;
+  box-shadow: 4px 4px 0 var(--color-ink-3);
+
+  .poster {
+    filter: grayscale(1);
+    opacity: 0.75;
+  }
+
+  .title,
+  .day {
+    @apply text-ink-2;
+  }
+
+  .stubs b {
+    @apply text-ink-2;
+  }
+
+  @variant md {
+    box-shadow: 6px 6px 0 var(--color-ink-3);
+  }
+}

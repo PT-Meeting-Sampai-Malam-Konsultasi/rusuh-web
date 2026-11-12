@@ -1,0 +1,152 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .stub: poster | details | QR, a dashed perforation with punched notches before the QR. Stacked on phones. */
+.stub {
+  @apply relative grid border-[2.5px] border-ink bg-card;
+  grid-template-columns: 1fr;
+  box-shadow: var(--shadow-off-s);
+
+  @variant md {
+    @apply min-h-[200px];
+    grid-template-columns: 200px minmax(0, 1fr) 190px;
+    box-shadow: var(--shadow-off);
+  }
+
+  @variant xl {
+    grid-template-columns: 260px minmax(0, 1fr) 210px;
+  }
+}
+
+.poster {
+  @apply border-b-[2.5px] border-ink;
+
+  @variant md {
+    @apply border-r-[2.5px] border-b-0;
+  }
+}
+
+.details {
+  @apply grid content-center gap-x-4 gap-y-3 p-4;
+  grid-template-columns: 1fr 1fr;
+
+  dt {
+    @apply text-[12.5px] font-semibold tracking-[0.05em] text-ink-2 uppercase;
+  }
+
+  dd {
+    @apply mt-1 font-display text-[17px] leading-[1.25] font-bold;
+    font-stretch: 85%;
+  }
+
+  small {
+    @apply mt-0.5 block font-sans text-sm leading-[1.4] font-medium text-ink-2 tabular-nums;
+    font-stretch: normal;
+  }
+
+  @variant md {
+    @apply gap-x-10 px-8 py-6;
+
+    dd {
+      @apply text-xl;
+    }
+  }
+
+  @variant xl {
+    grid-template-columns: repeat(3, auto);
+    justify-content: start;
+  }
+}
+
+.holder {
+  @apply col-span-full;
+
+  @variant xl {
+    @apply col-span-1;
+  }
+}
+
+.code {
+  @apply grid content-center justify-items-center gap-1.5 border-t-[2.5px] border-dashed border-ink p-[18px] text-[13px] font-semibold tracking-[0.06em];
+
+  @variant md {
+    @apply border-t-0 border-l-[2.5px] p-4;
+
+    /* The punched notches either end of the perforation. */
+    &::before,
+    &::after {
+      content: '';
+
+      @apply absolute size-[22px] rounded-full border-[2.5px] border-ink bg-paper;
+      right: 178px;
+    }
+
+    &::before {
+      top: -13px;
+      clip-path: inset(50% 0 0 0);
+    }
+
+    &::after {
+      bottom: -13px;
+      clip-path: inset(0 0 50% 0);
+    }
+  }
+
+  @variant xl {
+    &::before,
+    &::after {
+      right: 198px;
+    }
+  }
+}
+
+/* Shown on paper only: each printed page carries the gate rule on its own. */
+.printNote {
+  @apply hidden;
+}
+
+/* On paper: the stacked layout at any width (poster on top, details, then a QR big enough to scan from a printout). */
+@media print {
+  .stub {
+    @apply break-inside-avoid shadow-none;
+    grid-template-columns: 1fr;
+    print-color-adjust: exact;
+  }
+
+  .poster {
+    @apply border-r-0 border-b-[2.5px];
+
+    > * {
+      @apply h-[45mm];
+    }
+  }
+
+  .details {
+    @apply gap-x-6 gap-y-4 px-6 py-5;
+    grid-template-columns: 1fr 1fr;
+
+    dd {
+      @apply text-xl;
+    }
+  }
+
+  .holder {
+    @apply col-span-full;
+  }
+
+  .code {
+    @apply border-t-[2.5px] border-l-0 p-6;
+
+    svg {
+      width: 60mm;
+    }
+
+    &::before,
+    &::after {
+      @apply hidden;
+    }
+  }
+
+  .printNote {
+    @apply block border-t border-hair px-6 py-4 text-sm text-ink-2;
+  }
+}

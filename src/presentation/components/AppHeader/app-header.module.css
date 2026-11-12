@@ -71,3 +71,10 @@
     @apply hidden;
   }
 }
+
+/* Paper gets the content only (the e-ticket prints to PDF). */
+@media print {
+  .header {
+    @apply hidden;
+  }
+}
