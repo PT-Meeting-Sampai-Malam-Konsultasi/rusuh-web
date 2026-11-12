@@ -130,12 +130,15 @@ export function authHandlers({ coreApiUrl, getScenario, now }: MockContext): Htt
       return new HttpResponse(null, { status: 204 });
     }),
 
-    http.get(`${coreApiUrl}/me`, async ({ request }) => {
-      const failed = await failure(getScenario());
-      if (failed) return failed;
-      const user = signedIn(request);
-      return user ? HttpResponse.json<User>(user) : problem(401, 'UNAUTHORIZED', 'Sesi berakhir');
-    }),
+    // `GET /auth/profile` is what the auth service serves; `GET /me` is the Apidog alias.
+    ...['me', 'auth/profile'].map((path) =>
+      http.get(`${coreApiUrl}/${path}`, async ({ request }) => {
+        const failed = await failure(getScenario());
+        if (failed) return failed;
+        const user = signedIn(request);
+        return user ? HttpResponse.json<User>(user) : problem(401, 'UNAUTHORIZED', 'Sesi berakhir');
+      }),
+    ),
 
     http.put(`${coreApiUrl}/auth/profile`, async ({ request }) => {
       const failed = await failure(getScenario());

@@ -71,7 +71,7 @@ describe('AccountService', () => {
     const response = { data: { userId: 'u' }, status: 200 };
     coreHttp.get.mockResolvedValue(response);
     await expect(service.getMe()).resolves.toBe(response);
-    expect(coreHttp.get).toHaveBeenCalledWith('me');
+    expect(coreHttp.get).toHaveBeenCalledWith('auth/profile');
   });
 
   it('saves the name and language', async () => {

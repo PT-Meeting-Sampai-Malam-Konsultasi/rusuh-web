@@ -64,6 +64,8 @@ describe('auth mock', () => {
     const saved = await account.updateProfile({ fullName: 'Budi Santoso', locale: 'en' });
     expect(saved.data).toMatchObject({ email, fullName: 'Budi Santoso', locale: 'en' });
     await expect(account.getMe()).resolves.toMatchObject({ data: { fullName: 'Budi Santoso' } });
+    // The Apidog alias answers the same.
+    await expect(coreHttp.get('me')).resolves.toMatchObject({ data: { fullName: 'Budi Santoso' } });
 
     later(61);
     const again = await request(email);
