@@ -14,7 +14,7 @@ the i18n test).
 - [x] 2. `HolderList/index.tsx`: forward `name.onBlur`; wrap the NIK `TextField` in `.nikCell` with `error`, `valid`, the checking/example hint and `aria-busy`; add the per-holder `role="status"` region and the `canRecheck` button described by the message line [Requirement 1, Requirement 2, Requirement 3, Requirement 4]
 - [x] 3. `HolderList/holder-list.module.css`: add `.nikCell`, `.recheck` (hover, focus-visible, active, disabled, reduced motion) and `.srOnly`, tokens only [Requirement 3]
 - [x] 4. Tests: `HolderList/__tests__/index.test.tsx` for every state, same status node across rerenders, recheck, blurs, ID and EN strings; `src/infrastructure/i18n/__tests__/i18n.test.ts` for the EN plural and both hint examples passing `checkNik` [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6]
-- [ ] 5. Run the gate check and the manual check with the spec 53 sample NIKs at 390 and 1440, ID and EN [ALL]
+- [x] 5. Run the gate check and the manual check with the spec 53 sample NIKs at 390 and 1440, ID and EN [ALL]
 
 ## Task Dependency Graph
 

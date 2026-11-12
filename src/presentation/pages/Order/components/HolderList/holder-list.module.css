@@ -121,7 +121,8 @@
   @apply grid gap-[18px];
 
   @variant md {
-    @apply grid-cols-2 gap-x-7 gap-y-[22px];
+    /* items-start: a taller NIK cell (error + "Periksa lagi") must not stretch the name field beside it. */
+    @apply grid-cols-2 items-start gap-x-7 gap-y-[22px];
   }
 }
 
