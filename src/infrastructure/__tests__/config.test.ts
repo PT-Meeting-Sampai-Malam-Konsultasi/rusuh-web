@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { boolEnv, createConfig, optionalEnv, requireEnv, type RawEnv } from '../config';
+import { boolEnv, createConfig, optionalEnv, rateEnv, requireEnv, type RawEnv } from '../config';
 
 const env: RawEnv = {
   appVersion: '0.1.0',
@@ -12,6 +12,10 @@ const env: RawEnv = {
   turnstileSiteKey: 'site',
   defaultLocale: undefined,
   apiMock: undefined,
+  sentryDsn: undefined,
+  sentryEnvironment: undefined,
+  sentryTracesSampleRate: undefined,
+  sentryReplayOnErrorRate: undefined,
 };
 
 describe('config', () => {
@@ -30,6 +34,32 @@ describe('config', () => {
   it('turns the API mock on only when asked', () => {
     expect(createConfig(env).apiMock).toBe(false);
     expect(createConfig({ ...env, apiMock: 'true' }).apiMock).toBe(true);
+  });
+
+  it('keeps Sentry off without a DSN, with low sample rates by default', () => {
+    expect(createConfig(env)).toMatchObject({
+      sentryDsn: '',
+      sentryEnvironment: 'development',
+      sentryTracesSampleRate: 0.05,
+      sentryReplayOnErrorRate: 0.1,
+    });
+    expect(
+      createConfig({
+        ...env,
+        sentryDsn: 'https://k@o1.ingest.sentry.io/2',
+        sentryEnvironment: 'staging',
+        sentryTracesSampleRate: '1',
+        sentryReplayOnErrorRate: '0',
+      }),
+    ).toMatchObject({ sentryEnvironment: 'staging', sentryTracesSampleRate: 1, sentryReplayOnErrorRate: 0 });
+  });
+
+  it('accepts sample rates between 0 and 1 only', () => {
+    expect(rateEnv('0.25', 0.05)).toBe(0.25);
+    expect(rateEnv('1.5', 0.05)).toBe(0.05);
+    expect(rateEnv('-1', 0.05)).toBe(0.05);
+    expect(rateEnv('abc', 0.05)).toBe(0.05);
+    expect(rateEnv('', 0.05)).toBe(0.05);
   });
 
   it('fails fast on a missing required variable', () => {

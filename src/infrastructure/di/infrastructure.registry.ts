@@ -9,7 +9,8 @@ import { usePageVisible } from '@contexts/page-visibility';
 import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
 import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
-import { createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
+import { apiErrorReporter, createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
+import { createSentrySink } from '@infrastructure/adapters/sentry.adapter';
 import { createDeviceTokenStore } from '@infrastructure/adapters/device-token-store.adapter';
 import { createFileSaver } from '@infrastructure/adapters/file-saver.adapter';
 import { createPrinter } from '@infrastructure/adapters/printer.adapter';
@@ -38,6 +39,8 @@ export function registerInfrastructure() {
   // one refresh, because each refresh rotates the cookie and a second one with the old cookie revokes the session.
   const refreshSession = singleFlight(() => container.resolve('refreshSessionUseCase').execute());
 
+  const onError = apiErrorReporter(() => container.resolve('analyticsAdapter'));
+
   container.register({
     config: asValue(createConfig()),
     storage: asFunction(() => createStorageAdapter()).singleton(),
@@ -53,7 +56,20 @@ export function registerInfrastructure() {
     turnstile: asFunction((d: Deps) =>
       createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
     ).singleton(),
-    analyticsAdapter: asFunction(() => createAnalyticsAdapter()).singleton(),
+    // Sentry only with a DSN (off in local dev and tests); the SDK itself loads after the page is interactive.
+    analyticsAdapter: asFunction(({ config }: Pick<Deps, 'config'>) =>
+      createAnalyticsAdapter(
+        config.sentryDsn
+          ? createSentrySink({
+              dsn: config.sentryDsn,
+              environment: config.sentryEnvironment,
+              release: config.appVersion,
+              tracesSampleRate: config.sentryTracesSampleRate,
+              replayOnErrorRate: config.sentryReplayOnErrorRate,
+            })
+          : {},
+      ),
+    ).singleton(),
     // The session too: claiming a turn needs it (ADR-0025), and a join with it attaches the place to the account.
     queueHttp: asFunction((d: Deps) =>
       createHttpAdapter({
@@ -62,6 +78,7 @@ export function registerInfrastructure() {
         getLocale: locale(d),
         getAccessToken: () => d.tokenStore.getAccessToken(),
         refreshSession,
+        onError,
       }),
     ).singleton(),
     coreHttp: asFunction((d: Deps) =>
@@ -71,6 +88,7 @@ export function registerInfrastructure() {
         getLocale: locale(d),
         getAccessToken: () => d.tokenStore.getAccessToken(),
         refreshSession,
+        onError,
       }),
     ).singleton(),
     queueStream: asFunction((d: Deps) => createQueueStreamAdapter({ baseUrl: d.config.queueApiUrl })).singleton(),
