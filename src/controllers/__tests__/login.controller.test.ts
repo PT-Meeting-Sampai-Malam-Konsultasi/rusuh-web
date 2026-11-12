@@ -38,6 +38,7 @@ const problem = (status: number, code: string) => ({ status, code, message: code
 describe('LoginController', () => {
   let mutations: MutationOptions[];
   let mutate: ReturnType<typeof vi.fn>[];
+  let pending = false;
   let queryOptions: Record<string, unknown>;
   let search: string;
   const toggleLoading = vi.fn();
@@ -70,7 +71,7 @@ describe('LoginController', () => {
       const index = mutations.length % 3;
       mutations[index] = options;
       mutations.length = Math.max(mutations.length, index + 1);
-      return { mutate: mutate[index], isPending: false };
+      return { mutate: mutate[index], isPending: index === 0 && pending };
     },
   });
 
@@ -92,6 +93,7 @@ describe('LoginController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mutate = [vi.fn(), vi.fn(), vi.fn()];
+    pending = false;
     search = 'next=%2Fqueue%3Fevent%3Devt_samudra';
     i18n.language = 'id';
   });
@@ -139,7 +141,7 @@ describe('LoginController', () => {
     expect(mutate[0]).toHaveBeenCalledWith('nadia@gmail.com');
   });
 
-  it('requests the code through the use case with the event, toggling loading in every path', async () => {
+  it('requests the code through the use case with the event, without covering the Turnstile check', async () => {
     const { d, hook } = render();
     await requestCode().mutationFn('nadia@gmail.com');
     expect(d.requestSignInCodeUseCase.execute).toHaveBeenCalledWith({
@@ -148,7 +150,6 @@ describe('LoginController', () => {
       eventId: 'evt_samudra',
     });
     toCodeStep();
-    expect(toggleLoading).toHaveBeenCalledTimes(2);
     expect(hook.result.current.step).toBe('code');
     expect(hook.result.current.code).toMatchObject({
       email: 'nadia.saputri@gmail.com',
@@ -160,7 +161,7 @@ describe('LoginController', () => {
     expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('login_code_requested', { fromEvent: true });
 
     act(() => requestCode().onError(problem(0, 'NETWORK_ERROR')));
-    expect(toggleLoading).toHaveBeenCalledTimes(3);
+    expect(toggleLoading).not.toHaveBeenCalled();
     expect(openPopupError).toHaveBeenCalledWith({ message: 'error_network_error' });
   });
 
@@ -279,6 +280,16 @@ describe('LoginController', () => {
     act(() => requestCode().onSuccess({ kind: 'rate-limited', retryAfterSeconds: 30 }));
     expect(hook.result.current.code.resendError).toBe('login_rate_limited_wait:{"seconds":30}');
     expect(hook.result.current.emailForm.error).toBe('');
+  });
+
+  it('shows a resend on its way and sends no second one meanwhile', () => {
+    pending = true;
+    const { hook } = render();
+    toCodeStep();
+    expect(hook.result.current.code.resending).toBe(true);
+    expect(hook.result.current.emailForm.submitting).toBe(true);
+    act(() => hook.result.current.code.onResend());
+    expect(mutate[0]).not.toHaveBeenCalled();
   });
 
   it('goes back to the e-mail step to change the address', () => {

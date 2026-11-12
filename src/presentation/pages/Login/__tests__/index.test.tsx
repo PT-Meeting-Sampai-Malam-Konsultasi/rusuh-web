@@ -26,6 +26,16 @@ describe('LoginScreen', () => {
     expect(screen.getByRole('region', { name: 'login_flow_title' })).toBeInTheDocument();
   });
 
+  it('keeps a place for the Turnstile check while a code can be requested', () => {
+    const { container, unmount } = render(<LoginScreen />);
+    expect(container.querySelector('#turnstile-slot')).not.toBeNull();
+    unmount();
+    controller = { ...loginController(), step: 'code' };
+    render(<LoginScreen />).unmount();
+    controller = { ...loginController(), step: 'profile' };
+    expect(render(<LoginScreen />).container.querySelector('#turnstile-slot')).toBeNull();
+  });
+
   it('shows the code step', () => {
     controller = { ...loginController(), step: 'code' };
     render(<LoginScreen />);
