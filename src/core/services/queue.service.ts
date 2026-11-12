@@ -34,7 +34,8 @@ export const QueueService = ({ queueHttp }: Pick<AwilixRegistry, 'queueHttp'>): 
     queueHttp.post<QueuePlace>(`queue/${encodeURIComponent(eventId)}/join`, undefined, {
       headers: { [DEVICE_TOKEN_HEADER]: deviceToken, [TURNSTILE_TOKEN_HEADER]: turnstileToken },
     }),
-  getFrontier: (eventId) => queueHttp.get<Frontier>(`queue/${encodeURIComponent(eventId)}/frontier`),
+  getFrontier: (eventId) =>
+    queueHttp.get<Frontier>(`queue/${encodeURIComponent(eventId)}/frontier`, { cacheable: true }),
   claimTurn: (eventId, deviceToken, queueToken) =>
     queueHttp.post<Admission>(`queue/${encodeURIComponent(eventId)}/claim`, undefined, {
       headers: { [DEVICE_TOKEN_HEADER]: deviceToken, [QUEUE_TOKEN_HEADER]: queueToken },

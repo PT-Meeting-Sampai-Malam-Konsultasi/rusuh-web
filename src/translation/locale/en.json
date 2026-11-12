@@ -329,5 +329,6 @@
   "queue_left_lead_no_number": "Your place has been given up.",
   "queue_left_title": "You left the queue.",
   "queue_left_body": "{{event}} tickets are still on sale. If you change your mind, queue again any time — you'll get a new number at the back.",
-  "queue_left_body_no_event": "Tickets are still on sale. If you change your mind, queue again any time — you'll get a new number at the back."
+  "queue_left_body_no_event": "Tickets are still on sale. If you change your mind, queue again any time — you'll get a new number at the back.",
+  "error_reference": "Support code: {{code}}"
 }

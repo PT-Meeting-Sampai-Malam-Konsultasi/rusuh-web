@@ -12,6 +12,11 @@ export interface HttpError {
   message: string;
   data?: unknown;
   traceId?: string;
+  /**
+   * The request's `X-Request-ID` (NFR-09-W1): the server's echo when it sent one, otherwise the ID we sent. Support
+   * finds the backend log line with it ("Kode bantuan"); undefined for a call sent without one (the frontier).
+   */
+  requestId?: string;
 }
 
 export interface RequestConfig {
@@ -23,6 +28,11 @@ export interface RequestConfig {
   skipRefresh?: boolean;
   /** 'blob' for a file (the tickets PDF); JSON otherwise. */
   responseType?: 'blob';
+  /**
+   * A public read cached at the CDN (the frontier, polled by every phone in a sale): sent without `X-Request-ID`, since
+   * a custom header would add a CORS preflight to every poll.
+   */
+  cacheable?: boolean;
 }
 
 export interface HttpProtocol {

@@ -329,5 +329,6 @@
   "queue_left_lead_no_number": "Tempat Anda sudah dilepas.",
   "queue_left_title": "Anda keluar dari antrian.",
   "queue_left_body": "Tiket {{event}} masih dijual. Kalau berubah pikiran, antre lagi kapan saja — Anda mendapat nomor baru di belakang antrian.",
-  "queue_left_body_no_event": "Tiket masih dijual. Kalau berubah pikiran, antre lagi kapan saja — Anda mendapat nomor baru di belakang antrian."
+  "queue_left_body_no_event": "Tiket masih dijual. Kalau berubah pikiran, antre lagi kapan saja — Anda mendapat nomor baru di belakang antrian.",
+  "error_reference": "Kode bantuan: {{code}}"
 }
