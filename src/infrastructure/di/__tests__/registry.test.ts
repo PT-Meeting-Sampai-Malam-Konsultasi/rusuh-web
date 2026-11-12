@@ -21,6 +21,9 @@ const KEYS = {
   queueHttp: true,
   coreHttp: true,
   queueStream: true,
+  fileSaver: true,
+  printer: true,
+  qrEncoder: true,
   useTranslation: true,
   useQueryTanstack: true,
   useMutationTanstack: true,
@@ -49,6 +52,8 @@ const KEYS = {
   signOutUseCase: true,
   requestSignInCodeUseCase: true,
   verifySignInCodeUseCase: true,
+  getMyOrdersUseCase: true,
+  getETicketUseCase: true,
   ERROR_CODE_MAP: true,
   accountController: true,
   homeController: true,
@@ -56,6 +61,8 @@ const KEYS = {
   notFoundController: true,
   orderController: true,
   queueController: true,
+  ticketDetailController: true,
+  ticketsController: true,
 } satisfies Record<keyof AwilixRegistry, true>;
 
 const CONTROLLERS_DIR = join(__dirname, '../controllers');
@@ -112,6 +119,15 @@ describe('DI registries', () => {
     expect(typeof container.resolve('accountService').updateProfile).toBe('function');
     expect(container.resolve('requestSignInCodeUseCase')).toBe(container.resolve('requestSignInCodeUseCase'));
     expect(typeof container.resolve('verifySignInCodeUseCase').execute).toBe('function');
+  });
+
+  it('wires the e-ticket adapters and use cases (FR-22-W1)', () => {
+    expect(container.resolve('qrEncoder')).toBe(container.resolve('qrEncoder'));
+    expect(container.resolve('qrEncoder').encode('RSH1.x').length).toBeGreaterThan(20);
+    expect(typeof container.resolve('fileSaver').save).toBe('function');
+    expect(typeof container.resolve('getMyOrdersUseCase').execute).toBe('function');
+    expect(typeof container.resolve('getETicketUseCase').execute).toBe('function');
+    expect(typeof container.resolve('printer').print).toBe('function');
   });
 
   it('wires the order ticket selection use case as a singleton', () => {

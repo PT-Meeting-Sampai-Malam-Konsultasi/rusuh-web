@@ -11,6 +11,8 @@ import { createConfig } from '@infrastructure/config';
 import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
 import { createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
 import { createDeviceTokenStore } from '@infrastructure/adapters/device-token-store.adapter';
+import { createFileSaver } from '@infrastructure/adapters/file-saver.adapter';
+import { createPrinter } from '@infrastructure/adapters/printer.adapter';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 import { createQueuePlaceStore } from '@infrastructure/adapters/queue-place-store.adapter';
 import { createQueueStreamAdapter } from '@infrastructure/adapters/queue-stream.adapter';
@@ -72,6 +74,8 @@ export function registerInfrastructure() {
       }),
     ).singleton(),
     queueStream: asFunction((d: Deps) => createQueueStreamAdapter({ baseUrl: d.config.queueApiUrl })).singleton(),
+    fileSaver: asFunction(() => createFileSaver()).singleton(),
+    printer: asFunction(() => createPrinter()).singleton(),
 
     useTranslation: asValue(useTranslation),
     useQueryTanstack: asValue(useQuery),
