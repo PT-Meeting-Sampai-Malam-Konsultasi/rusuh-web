@@ -12,11 +12,11 @@ import {
 
 const useCase = OrderTicketSelectionUseCase();
 
-const CATEGORIES: readonly SelectableCategory[] = Object.freeze([
-  Object.freeze({ categoryId: 'A', name: 'Festival A' }),
-  Object.freeze({ categoryId: 'B', name: 'Festival B' }),
-  Object.freeze({ categoryId: 'C', name: 'Tribun Bawah' }),
-  Object.freeze({ categoryId: 'D', name: 'Tribun Atas' }),
+const CATEGORIES: readonly SelectableCategory[] = Object.freeze<SelectableCategory[]>([
+  Object.freeze({ categoryId: 'A', name: 'Festival A', availability: 'available' }),
+  Object.freeze({ categoryId: 'B', name: 'Festival B', availability: 'available' }),
+  Object.freeze({ categoryId: 'C', name: 'Tribun Bawah', availability: 'available' }),
+  Object.freeze({ categoryId: 'D', name: 'Tribun Atas', availability: 'available' }),
 ]);
 
 const freeze = (quantities: Record<string, number>): TicketQuantities => Object.freeze({ ...quantities });
@@ -106,8 +106,8 @@ describe('OrderTicketSelectionUseCase', () => {
 
     it('gives unique keys for category ids that contain "-"', () => {
       const categories = Object.freeze([
-        { categoryId: 'cat-vip', name: 'VIP' },
-        { categoryId: 'cat', name: 'Reguler' },
+        { categoryId: 'cat-vip', name: 'VIP', availability: 'available' as const },
+        { categoryId: 'cat', name: 'Reguler', availability: 'available' as const },
       ]);
       const { slots } = useCase.summarize(categories, freeze({ 'cat-vip': 2, cat: 1 }), 3);
       const keys = slots.map((slot) => slot.key);
@@ -385,6 +385,229 @@ describe('OrderTicketSelectionUseCase', () => {
       expect(apply('A-1', 'other')).toBe('changed');
       expect(apply('B-1', 'self')).toBe('changed');
       expect(holders.map((h) => h.holderType)).toEqual(['other', 'self', 'other']);
+    });
+  });
+
+  describe('stock caps (FR-14)', () => {
+    /** Design data models example: A sold out, B no cap, C cap 1, D invalid count (no cap). */
+    const STOCK: readonly SelectableCategory[] = Object.freeze<SelectableCategory[]>([
+      Object.freeze({ categoryId: 'A', name: 'Festival A', availability: 'sold_out', available: 0 }),
+      Object.freeze({ categoryId: 'B', name: 'Festival B', availability: 'available' }),
+      Object.freeze({ categoryId: 'C', name: 'Tribun Bawah', availability: 'almost_gone', available: 1 }),
+      Object.freeze({ categoryId: 'D', name: 'Tribun Atas', availability: 'available', available: 2.5 }),
+    ]);
+
+    const IDS = ['A', 'B', 'C', 'D'] as const;
+
+    type Row = [
+      label: string,
+      quantities: Record<string, number>,
+      plus: boolean[],
+      minus: boolean[],
+      total: number,
+      limitReached: boolean,
+      reasons: Record<string, string>,
+    ];
+
+    const ROWS: Row[] = [
+      ['empty', {}, [false, true, true, true], [false, false, false, false], 0, false, { A: 'SOLD_OUT' }],
+      [
+        'C at its cap',
+        { C: 1 },
+        [false, true, false, true],
+        [false, false, true, false],
+        1,
+        false,
+        { A: 'SOLD_OUT', C: 'STOCK_REACHED' },
+      ],
+      [
+        'at the order limit',
+        { B: 2, C: 1 },
+        [false, false, false, false],
+        [false, true, true, false],
+        3,
+        true,
+        { A: 'SOLD_OUT', B: 'LIMIT_REACHED', C: 'LIMIT_REACHED', D: 'LIMIT_REACHED' },
+      ],
+      [
+        'stale sold-out pick',
+        { A: 1 },
+        [false, true, true, true],
+        [true, false, false, false],
+        1,
+        false,
+        { A: 'SOLD_OUT' },
+      ],
+    ];
+
+    it.each(ROWS)('summarize + increment: %s', (_label, raw, plus, minus, total, limitReached, reasons) => {
+      const quantities = freeze(raw);
+      const selection = useCase.summarize(STOCK, quantities, 3);
+      expect(selection.total).toBe(total);
+      expect(selection.limitReached).toBe(limitReached);
+      expect(selection.lines.map((line) => line.canIncrement)).toEqual(plus);
+      expect(selection.lines.map((line) => line.canDecrement)).toEqual(minus);
+      expect(selection.lines.map((line) => line.quantity)).toEqual(IDS.map((id) => raw[id] ?? 0));
+      IDS.forEach((id, i) => {
+        const result = useCase.increment(STOCK, quantities, id, 3);
+        // Property 5: canIncrement ⇔ increment changes.
+        expect(result.kind === 'changed').toBe(selection.lines[i].canIncrement);
+        if (reasons[id]) expect(result).toEqual({ kind: 'unchanged', reason: reasons[id] });
+        else expect(result.kind).toBe('changed');
+      });
+      expect(quantities).toEqual(raw);
+    });
+
+    it.each(['available', 'almost_gone', 'paused'])(
+      'availability %s with no valid count never blocks on its own',
+      (availability) => {
+        const categories = [{ categoryId: 'X', name: 'X', availability } as SelectableCategory];
+        expect(useCase.summarize(categories, freeze({ X: 2 }), 3).lines[0].canIncrement).toBe(true);
+        expect(useCase.increment(categories, freeze({ X: 2 }), 'X', 3)).toEqual({
+          kind: 'changed',
+          quantities: { X: 3 },
+        });
+      },
+    );
+
+    it.each([undefined, Number.NaN, -1, 1.5, '2' as never])('available %s adds no cap', (available) => {
+      const categories = [{ categoryId: 'X', name: 'X', availability: 'almost_gone' as const, available }];
+      expect(useCase.summarize(categories, freeze({ X: 2 }), 3).lines[0].canIncrement).toBe(true);
+      expect(useCase.increment(categories, freeze({ X: 2 }), 'X', 3).kind).toBe('changed');
+    });
+
+    it('available 0 with availability "available" blocks with STOCK_REACHED', () => {
+      const categories = [{ categoryId: 'X', name: 'X', availability: 'available' as const, available: 0 }];
+      expect(useCase.summarize(categories, freeze({}), 3).lines[0]).toEqual({
+        categoryId: 'X',
+        quantity: 0,
+        canIncrement: false,
+        canDecrement: false,
+      });
+      expect(useCase.increment(categories, freeze({}), 'X', 3)).toEqual({
+        kind: 'unchanged',
+        reason: 'STOCK_REACHED',
+      });
+    });
+
+    it('a valid count caps the category: increments stop at available', () => {
+      const categories = [{ categoryId: 'X', name: 'X', availability: 'almost_gone' as const, available: 2 }];
+      let quantities: TicketQuantities = freeze({});
+      const kinds: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const result = useCase.increment(categories, quantities, 'X', 3);
+        kinds.push(result.kind === 'changed' ? 'changed' : result.reason);
+        if (result.kind === 'changed') quantities = freeze({ ...result.quantities });
+      }
+      expect(kinds).toEqual(['changed', 'changed', 'STOCK_REACHED']);
+      expect(quantities).toEqual({ X: 2 });
+    });
+
+    describe('reason order: UNKNOWN_CATEGORY → SOLD_OUT → LIMIT_REACHED → STOCK_REACHED', () => {
+      it('unknown id wins over everything', () => {
+        expect(useCase.increment(STOCK, freeze({ B: 3 }), 'GONE', 0)).toEqual({
+          kind: 'unchanged',
+          reason: 'UNKNOWN_CATEGORY',
+        });
+      });
+
+      it('sold out wins over the order limit', () => {
+        expect(useCase.increment(STOCK, freeze({ B: 3 }), 'A', 3)).toEqual({ kind: 'unchanged', reason: 'SOLD_OUT' });
+        expect(useCase.increment(STOCK, freeze({}), 'A', 0)).toEqual({ kind: 'unchanged', reason: 'SOLD_OUT' });
+      });
+
+      it('the order limit wins over the stock cap', () => {
+        expect(useCase.increment(STOCK, freeze({ C: 1 }), 'C', 1)).toEqual({
+          kind: 'unchanged',
+          reason: 'LIMIT_REACHED',
+        });
+      });
+
+      it('stock cap applies when below the limit', () => {
+        expect(useCase.increment(STOCK, freeze({ C: 1 }), 'C', 3)).toEqual({
+          kind: 'unchanged',
+          reason: 'STOCK_REACHED',
+        });
+      });
+    });
+
+    it('decrement still removes a sold-out stale pick and a pick above available', () => {
+      expect(useCase.decrement(STOCK, freeze({ A: 1 }), 'A')).toEqual({ kind: 'changed', quantities: { A: 0 } });
+      const quantities = freeze({ C: 2 });
+      const selection = useCase.summarize(STOCK, quantities, 3);
+      expect(selection.lines[2]).toEqual({ categoryId: 'C', quantity: 2, canIncrement: false, canDecrement: true });
+      expect(useCase.decrement(STOCK, quantities, 'C')).toEqual({ kind: 'changed', quantities: { C: 1 } });
+      expect(quantities).toEqual({ C: 2 });
+    });
+
+    it('summarize never trims a stale pick above its cap', () => {
+      const selection = useCase.summarize(STOCK, freeze({ A: 2, C: 1 }), 3);
+      expect(selection.lines.map((line) => line.quantity)).toEqual([2, 0, 1, 0]);
+      expect(selection.slots.map((slot) => slot.key)).toEqual(['A-1', 'A-2', 'C-1']);
+    });
+
+    it('keeps every quantity ≤ its cap and the total ≤ the limit over a scripted sequence', () => {
+      const limit = 3;
+      const caps: Record<string, number> = { A: 0, B: Number.POSITIVE_INFINITY, C: 1, D: Number.POSITIVE_INFINITY };
+      const steps: Array<['+' | '-', string]> = [
+        ['+', 'A'],
+        ['+', 'C'],
+        ['+', 'C'],
+        ['+', 'A'],
+        ['+', 'B'],
+        ['-', 'C'],
+        ['+', 'D'],
+        ['+', 'D'],
+        ['+', 'C'],
+        ['+', 'B'],
+        ['-', 'D'],
+        ['+', 'C'],
+        ['-', 'A'],
+        ['+', 'C'],
+        ['-', 'B'],
+        ['+', 'D'],
+      ];
+      let quantities: TicketQuantities = freeze({});
+      for (const [op, id] of steps) {
+        const result =
+          op === '+' ? useCase.increment(STOCK, quantities, id, limit) : useCase.decrement(STOCK, quantities, id);
+        if (result.kind === 'changed') quantities = freeze({ ...result.quantities });
+        const { total, lines } = useCase.summarize(STOCK, quantities, limit);
+        lines.forEach((line) => expect(line.quantity).toBeLessThanOrEqual(caps[line.categoryId]));
+        expect(total).toBeLessThanOrEqual(limit);
+      }
+      expect(quantities).toEqual({ B: 0, C: 1, D: 2 });
+    });
+  });
+
+  describe('limit flags (FR-14)', () => {
+    it.each([
+      [3, 3, 2, false, false],
+      [3, 3, 3, true, false],
+      [3, 2, 2, true, true],
+      [3, 1, 1, true, true],
+      [3, 0, 0, false, true],
+    ])(
+      'maxTicketsPerOrder %s, reservedUnits %s, total %s → limitReached %s, limitBelowMax %s',
+      (maxTicketsPerOrder, reservedUnits, total, limitReached, limitBelowMax) => {
+        const limit = useCase.orderLimit({ maxTicketsPerOrder, reservedUnits });
+        const selection = useCase.summarize(CATEGORIES, freeze({ B: total }), limit);
+        expect(selection.total).toBe(total);
+        expect(selection.limitReached).toBe(limitReached);
+        expect(selection.limitBelowMax).toBe(limitBelowMax);
+      },
+    );
+
+    it('a category at its cap alone never sets limitReached', () => {
+      const categories = [{ categoryId: 'X', name: 'X', availability: 'almost_gone' as const, available: 1 }];
+      const selection = useCase.summarize(categories, freeze({ X: 1 }), 3);
+      expect(selection.lines[0].canIncrement).toBe(false);
+      expect(selection.limitReached).toBe(false);
+    });
+
+    it('returns booleans only, no text', () => {
+      const selection = useCase.summarize(CATEGORIES, freeze({}), 3);
+      expect(Object.keys(selection).sort()).toEqual(['limitBelowMax', 'limitReached', 'lines', 'slots', 'total']);
     });
   });
 
