@@ -4,6 +4,7 @@ import type { OrderControllerInterface } from '@controllers/order.controller';
 import container from '@infrastructure/di/container';
 import '@infrastructure/di/controllers/order';
 import FlowHeader from '@presentation/components/FlowHeader';
+import Timer from '@presentation/components/Timer';
 
 import CategoryList from './components/CategoryList';
 import HolderList from './components/HolderList';
@@ -32,6 +33,7 @@ export default function OrderScreen() {
     homeHref,
     locale,
     setLocale,
+    timer,
   } = container.resolve<OrderControllerInterface>('orderController');
 
   return (
@@ -49,6 +51,7 @@ export default function OrderScreen() {
           language: t('language_switch_label'),
           back: t('order_back_label'),
         }}
+        timer={timer && <Timer seconds={timer.seconds} label={timer.label} compact />}
       />
       <main className={styles.main} aria-busy={status === 'loading'}>
         <div className={styles.flowMain}>

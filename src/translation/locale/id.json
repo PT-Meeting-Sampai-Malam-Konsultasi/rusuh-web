@@ -69,6 +69,7 @@
   "order_title": "Pilih tiket",
   "order_steps_label": "Langkah",
   "order_back_label": "Kembali",
+  "order_timer_label": "sisa waktu memilih",
   "order_category_heading": "Kategori",
   "order_availability_available": "Tersedia",
   "order_availability_almost_gone": "Hampir habis",

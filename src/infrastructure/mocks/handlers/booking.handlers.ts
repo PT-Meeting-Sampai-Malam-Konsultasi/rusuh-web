@@ -14,6 +14,8 @@ import { eventsFixture } from '../fixtures/events.fixture';
 import { failure, problem, problemWith, type MockContext } from './shared';
 
 const ORDER_WINDOW_MS = 5 * 60_000;
+/** `?mock=short_window`: 15 s of the ink timer, pink from 1:00, then 0:00. */
+export const MOCK_SHORT_ORDER_WINDOW_MS = 75_000;
 
 const admissionInvalid = () => problem(403, 'ADMISSION_INVALID', 'Giliran tidak berlaku');
 const signedOut = () => problem(401, 'UNAUTHORIZED', 'Sesi berakhir');
@@ -69,13 +71,14 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
       const locale = request.headers.get('Accept-Language')?.toLowerCase().startsWith('en') ? 'en' : 'id';
       let categories = categoriesFixture(locale);
       if (scenario === 'sold_out') categories = categories.map((c) => ({ ...c, availability: 'sold_out' }));
+      const windowMs = scenario === 'short_window' ? MOCK_SHORT_ORDER_WINDOW_MS : ORDER_WINDOW_MS;
       return HttpResponse.json<GetCategoriesResponse>({
         eventId,
         categories,
         maxTicketsPerOrder: 3,
         reservedUnits: 3,
         adminFee: { amount: 10000, currency: 'IDR' },
-        expiresAt: new Date(today.getTime() + ORDER_WINDOW_MS).toISOString(),
+        expiresAt: new Date(today.getTime() + windowMs).toISOString(),
         serverNow: today.toISOString(),
       });
     }),

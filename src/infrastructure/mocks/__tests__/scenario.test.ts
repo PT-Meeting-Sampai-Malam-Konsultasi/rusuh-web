@@ -22,4 +22,10 @@ describe('resolveScenario', () => {
     expect(resolveScenario('?mock=no_queue', null)).toBe('no_queue');
     expect(resolveScenario('?mock=dukcapil_down', null)).toBe('dukcapil_down');
   });
+
+  it('knows the short_window scenario (FR-17-W1)', () => {
+    expect(resolveScenario('?mock=short_window', null)).toBe('short_window');
+    expect(resolveScenario('', 'short_window')).toBe('short_window');
+    expect(resolveScenario('?mock=ok', 'short_window')).toBe('ok');
+  });
 });

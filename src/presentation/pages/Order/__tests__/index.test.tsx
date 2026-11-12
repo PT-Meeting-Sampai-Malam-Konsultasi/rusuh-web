@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -233,5 +233,58 @@ describe('OrderScreen', () => {
     expect(screen.getByText('order_not_found_body')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'action_retry' })).toBeNull();
     expect(screen.getByRole('link', { name: 'action_back_home' })).toBeInTheDocument();
+  });
+
+  it('shows the countdown in both bars of the flow header, compact (FR-17-W1)', () => {
+    controller = { ...base(), timer: { seconds: 252, label: 'order_timer_label' } };
+    render(<OrderScreen />);
+    const timers = screen.getAllByRole('timer');
+    // jsdom applies no CSS: the flow bar and the app bar instances are both there.
+    expect(timers).toHaveLength(2);
+    expect(within(screen.getByRole('banner')).getAllByRole('timer')).toEqual(timers);
+    for (const timer of timers) {
+      expect(timer).toHaveTextContent('4:12');
+      expect(within(timer).getByText('order_timer_label')).toBeInTheDocument();
+      expect(timer).toHaveAttribute('data-compact');
+      expect(timer).toHaveAttribute('aria-live', 'off');
+    }
+  });
+
+  it.each([
+    { seconds: 61, live: 'off', text: '1:01' },
+    { seconds: 60, live: 'polite', text: '1:00' },
+    { seconds: 0, live: 'polite', text: '0:00' },
+  ])('puts both timers in the warning state from 60 seconds: $seconds s is $live', ({ seconds, live, text }) => {
+    controller = { ...base(), timer: { seconds, label: 'order_timer_label' } };
+    render(<OrderScreen />);
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    for (const timer of timers) {
+      expect(timer).toHaveAttribute('aria-live', live);
+      expect(timer).toHaveTextContent(text);
+    }
+  });
+
+  it.each([
+    { status: 'loading' as const, extra: { categories: [], categoryNote: '' } },
+    { status: 'error' as const, extra: { categories: [], errorMessage: 'error_network_error' } },
+    { status: 'not-found' as const, extra: { categories: [] } },
+  ])('renders no timer when the controller gives none: $status', ({ status, extra }) => {
+    controller = { ...base(), status, event: null, ...extra, timer: null };
+    render(<OrderScreen />);
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.queryByRole('timer')).toBeNull();
+  });
+
+  it('does not consume timeUp yet: the page is the same at zero (FR-18-W1)', () => {
+    controller = { ...base(), timer: { seconds: 0, label: 'order_timer_label' }, timeUp: false };
+    const { container: before, unmount } = render(<OrderScreen />);
+    const html = before.innerHTML;
+    unmount();
+    controller = { ...base(), timer: { seconds: 0, label: 'order_timer_label' }, timeUp: true };
+    const { container: after } = render(<OrderScreen />);
+    expect(after.innerHTML).toBe(html);
+    expect(screen.getByRole('heading', { level: 2, name: 'order_category_heading' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tambah Festival A' })).toBeEnabled();
   });
 });
