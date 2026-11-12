@@ -103,6 +103,14 @@ export interface OrderLimitNotice {
   message: string;
 }
 
+/** The order-window countdown for the flow header (FR-17-W1): what the shared Timer component takes. */
+export interface OrderTimerView {
+  /** Whole seconds left, rounded down, never negative. From server time plus elapsed client time. */
+  seconds: number;
+  /** "sisa waktu memilih" / "left to choose". */
+  label: string;
+}
+
 export interface OrderControllerInterface {
   t: TFunction;
   status: OrderStatus;
@@ -137,6 +145,10 @@ export interface OrderControllerInterface {
   setLocale: (locale: FormatLocale) => void;
   /** Every ticket holder passed the Dukcapil check (≥ 1 holder). For the payment button (FR-16+). */
   allHoldersVerified: boolean;
+  /** Null unless status is 'ready' and the answer's expiresAt / serverNow are valid dates. */
+  timer: OrderTimerView | null;
+  /** The order window has run out (seconds left is 0). Exposed for FR-18-W1; nothing reacts to it yet. */
+  timeUp: boolean;
 }
 
 type OrderControllerDeps = Pick<
@@ -190,6 +202,13 @@ type NikCheckRun =
   | { nik: string; fullName: string; phase: 'failed'; code: string };
 
 type NikCheckState = 'idle' | 'checking' | 'valid' | 'error';
+
+/** The answer the countdown runs from: its server times and when it arrived (the query's dataUpdatedAt). */
+interface TimerAnchor {
+  expiresAt: string;
+  serverNow: string;
+  receivedAt: number;
+}
 
 /** Stable empty list for summarize before the categories load (constant, not mutable state). */
 const NO_CATEGORIES: readonly [] = [];
@@ -257,6 +276,13 @@ const OrderController = ({
   }, [shouldRedirect, router, eventId]);
 
   const ok = categoriesData?.kind === 'ok' ? categoriesData : null;
+
+  // The countdown's anchor is written only from a real answer: on a language switch TanStack shows the previous
+  // answer as placeholder data with the new query's dataUpdatedAt of 0, which must not move the countdown (FR-17-W1).
+  const [anchor, setAnchor] = useState<TimerAnchor | null>(null);
+  if (ok && !categoriesQuery.isPlaceholderData && categoriesQuery.dataUpdatedAt !== anchor?.receivedAt) {
+    setAnchor({ expiresAt: ok.expiresAt, serverNow: ok.serverNow, receivedAt: categoriesQuery.dataUpdatedAt });
+  }
 
   let status: OrderStatus = 'loading';
   if (!hasEventId || eventNotFound) status = 'not-found';
@@ -564,6 +590,21 @@ const OrderController = ({
     [status, selection, limit, t],
   );
 
+  // The 5-minute order window: server times give its length, the device clock only measures the time since the
+  // answer arrived (elapsed time, never a deadline against the device clock).
+  const [now, setNow] = useState(() => Date.now());
+  const windowSeconds = anchor ? (Date.parse(anchor.expiresAt) - Date.parse(anchor.serverNow)) / 1000 : NaN;
+  const secondsLeft =
+    ok && anchor && Number.isFinite(windowSeconds)
+      ? Math.max(0, windowSeconds - Math.max(0, now - anchor.receivedAt) / 1000)
+      : null;
+  const ticking = secondsLeft !== null && secondsLeft > 0;
+  useEffect(() => {
+    if (!ticking) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [ticking]);
+
   const errorCode = (eventError ?? categoriesError)?.code;
   const errorMessage =
     status === 'error' && errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
@@ -608,6 +649,11 @@ const OrderController = ({
       void i18n.changeLanguage(next);
     },
     allHoldersVerified,
+    timer:
+      status === 'ready' && secondsLeft !== null
+        ? { seconds: Math.floor(secondsLeft), label: t('order_timer_label') }
+        : null,
+    timeUp: status === 'ready' && secondsLeft === 0,
   };
 };
 

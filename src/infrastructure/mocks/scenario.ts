@@ -19,6 +19,8 @@ export const MOCK_SCENARIOS = [
   'no_queue',
   /** FR-15: the Dukcapil circuit is open: every NIK check answers 503 DUKCAPIL_UNAVAILABLE. */
   'dukcapil_down',
+  /** FR-17: the order window is 75 seconds, so the pink last minute and 0:00 show quickly. */
+  'short_window',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];

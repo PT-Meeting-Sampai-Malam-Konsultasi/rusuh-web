@@ -20,3 +20,39 @@
     @apply text-pink-ink;
   }
 }
+
+/* FlowHeader app bar (HiFi .appbar .timer): compact below 720px, the normal stamp from 720px.
+   Opt-in through the compact prop, so the queue turn timer is unchanged. 3px has no shadow token: built from the colours. */
+.timer[data-compact] {
+  @apply px-[9px] pt-[5px] pb-1;
+  box-shadow: 3px 3px 0 var(--color-ink);
+
+  .time {
+    @apply text-[22px];
+  }
+
+  .label {
+    @apply sr-only;
+  }
+
+  @variant md {
+    @apply px-3.5 pt-2 pb-[7px];
+    box-shadow: 4px 4px 0 var(--color-ink);
+
+    .time {
+      @apply text-[34px];
+    }
+
+    .label {
+      @apply not-sr-only;
+    }
+  }
+}
+
+.warn[data-compact] {
+  box-shadow: 3px 3px 0 var(--color-pink);
+
+  @variant md {
+    box-shadow: 4px 4px 0 var(--color-pink);
+  }
+}

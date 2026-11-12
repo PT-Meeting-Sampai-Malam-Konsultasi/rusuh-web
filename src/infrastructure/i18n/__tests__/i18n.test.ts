@@ -78,6 +78,11 @@ describe('translations', () => {
     expect(keys.filter((k) => !(k in en))).toEqual([]);
   });
 
+  it('has the order timer label in both locales (FR-17-W1)', () => {
+    expect(id.order_timer_label).toBe('sisa waktu memilih');
+    expect(en.order_timer_label).toBe('left to choose');
+  });
+
   it('uses a NIK hint example that passes the structure rule in both locales', () => {
     const useCase = ValidateAttendeeUseCase({ bookingService: {} as never });
     for (const hint of [id.order_holder_nik_hint, en.order_holder_nik_hint]) {

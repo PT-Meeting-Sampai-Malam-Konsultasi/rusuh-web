@@ -69,6 +69,7 @@
   "order_title": "Choose tickets",
   "order_steps_label": "Steps",
   "order_back_label": "Back",
+  "order_timer_label": "left to choose",
   "order_category_heading": "Category",
   "order_availability_available": "Available",
   "order_availability_almost_gone": "Almost gone",
