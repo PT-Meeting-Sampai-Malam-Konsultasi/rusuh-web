@@ -15,6 +15,7 @@ const API_ERROR_CODES = [
   'VERIFICATION_UNAVAILABLE',
   'UNAUTHORIZED',
   'ADMISSION_INVALID',
+  'ADMISSION_UNAVAILABLE',
   'NOT_FOUND',
   'RATE_LIMITED',
   'QUEUE_CLOSED',
@@ -81,6 +82,15 @@ describe('translations', () => {
   it('has the order timer label in both locales (FR-17-W1)', () => {
     expect(id.order_timer_label).toBe('sisa waktu memilih');
     expect(en.order_timer_label).toBe('left to choose');
+  });
+
+  it('has the admission unavailable message in both locales (FR-19-W1)', () => {
+    expect(id.error_admission_unavailable).toBe(
+      'Pesanan Anda sedang disiapkan. Giliran Anda tetap aman, coba lagi sebentar lagi.',
+    );
+    expect(en.error_admission_unavailable).toBe(
+      "We're getting your order ready. Your turn is safe; please try again in a moment.",
+    );
   });
 
   it('uses a NIK hint example that passes the structure rule in both locales', () => {

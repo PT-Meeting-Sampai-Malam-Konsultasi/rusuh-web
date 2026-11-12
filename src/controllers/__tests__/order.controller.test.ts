@@ -9,6 +9,7 @@ import {
   ValidateAttendeeUseCase,
   type ValidateAttendeeResult,
 } from '@core/use_case/booking/validate-attendee.use-case';
+import { ERROR_CODE_MAP } from '@utils/constants/error-codes';
 import { retryTransientOnce } from '@utils/query/retry';
 
 import OrderController from '../order.controller';
@@ -1770,6 +1771,159 @@ describe('OrderController', () => {
         d.getOrderCategoriesUseCase.execute.mock.calls.length,
       ]).toEqual(before);
       expect(mutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('order resume after reload (FR-19-W1)', () => {
+    const SERVER_NOW = '2026-11-09T03:00:00Z';
+    const resumed: OrderCategoriesResult = { ...okResult, resumed: true, expiresAt: '2026-11-09T03:02:12Z' };
+    const windowEnded = { kind: 'window-ended' };
+    const sheet = {
+      stamp: 'order_time_up_stamp',
+      title: 'order_time_up_title',
+      body: 'order_time_up_body',
+      queueAgainLabel: 'order_time_up_queue_again',
+      homeLabel: 'action_back_home',
+      homeHref: '/',
+      queueAgain: expect.any(Function),
+    };
+    const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+    const callsOf = (d: ReturnType<typeof deps>, event: string) =>
+      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === event);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date(SERVER_NOW) });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('window-ended shows the time-up sheet at once over the loading page', () => {
+      eventState = { data: event };
+      categoriesState = { data: windowEnded };
+      const { result } = render();
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+      expect(result.current.status).toBe('loading');
+      expect(result.current.timer).toBeNull();
+    });
+
+    it('window-ended ends the window and tracks order_time_up once, never redirects, disables the query', () => {
+      eventState = { data: event };
+      categoriesState = { data: windowEnded };
+      const d = deps();
+      const { rerender } = render(d);
+      rerender();
+      rerender();
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledWith('evt_samudra');
+      expect(callsOf(d, 'order_time_up')).toEqual([['order_time_up', { eventId: 'evt_samudra', tickets: 0 }]]);
+      expect(replace).not.toHaveBeenCalled();
+      expect(categoriesOptions.enabled).toBe(false);
+    });
+
+    it('window-ended before the event loads latches, and the sheet stays when the event then fails', () => {
+      categoriesState = { data: windowEnded };
+      const d = deps();
+      const { result, rerender } = render(d);
+      expect(result.current.timeUp).toBe(true);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      eventState = { isError: true, error: { status: 500, code: 'INTERNAL_ERROR', message: 'raw' } };
+      rerender();
+      expect(result.current.status).toBe('error');
+      expect(result.current.timeUpSheet).not.toBeNull();
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('admission-invalid still redirects once; a thrown error still shows the error state', () => {
+      eventState = { data: event };
+      categoriesState = { data: { kind: 'admission-invalid' } };
+      const { result, rerender } = render();
+      rerender();
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+      expect(result.current.timeUp).toBe(false);
+
+      categoriesState = err(503, 'INTERNAL_ERROR');
+      const second = render();
+      expect(second.result.current.status).toBe('error');
+      expect(second.result.current.errorMessage).toBe('error_internal_error');
+      expect(second.result.current.timeUp).toBe(false);
+    });
+
+    it('a resumed 132 s answer counts down from 2:12', () => {
+      eventState = { data: event };
+      categoriesState = { data: resumed, dataUpdatedAt: Date.now() };
+      const { result } = render();
+      expect(result.current.status).toBe('ready');
+      expect(result.current.timer?.seconds).toBe(132);
+      advance(1000);
+      expect(result.current.timer?.seconds).toBe(131);
+      expect(result.current.timeUp).toBe(false);
+    });
+
+    it('a resumed answer already at its end shows the sheet in the first ready render', () => {
+      eventState = { data: event };
+      categoriesState = { data: { ...resumed, expiresAt: resumed.serverNow }, dataUpdatedAt: Date.now() };
+      const { result } = render();
+      expect(result.current.status).toBe('ready');
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+    });
+
+    it('tracks order_resumed once per visit, through tickets and a language switch', () => {
+      eventState = { data: event };
+      categoriesState = { data: resumed, dataUpdatedAt: Date.now() };
+      let current = { t, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      rerender();
+      act(() => result.current.increment('cat_festival'));
+      current = { t, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: resumed, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      categoriesState = { data: okResult, dataUpdatedAt: Date.now() + 5000, isPlaceholderData: false };
+      rerender();
+      expect(callsOf(d, 'order_resumed')).toEqual([['order_resumed', { eventId: 'evt_samudra' }]]);
+    });
+
+    it('never tracks order_resumed for a non-resumed answer', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult, dataUpdatedAt: Date.now() };
+      const d = deps();
+      const { rerender } = render(d);
+      rerender();
+      expect(callsOf(d, 'order_resumed')).toHaveLength(0);
+    });
+
+    it('maps ADMISSION_UNAVAILABLE to its message with the real error map', () => {
+      expect(ERROR_CODE_MAP.ADMISSION_UNAVAILABLE).toBe('error_admission_unavailable');
+      eventState = { data: event };
+      categoriesState = err(503, 'ADMISSION_UNAVAILABLE');
+      const { result } = renderHook(() => OrderController({ ...deps(), ERROR_CODE_MAP } as never));
+      expect(result.current.status).toBe('error');
+      expect(result.current.errorMessage).toBe('error_admission_unavailable');
+      act(() => result.current.retry());
+      expect(categoriesRefetch).toHaveBeenCalled();
+    });
+
+    it('keeps the categories query options and reads the token at fetch time, null included', async () => {
+      const d = deps();
+      d.admissionStore.get.mockReturnValue(null);
+      render(d);
+      expect(categoriesOptions).toMatchObject({
+        queryKey: ['categories', 'evt_samudra', 'id'],
+        gcTime: 0,
+        retry: retryTransientOnce,
+      });
+      expect(categoriesOptions.placeholderData).toEqual(expect.any(Function));
+      await (categoriesOptions.queryFn as () => Promise<unknown>)();
+      expect(d.getOrderCategoriesUseCase.execute).toHaveBeenCalledWith({
+        eventId: 'evt_samudra',
+        admissionToken: null,
+      });
     });
   });
 });

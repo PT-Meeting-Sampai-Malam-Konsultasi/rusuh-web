@@ -112,6 +112,7 @@
   "error_verification_unavailable": "The security check is unavailable right now. Please try again shortly.",
   "error_unauthorized": "Your session has ended. Please sign in again.",
   "error_admission_invalid": "Your ordering access is no longer valid. Please queue again.",
+  "error_admission_unavailable": "We're getting your order ready. Your turn is safe; please try again in a moment.",
   "error_not_found": "We couldn't find that.",
   "error_rate_limited": "Too many attempts. Try again in a minute.",
   "error_queue_closed": "The queue for this event is closed.",

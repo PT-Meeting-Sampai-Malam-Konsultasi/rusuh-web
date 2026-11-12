@@ -166,8 +166,8 @@ export interface OrderControllerInterface {
   /** Null unless status is 'ready' and the answer's expiresAt / serverNow are valid dates. */
   timer: OrderTimerView | null;
   /**
-   * The order window has run out on this page visit: true from the first render at zero, then latched (stays true
-   * whatever status does later). Drives timeUpSheet.
+   * The order window has run out on this page visit: true from the first render at zero, or from a reload whose
+   * re-claim found the window ended (FR-19-W1); then latched (stays true whatever status does later). Drives timeUpSheet.
    */
   timeUp: boolean;
   /** Non-null exactly when timeUp. */
@@ -312,6 +312,14 @@ const OrderController = ({
   if (ok && !categoriesQuery.isPlaceholderData && categoriesQuery.dataUpdatedAt !== anchor?.receivedAt) {
     setAnchor({ expiresAt: ok.expiresAt, serverNow: ok.serverNow, receivedAt: categoriesQuery.dataUpdatedAt });
   }
+
+  // FR-19-W1: a reload claimed the turn again (spec 64); once per page visit (a placeholder or refetch never repeats it).
+  const resumedTracked = useRef(false);
+  useEffect(() => {
+    if (!ok?.resumed || resumedTracked.current) return;
+    resumedTracked.current = true;
+    analyticsAdapter.trackEvent('order_resumed', { eventId });
+  }, [ok, analyticsAdapter, eventId]);
 
   let status: OrderStatus = 'loading';
   if (!hasEventId || eventNotFound) status = 'not-found';
@@ -636,7 +644,9 @@ const OrderController = ({
 
   // A render-time update (as the anchor above), so the sheet shows in the same frame as "0:00"; the guard stops a loop.
   const windowOver = status === 'ready' && secondsLeft === 0;
-  if (windowOver && !expired) setExpired(true);
+  // FR-19-W1: a reload's re-claim found the turn over: the same time's-up state, without a ready page under it.
+  const windowEnded = categoriesData?.kind === 'window-ended';
+  if ((windowOver || windowEnded) && !expired) setExpired(true);
 
   // Once per visit: end the window on this device and block every later admission-invalid redirect (the buyer leaves
   // through the sheet). The use case is synchronous and local (spec 61), not async work for TanStack.
