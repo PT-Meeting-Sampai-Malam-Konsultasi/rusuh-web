@@ -2,7 +2,7 @@ import { http, HttpResponse, type HttpHandler } from 'msw';
 
 import type { OtpChallenge, Session, User } from '@core/entities/auth/auth.entity';
 
-import { failure, problem, type MockContext } from './shared';
+import { failure, problem, problemWith, type MockContext } from './shared';
 
 /** The code that signs in; `000000` answers expired; anything else is wrong. */
 export const MOCK_OTP_CODE = '123456';
@@ -21,13 +21,6 @@ interface MockChallenge {
   attempts: number;
   used: boolean;
 }
-
-/** A problem with the extra fields the real API adds (`attemptsLeft`, `retryAfter`). */
-const problemWith = (status: number, code: string, title: string, extra: Record<string, unknown>) =>
-  HttpResponse.json(
-    { type: 'about:blank', title, status, code, ...extra },
-    { status, headers: { 'Content-Type': 'application/problem+json' } },
-  );
 
 /**
  * The core auth service as the sign-in page sees it (ADR-0006). Sessions live in this factory, so a page reload

@@ -34,6 +34,7 @@ const setup = () => {
     getBooking: vi.fn(),
     listMyTickets: vi.fn(),
     downloadTickets: vi.fn(),
+    validateAttendee: vi.fn(),
   };
   const useCase = GetOrderCategoriesUseCase({ bookingService });
   return { bookingService, useCase };

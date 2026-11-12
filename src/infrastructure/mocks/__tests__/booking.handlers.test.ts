@@ -3,9 +3,11 @@
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+import type { ValidateAttendeeRequest } from '@core/entities/booking/booking.entity';
 import { BookingService } from '@core/services/booking.service';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 
+import { MOCK_RETRY_AFTER_S } from '../handlers/booking.handlers';
 import { createHandlers } from '../handlers/handlers';
 import type { MockScenario } from '../scenario';
 
@@ -143,5 +145,128 @@ describe('tickets mock (FR-22-W1)', () => {
     await expect(signedIn.downloadTickets('bk_nope')).rejects.toMatchObject({ status: 404 });
     scenario = 'error';
     await expect(signedIn.downloadTickets('bk_mock_samudra')).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('validate attendee mock', () => {
+  const NAME = 'Nadia Saputri';
+  const attendee = (nik: string, extra: Partial<ValidateAttendeeRequest> = {}): ValidateAttendeeRequest => ({
+    fieldIndex: 0,
+    fullName: NAME,
+    nik,
+    ...extra,
+  });
+
+  /** Rejects with the status and code, and the problem body never carries the NIK or the name. */
+  const expectProblem = async (
+    call: Promise<unknown>,
+    expected: { status: number; code: string },
+    body?: ValidateAttendeeRequest,
+  ) => {
+    const error: unknown = await call.then(
+      () => expect.fail('expected a rejection'),
+      (e: unknown) => e,
+    );
+    expect(error).toMatchObject(expected);
+    const text = JSON.stringify((error as { data?: unknown }).data ?? {});
+    if (body) {
+      if (body.nik) expect(text).not.toContain(body.nik);
+      if (body.fullName.trim()) expect(text).not.toContain(body.fullName);
+    }
+    return error as { data?: Record<string, unknown> };
+  };
+
+  it('validates a NIK and masks all but the last 4 digits', async () => {
+    const body = attendee('3174055203960004', { fieldIndex: 2 });
+    const { data, status } = await booking.validateAttendee('evt_samudra', 'adm-1', body);
+    expect(status).toBe(200);
+    expect(data.nikMasked).toBe('************0004');
+    expect(data.validationToken).toMatch(/^mock-attendee-2-\d+$/);
+    expect(Date.parse(data.expiresAt) - NOW.getTime()).toBe(300_000);
+    expect(JSON.stringify(data)).not.toContain(body.nik);
+    expect(JSON.stringify(data)).not.toContain(NAME);
+  });
+
+  it('gives each validation its own token', async () => {
+    const a = await booking.validateAttendee('evt_samudra', 'adm-1', attendee('3174055203960004'));
+    const b = await booking.validateAttendee('evt_samudra', 'adm-1', attendee('3174055203960004'));
+    expect(a.data.validationToken).not.toBe(b.data.validationToken);
+  });
+
+  it.each([
+    { nik: '3174055203969999', status: 422, code: 'NIK_INVALID' },
+    { nik: '3174055203968888', status: 409, code: 'NIK_SEAT_TAKEN' },
+    { nik: '3174055203967777', status: 503, code: 'DUKCAPIL_UNAVAILABLE' },
+  ])('answers $status $code for a NIK ending in $nik', async ({ nik, status, code }) => {
+    const body = attendee(nik);
+    await expectProblem(booking.validateAttendee('evt_samudra', 'adm-1', body), { status, code }, body);
+  });
+
+  it('rate-limits the 6666 NIK with retryAfter in the body and the Retry-After header', async () => {
+    const body = attendee('3174055203966666');
+    const error = await expectProblem(
+      booking.validateAttendee('evt_samudra', 'adm-1', body),
+      { status: 429, code: 'RATE_LIMITED' },
+      body,
+    );
+    expect(error.data?.retryAfter).toBe(MOCK_RETRY_AFTER_S);
+    const raw = await fetch(`${CORE}/events/evt_samudra/attendees/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admission-Token': 'adm-1' },
+      body: JSON.stringify(body),
+    });
+    expect(raw.status).toBe(429);
+    expect(raw.headers.get('Retry-After')).toBe('60');
+  });
+
+  it.each([
+    { name: 'a NIK that is not 16 digits', body: attendee('31740552039600'), code: 'NIK_INVALID' },
+    { name: 'a blank name', body: attendee('3174055203960004', { fullName: '   ' }), code: 'VALIDATION_FAILED' },
+    { name: 'fieldIndex 3', body: attendee('3174055203960004', { fieldIndex: 3 }), code: 'VALIDATION_FAILED' },
+  ])('answers 422 for $name', async ({ body, code }) => {
+    await expectProblem(booking.validateAttendee('evt_samudra', 'adm-1', body), { status: 422, code }, body);
+  });
+
+  it('answers 422 VALIDATION_FAILED for a body that is not JSON', async () => {
+    const raw = await fetch(`${CORE}/events/evt_samudra/attendees/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admission-Token': 'adm-1' },
+      body: 'not json',
+    });
+    expect(raw.status).toBe(422);
+    expect(await raw.json()).toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+
+  it('answers 403 ADMISSION_INVALID without a token, for an unknown event and under admission_invalid', async () => {
+    const body = attendee('3174055203960004');
+    const invalid = { status: 403, code: 'ADMISSION_INVALID' };
+    await expectProblem(booking.validateAttendee('evt_samudra', '', body), invalid, body);
+    await expectProblem(booking.validateAttendee('evt_nope', 'adm-1', body), invalid, body);
+    scenario = 'admission_invalid';
+    await expectProblem(booking.validateAttendee('evt_samudra', 'adm-1', body), invalid, body);
+  });
+
+  it('answers 503 DUKCAPIL_UNAVAILABLE for every NIK under dukcapil_down, categories still load', async () => {
+    scenario = 'dukcapil_down';
+    const body = attendee('3174055203960004');
+    await expectProblem(
+      booking.validateAttendee('evt_samudra', 'adm-1', body),
+      { status: 503, code: 'DUKCAPIL_UNAVAILABLE' },
+      body,
+    );
+    await expect(booking.getCategories('evt_samudra', 'adm-1')).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('fails with the API problem code and like a dropped connection', async () => {
+    const body = attendee('3174055203960004');
+    scenario = 'error';
+    await expectProblem(booking.validateAttendee('evt_samudra', 'adm-1', body), {
+      status: 503,
+      code: 'INTERNAL_ERROR',
+    });
+    scenario = 'offline';
+    await expect(booking.validateAttendee('evt_samudra', 'adm-1', body)).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+    });
   });
 });
