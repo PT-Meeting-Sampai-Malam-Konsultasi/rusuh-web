@@ -27,3 +27,10 @@
     @apply outline-3 outline-offset-3 outline-blue;
   }
 }
+
+/* Paper gets the content only (the e-ticket prints to PDF). */
+@media print {
+  .footer {
+    @apply hidden;
+  }
+}

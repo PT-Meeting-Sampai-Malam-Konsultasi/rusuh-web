@@ -1,0 +1,153 @@
+@reference "../../../styles/app.css";
+
+/* Leaves room for the phone tab bar; the desktop footer follows the content. */
+.page {
+  @apply flex min-h-screen flex-col pb-[84px];
+
+  @variant md {
+    @apply pb-0;
+  }
+}
+
+/* HiFi .tk */
+.main {
+  @apply mx-auto w-full max-w-[calc(1328px+112px)] flex-1 px-4 pt-[22px] pb-14;
+
+  @variant md {
+    @apply px-14 pt-9;
+  }
+}
+
+.hero {
+  @apply grid gap-[22px] border-b-[2.5px] border-ink pb-6;
+
+  @variant md {
+    @apply items-end gap-14 pb-[34px];
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+}
+
+.stamp {
+  @apply inline-flex border-[3px] border-current px-2.5 pt-[7px] pb-1.5 text-[15px] leading-none font-bold tracking-[0.05em] text-blue-ink uppercase;
+  transform: rotate(-3deg);
+}
+
+.heading {
+  @apply mt-4 -ml-1.5 font-display text-[62px] leading-[0.86] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+
+  @variant md {
+    @apply mt-6;
+    font-size: clamp(64px, 8.6vw, 132px);
+  }
+}
+
+.lead {
+  @apply mt-4 max-w-[640px] text-base leading-[1.55];
+
+  @variant md {
+    @apply mt-6 text-[19px];
+  }
+}
+
+.actions {
+  @apply grid gap-4;
+}
+
+.orderLine {
+  @apply mt-1 text-sm text-ink-2;
+
+  b {
+    @apply font-semibold text-ink tabular-nums;
+  }
+}
+
+.stubs {
+  @apply mt-[26px] grid gap-[22px];
+
+  @variant md {
+    @apply mt-10 gap-7;
+  }
+}
+
+.gate {
+  @apply mt-9 grid gap-2.5 border-t-[2.5px] border-ink pt-5;
+
+  ol {
+    @apply grid max-w-[760px] list-decimal gap-2 pl-[22px] text-[15px] leading-normal;
+  }
+
+  @variant md {
+    @apply mt-14 gap-6;
+    grid-template-columns: 260px minmax(0, 1fr);
+
+    ol {
+      @apply text-base;
+    }
+  }
+}
+
+.gateTitle {
+  @apply font-display text-[26px] leading-none font-extrabold;
+  font-stretch: 75%;
+}
+
+.message {
+  @apply mt-7 grid max-w-[720px] justify-items-start gap-5;
+
+  @variant md {
+    @apply mt-11;
+  }
+}
+
+.messageTitle {
+  @apply font-display text-[40px] leading-[0.9] font-extrabold;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply text-[64px];
+  }
+}
+
+.messageBody {
+  @apply text-base text-ink-2;
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+/*
+ * "Simpan / cetak PDF": the tickets only, one per A4 sheet. The page margin is ours (padding on each sheet), so the
+ * print dialog's margin setting and the paper width change nothing.
+ */
+@page {
+  size: a4;
+  margin: 0;
+}
+
+@media print {
+  .page,
+  .main {
+    @apply block min-h-0 p-0;
+  }
+
+  .hero,
+  .gate {
+    @apply hidden;
+  }
+
+  .stubs {
+    @apply m-0 block;
+  }
+
+  .sheet {
+    @apply break-inside-avoid p-[12mm];
+  }
+
+  .sheet + .sheet {
+    break-before: page;
+  }
+}

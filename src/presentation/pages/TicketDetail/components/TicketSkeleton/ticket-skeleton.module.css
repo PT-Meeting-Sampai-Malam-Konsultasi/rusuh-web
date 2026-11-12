@@ -1,0 +1,29 @@
+@reference "../../../../../styles/app.css";
+
+.skeleton {
+  @apply mx-auto grid w-full max-w-[calc(1328px+112px)] gap-7 px-4 pt-[22px];
+
+  @variant md {
+    @apply px-14 pt-9;
+  }
+
+  span {
+    @apply block bg-paper-2;
+  }
+}
+
+.heading {
+  @apply h-[62px] w-3/4;
+
+  @variant md {
+    @apply h-[120px];
+  }
+}
+
+.stub {
+  @apply h-[360px];
+
+  @variant md {
+    @apply h-[200px];
+  }
+}

@@ -1,0 +1,103 @@
+@reference "../../../styles/app.css";
+
+/* Leaves room for the phone tab bar; the desktop footer follows the content. */
+.page {
+  @apply flex min-h-screen flex-col pb-[84px];
+
+  @variant md {
+    @apply pb-0;
+  }
+}
+
+/* HiFi .tl */
+.main {
+  @apply mx-auto w-full max-w-[calc(1328px+112px)] flex-1 px-4 pt-[22px] pb-14;
+
+  @variant md {
+    @apply px-14 pt-9;
+  }
+}
+
+.title {
+  @apply -ml-1 font-display text-[52px] leading-[0.84] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.02em;
+
+  @variant md {
+    font-size: clamp(64px, 9vw, 128px);
+  }
+}
+
+.lead {
+  @apply mt-2.5 max-w-[720px] text-base text-ink-2;
+
+  @variant md {
+    @apply mt-4 text-xl;
+  }
+}
+
+.group {
+  @apply mt-[34px];
+
+  @variant md {
+    @apply mt-[52px];
+  }
+}
+
+.groupHead {
+  @apply flex items-baseline justify-between gap-6 border-b-[2.5px] border-ink pb-3;
+}
+
+.groupTitle {
+  @apply font-display text-[26px] leading-none font-extrabold;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply text-[40px];
+  }
+}
+
+.groupSummary {
+  @apply text-sm text-ink-2;
+}
+
+.list {
+  @apply mt-[18px] grid list-none gap-[18px];
+
+  @variant md {
+    @apply mt-7 gap-7;
+  }
+}
+
+.message {
+  @apply mt-7 grid max-w-[720px] justify-items-start gap-5;
+
+  @variant md {
+    @apply mt-11;
+  }
+}
+
+.messageTitle {
+  @apply font-display text-[40px] leading-[0.9] font-extrabold;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply text-[64px];
+  }
+}
+
+.messageBody {
+  @apply text-base text-ink-2;
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+.skeleton {
+  @apply mt-10 grid gap-7;
+
+  span {
+    @apply block h-[180px] bg-paper-2;
+  }
+}

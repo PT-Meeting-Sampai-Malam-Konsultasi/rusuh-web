@@ -36,3 +36,10 @@
     transform: translateY(1px);
   }
 }
+
+/* Paper gets the content only (the e-ticket prints to PDF). */
+@media print {
+  .tabbar {
+    @apply hidden;
+  }
+}

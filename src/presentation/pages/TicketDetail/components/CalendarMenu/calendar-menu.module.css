@@ -1,0 +1,54 @@
+@reference "../../../../../styles/app.css";
+
+.menu {
+  @apply relative;
+}
+
+/* Looks like the secondary button; the marker is ours (▾ turns when open). */
+.summary {
+  @apply cursor-pointer list-none;
+
+  &::-webkit-details-marker {
+    @apply hidden;
+  }
+
+  &::after {
+    content: '▾';
+
+    @apply ml-2 inline-block transition-transform duration-150;
+  }
+
+  .menu[open] &::after {
+    @apply rotate-180;
+  }
+}
+
+/* A plain list under the button: three equal rows, each a full-width target. */
+.options {
+  @apply mt-2 grid list-none border-[2.5px] border-ink bg-card;
+  box-shadow: var(--shadow-off-s);
+
+  li + li {
+    @apply border-t border-hair;
+  }
+
+  a,
+  button {
+    @apply flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 px-4 text-left text-base font-semibold text-ink no-underline;
+  }
+
+  a:hover,
+  button:hover {
+    @apply bg-paper-2;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    @apply outline-2 outline-offset-[-4px] outline-blue;
+  }
+
+  a:active,
+  button:active {
+    @apply bg-paper;
+  }
+}

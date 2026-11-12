@@ -1,0 +1,6 @@
+@reference "../../../styles/app.css";
+
+/* White ground and black modules on every theme: gate scanners expect dark on light. */
+.qr {
+  @apply block h-auto max-w-full;
+}

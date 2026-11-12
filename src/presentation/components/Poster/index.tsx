@@ -4,8 +4,11 @@ export type PosterTone = 'blue' | 'pink' | 'paper' | 'ink';
 
 interface PosterProps {
   tone: PosterTone;
-  /** 'thumb': the order page header (58×72 phone, 84×104 from 720px), title only. */
-  size: 'hero' | 'card' | 'thumb';
+  /**
+   * 'thumb': the order page header (58×72 phone, 84×104 from 720px), title only. 'tile': a My tickets card (84px
+   * phone, 132px desktop). 'stub': the left of an e-ticket stub, kicker on top (full width × 120px on phones).
+   */
+  size: 'hero' | 'card' | 'thumb' | 'tile' | 'stub';
   title: string;
   kicker?: string;
   subtitle?: string;
@@ -21,7 +24,13 @@ interface PosterProps {
   className?: string;
 }
 
-const IMAGE_SIZE = { hero: [400, 500], card: [400, 500], thumb: [84, 104] } as const;
+const IMAGE_SIZE = {
+  hero: [400, 500],
+  card: [400, 500],
+  thumb: [84, 104],
+  tile: [132, 165],
+  stub: [260, 200],
+} as const;
 
 /** Screen-printed event poster: halftone, condensed title, tilted subtitle plate. Generated when there is no artwork. */
 export default function Poster({

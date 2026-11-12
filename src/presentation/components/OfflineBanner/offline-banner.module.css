@@ -7,3 +7,10 @@
 .banner {
   @apply bg-ink px-4 py-2 text-center text-sm font-semibold text-paper;
 }
+
+/* Paper gets the content only (the e-ticket prints to PDF). */
+@media print {
+  .region {
+    @apply hidden;
+  }
+}
