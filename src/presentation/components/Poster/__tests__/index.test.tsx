@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import Poster from '../index';
@@ -24,10 +24,38 @@ describe('Poster', () => {
     expect(screen.getByText('GBK · JAKARTA')).toBeInTheDocument();
   });
 
-  it('shows the artwork when the event has one, keeping the title for screen readers', () => {
-    const { container } = render(<Poster tone="pink" size="card" title="Deru" imageUrl="/posters/deru.webp" />);
-    expect(container.querySelector('img')).toHaveAttribute('src', '/posters/deru.webp');
-    expect(screen.getByText('Deru')).toBeInTheDocument();
+  it('prints the title and plates over the artwork when the event has one', () => {
+    const { container } = render(
+      <Poster
+        tone="pink"
+        size="card"
+        title="Deru"
+        kicker="Live"
+        subtitle="Malam Mesin"
+        imageUrl="/posters/deru.webp"
+      />,
+    );
+    const img = container.querySelector('img');
+    expect(img).toHaveAttribute('src', '/posters/deru.webp');
+    expect(img).toHaveAttribute('alt', '');
+    expect(screen.getByText('DERU')).toBeVisible();
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Malam Mesin')).toBeInTheDocument();
+    expect(container.firstElementChild?.className).toMatch(/withImage/);
+  });
+
+  it('drops artwork that fails to load and stands as the printed poster', () => {
+    const { container, rerender } = render(
+      <Poster tone="blue" size="hero" title="Way Back Home" imageUrl="https://s3.example/placeholder.avif" />,
+    );
+    fireEvent.error(container.querySelector('img') as HTMLImageElement);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.firstElementChild?.className).not.toMatch(/withImage/);
+    expect(container.querySelector('svg')).not.toBeNull();
+    expect(screen.getByText('WAY BACK HOME')).toBeInTheDocument();
+    // A different image is tried again.
+    rerender(<Poster tone="blue" size="hero" title="Way Back Home" imageUrl="https://cdn.example/real.webp" />);
+    expect(container.querySelector('img')).toHaveAttribute('src', 'https://cdn.example/real.webp');
   });
 
   it('prints only the title at thumb size', () => {
