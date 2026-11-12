@@ -277,15 +277,39 @@ describe('OrderScreen', () => {
     expect(screen.queryByRole('timer')).toBeNull();
   });
 
-  it('does not consume timeUp yet: the page is the same at zero (FR-18-W1)', () => {
-    controller = { ...base(), timer: { seconds: 0, label: 'order_timer_label' }, timeUp: false };
-    const { container: before, unmount } = render(<OrderScreen />);
-    const html = before.innerHTML;
-    unmount();
-    controller = { ...base(), timer: { seconds: 0, label: 'order_timer_label' }, timeUp: true };
-    const { container: after } = render(<OrderScreen />);
-    expect(after.innerHTML).toBe(html);
+  it('renders no dialog while the controller gives no time-up sheet', () => {
+    controller = { ...base(), timer: { seconds: 0, label: 'order_timer_label' }, timeUp: true, timeUpSheet: null };
+    render(<OrderScreen />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("shows the time's-up sheet over the page, timers at 0:00 underneath (FR-18-W1)", async () => {
+    const queueAgain = vi.fn();
+    controller = {
+      ...base(),
+      timer: { seconds: 0, label: 'order_timer_label' },
+      timeUp: true,
+      timeUpSheet: {
+        stamp: 'order_time_up_stamp',
+        title: 'order_time_up_title',
+        body: 'order_time_up_body',
+        queueAgainLabel: 'order_time_up_queue_again',
+        homeLabel: 'action_back_home',
+        homeHref: '/',
+        queueAgain,
+      },
+    };
+    render(<OrderScreen />);
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0]).toHaveAccessibleName('order_time_up_title');
+    expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'order_category_heading' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tambah Festival A' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Tambah Festival A' })).toBeInTheDocument();
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    for (const timer of timers) expect(timer).toHaveTextContent('0:00');
+    await userEvent.click(within(dialogs[0]).getByRole('button', { name: 'order_time_up_queue_again' }));
+    expect(queueAgain).toHaveBeenCalledTimes(1);
   });
 });
