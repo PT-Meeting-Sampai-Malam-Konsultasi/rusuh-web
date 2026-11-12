@@ -176,6 +176,15 @@
   @apply bg-pink text-white;
 }
 
+/* Limit line (HiFi .limit): the count on a pink plate ("pink = you"), the message in ink. */
+.limit {
+  @apply mt-3.5 flex items-center gap-2.5 text-sm text-ink;
+}
+
+.limitCount {
+  @apply shrink-0 bg-pink px-[7px] pt-1 pb-[3px] font-display text-[15px] leading-none font-extrabold whitespace-nowrap text-white tabular-nums;
+}
+
 /* Rises 60ms after the event header. */
 @media (prefers-reduced-motion: no-preference) {
   .section {

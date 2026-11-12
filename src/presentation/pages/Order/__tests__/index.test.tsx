@@ -46,7 +46,7 @@ const base = (): OrderControllerInterface => ({
       soldOut: true,
       quantity: 0,
       selected: false,
-      canIncrement: true,
+      canIncrement: false,
       canDecrement: false,
       incrementLabel: 'Tambah Tribun Bawah',
       decrementLabel: 'Kurangi Tribun Bawah',
@@ -59,6 +59,7 @@ const base = (): OrderControllerInterface => ({
   showHolders: false,
   showHolderChoice: false,
   holders: [],
+  limitNotice: null,
   categoryNote: 'Maks. 3 tiket per transaksi.',
   errorMessage: '',
   retry: vi.fn(),
@@ -88,6 +89,13 @@ const holder: OrderControllerInterface['holders'][number] = {
     onChange: vi.fn(),
   },
   nik: { id: 'order-holder-1-nik', value: '', onChange: vi.fn(), onFocus: vi.fn(), onBlur: vi.fn() },
+};
+
+/** The limit region: the one atomic status (each stepper `output` is an implicit status too). */
+const limitRegion = () => {
+  const regions = screen.getAllByRole('status').filter((el) => el.getAttribute('aria-atomic') === 'true');
+  expect(regions).toHaveLength(1);
+  return regions[0];
 };
 
 describe('OrderScreen', () => {
@@ -127,6 +135,25 @@ describe('OrderScreen', () => {
     expect(controller.increment).toHaveBeenCalledWith('cat_fa');
     await userEvent.click(screen.getByRole('button', { name: 'Kurangi Festival A' }));
     expect(controller.decrement).toHaveBeenCalledWith('cat_fa');
+  });
+
+  it('passes the limit notice to the category list', () => {
+    controller = { ...base(), limitNotice: { count: '3/3', message: 'order_limit_reached' } };
+    render(<OrderScreen />);
+    const region = limitRegion();
+    expect(region).toHaveTextContent('3/3 order_limit_reached');
+    expect(region.querySelector('b')).toHaveTextContent('3/3');
+  });
+
+  it('keeps the limit region empty without a notice', () => {
+    render(<OrderScreen />);
+    expect(limitRegion()).toBeEmptyDOMElement();
+  });
+
+  it('shows the sold-out row with both stepper buttons disabled', () => {
+    render(<OrderScreen />);
+    expect(screen.getByRole('button', { name: 'Tambah Tribun Bawah' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Kurangi Tribun Bawah' })).toBeDisabled();
   });
 
   it('hides the holders section until a ticket is picked', () => {

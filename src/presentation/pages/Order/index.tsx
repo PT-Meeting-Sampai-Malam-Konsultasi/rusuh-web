@@ -23,6 +23,7 @@ export default function OrderScreen() {
     showHolders,
     showHolderChoice,
     holders,
+    limitNotice,
     categoryNote,
     errorMessage,
     retry,
@@ -78,6 +79,7 @@ export default function OrderScreen() {
               categories={categories}
               onIncrement={increment}
               onDecrement={decrement}
+              limitNotice={limitNotice}
             />
           )}
           {status === 'ready' && showHolders && <HolderList t={t} showChoice={showHolderChoice} holders={holders} />}

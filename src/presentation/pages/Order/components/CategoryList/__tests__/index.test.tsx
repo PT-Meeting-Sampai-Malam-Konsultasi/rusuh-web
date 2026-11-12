@@ -4,6 +4,8 @@ import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OrderCategoryRow } from '@controllers/order.controller';
+import en from '@translation/locale/en.json';
+import id from '@translation/locale/id.json';
 
 import CategoryList from '../index';
 
@@ -50,6 +52,7 @@ const categories: OrderCategoryRow[] = [
     availabilityLabel: 'Habis',
     soldOut: true,
     ...stepper('Tribun Bawah'),
+    canIncrement: false,
   },
 ];
 
@@ -62,10 +65,18 @@ const renderList = (overrides: Partial<Props> = {}) => {
     categories,
     onIncrement: vi.fn(),
     onDecrement: vi.fn(),
+    limitNotice: null,
     ...overrides,
   };
-  render(<CategoryList {...props} />);
-  return props;
+  const view = render(<CategoryList {...props} />);
+  return { ...props, rerender: (next: Partial<Props>) => view.rerender(<CategoryList {...props} {...next} />) };
+};
+
+/** The limit region: the one atomic status (each stepper `output` is an implicit status too). */
+const limitRegion = () => {
+  const regions = screen.getAllByRole('status').filter((el) => el.getAttribute('aria-atomic') === 'true');
+  expect(regions).toHaveLength(1);
+  return regions[0];
 };
 
 const note = 'Maks. 3 tiket per transaksi. Tanpa nomor kursi — masuk sesuai kategori.';
@@ -194,9 +205,75 @@ describe('CategoryList', () => {
     expect(screen.getByRole('button', { name: 'Tambah Festival B' })).toBeDisabled();
   });
 
-  it('keeps + enabled on a sold-out row (FR-14-W1 disables it later)', () => {
+  it('disables both buttons on a sold-out row at 0, natively and without aria-disabled', async () => {
+    const props = renderList();
+    const minus = screen.getByRole('button', { name: 'Kurangi Tribun Bawah' });
+    const plus = screen.getByRole('button', { name: 'Tambah Tribun Bawah' });
+    expect(minus).toBeDisabled();
+    expect(plus).toBeDisabled();
+    expect(minus).not.toHaveAttribute('aria-disabled');
+    expect(plus).not.toHaveAttribute('aria-disabled');
+    await userEvent.click(plus);
+    await userEvent.click(minus);
+    expect(props.onIncrement).not.toHaveBeenCalled();
+    expect(props.onDecrement).not.toHaveBeenCalled();
+  });
+
+  it('keeps − enabled on a sold-out row with a stale pick', async () => {
+    const stale: OrderCategoryRow = {
+      ...categories[2],
+      id: 'cat_a',
+      quantity: 1,
+      selected: true,
+      canIncrement: false,
+      canDecrement: true,
+    };
+    const props = renderList({ categories: [stale] });
+    expect(screen.getByRole('button', { name: 'Tambah Tribun Bawah' })).toBeDisabled();
+    const minus = screen.getByRole('button', { name: 'Kurangi Tribun Bawah' });
+    expect(minus).toBeEnabled();
+    await userEvent.click(minus);
+    expect(props.onDecrement).toHaveBeenCalledWith('cat_a');
+  });
+
+  it('keeps an empty, atomic status region when there is no limit notice', () => {
     renderList();
-    expect(screen.getByRole('button', { name: 'Tambah Tribun Bawah' })).toBeEnabled();
+    const region = limitRegion();
+    expect(region.tagName).toBe('DIV');
+    expect(region).toBeEmptyDOMElement();
+  });
+
+  it('shows the limit line after the list, the count in a b', () => {
+    renderList({ limitNotice: { count: '3/3', message: 'msg' } });
+    const region = limitRegion();
+    expect(region).toHaveTextContent('3/3 msg');
+    expect(region.querySelector('b')).toHaveTextContent('3/3');
+    const list = screen.getByRole('list');
+    expect(list.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('inserts and removes the line inside the same mounted region', () => {
+    const view = renderList();
+    const region = limitRegion();
+    view.rerender({ limitNotice: { count: '3/3', message: 'msg' } });
+    expect(limitRegion()).toBe(region);
+    expect(region).toHaveTextContent('3/3 msg');
+    view.rerender({ limitNotice: null });
+    expect(limitRegion()).toBe(region);
+    expect(region).toBeEmptyDOMElement();
+  });
+
+  it('renders the real ID and EN limit copy', () => {
+    const fill = (template: string, count: number) => template.replace('{{count}}', String(count));
+    const idView = renderList({
+      limitNotice: { count: '3/3', message: fill(id.order_limit_reached_other, 3) },
+    });
+    expect(limitRegion()).toHaveTextContent('3/3 Batas 3 tiket tercapai. Kurangi satu untuk ganti kategori.');
+    idView.rerender({ limitNotice: { count: '3/3', message: fill(en.order_limit_reached_other, 3) } });
+    expect(limitRegion()).toHaveTextContent("3/3 You've hit the 3-ticket limit. Remove one to switch category.");
+    idView.rerender({ limitNotice: { count: '2/2', message: fill(id.order_limit_reached_reserved_other, 2) } });
+    expect(limitRegion()).toHaveTextContent(/^2\/2 Kuota giliran Anda 2 tiket\. /);
   });
 
   it('calls onIncrement / onDecrement with the row id', async () => {
