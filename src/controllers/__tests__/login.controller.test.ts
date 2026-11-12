@@ -202,7 +202,11 @@ describe('LoginController', () => {
     expect(d.verifySignInCodeUseCase.execute).toHaveBeenCalledWith({ challengeId: 'ch_1', code: '123456' });
     act(() => verify().onSuccess({ kind: 'signed-in', isNewAccount: false, user: USER }));
     expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
-    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('login_verified', { isNewAccount: false });
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('login', {
+      method: 'email_code',
+      from: 'queue',
+      event_id: 'evt_samudra',
+    });
   });
 
   it('asks a new account for its name, then saves it with the locale and returns', async () => {
@@ -211,6 +215,11 @@ describe('LoginController', () => {
     toCodeStep();
     act(() => verify().onSuccess({ kind: 'signed-in', isNewAccount: true, user: { ...USER, fullName: undefined } }));
     expect(hook.result.current.step).toBe('profile');
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('sign_up', {
+      method: 'email_code',
+      from: 'queue',
+      event_id: 'evt_samudra',
+    });
     expect(hook.result.current.profileForm.email).toBe('nadia.saputri@gmail.com');
     expect(replace).not.toHaveBeenCalled();
 

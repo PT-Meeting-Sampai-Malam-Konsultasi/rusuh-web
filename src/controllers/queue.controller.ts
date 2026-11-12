@@ -30,6 +30,7 @@ import { posterToneFor, type PosterTone } from '@utils/format/event-card';
 import { formatCount } from '@utils/format/number';
 import { findHomeEvent, formatCountdown, queueStatusFor, type QueueStatus } from '@utils/format/queue';
 import { mainNav, type NavItem } from '@utils/navigation';
+import { ANALYTICS_EVENTS, positionBucket, waitBucket } from '@utils/analytics';
 
 export type { QueueStatus } from '@utils/format/queue';
 
@@ -130,6 +131,20 @@ export interface QueueControllerInterface {
   nav: NavItem[];
   homeHref: string;
 }
+
+/** `queue_join` outcome (tracking plan §2 step 3). */
+function joinOutcome(result: JoinQueueResult, noQueue: boolean): string {
+  if (result.kind !== 'joined') return result.kind.replace('-', '_');
+  if (noQueue) return 'no_queue';
+  return result.resumed ? 'resumed' : 'joined';
+}
+
+/** Claim answers that are `queue_claim` outcomes (admitted is sent with the redirect). */
+const CLAIM_OUTCOMES: Partial<Record<ClaimTurnResult['kind'], string>> = {
+  missed: 'missed',
+  'sold-out': 'sold_out',
+  paused: 'paused',
+};
 
 type QueueControllerDeps = Pick<
   AwilixRegistry,
@@ -291,16 +306,21 @@ const QueueController = ({
   const turnWindow = windowQuery.data;
   const summary = findHomeEvent(eventsQuery.data, eventId);
 
+  // Tracking plan §2 step 3: one queue_join per answer; "no queue at all" (FR-05) is its `no_queue` outcome.
   const trackedFor = useRef<JoinQueueResult | null>(null);
+  /** When this visit got its place: the start of `queue_turn`'s wait (a resumed place counts from this visit). */
+  const joinedAt = useRef<number | null>(null);
   useEffect(() => {
     if (!result || trackedFor.current === result) return;
     trackedFor.current = result;
-    analyticsAdapter.trackEvent('queue_join', {
-      eventId,
-      outcome: result.kind === 'joined' && result.resumed ? 'resumed' : result.kind,
-      state: result.kind === 'joined' ? result.place.state : 'none',
+    joinedAt.current ??= Date.now();
+    const joinedPosition = result.kind === 'joined' ? result.place.position : null;
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_JOIN, {
+      event_id: eventId,
+      outcome: joinOutcome(result, skipping),
+      ...(joinedPosition !== null ? { position_bucket: positionBucket(joinedPosition) } : {}),
     });
-  }, [result, analyticsAdapter, eventId]);
+  }, [result, analyticsAdapter, eventId, skipping]);
 
   // One clock for the pre-queue countdown, "Diperbarui n detik lalu" and the stream retry: elapsed time only, never a
   // deadline against the device clock.
@@ -336,23 +356,35 @@ const QueueController = ({
     if (skipping && claim?.kind === 'sign-in') router.replace(signInHref);
   }, [skipping, claim, router, signInHref]);
 
-  const skipTracked = useRef(false);
+  // Tracking plan §2 step 4: the turn arrived (not when there was no queue at all), once per number.
+  const turnTrackedFor = useRef<number | null>(null);
   useEffect(() => {
-    if (!skipping || skipTracked.current) return;
-    skipTracked.current = true;
-    analyticsAdapter.trackEvent('queue_skip', { eventId });
-  }, [skipping, analyticsAdapter, eventId]);
+    if (!atTurn || skipping || place?.seq == null || turnTrackedFor.current === place.seq) return;
+    turnTrackedFor.current = place.seq;
+    const waited = joinedAt.current === null ? 0 : (Date.now() - joinedAt.current) / 1000;
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_TURN, { event_id: eventId, wait_bucket: waitBucket(waited) });
+  }, [atTurn, skipping, place?.seq, analyticsAdapter, eventId]);
+
+  const soldOutTracked = useRef(false);
+  useEffect(() => {
+    if (status !== 'sold-out' || soldOutTracked.current) return;
+    soldOutTracked.current = true;
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.SOLD_OUT_SEEN, { event_id: eventId, where: 'queue' });
+  }, [status, analyticsAdapter, eventId]);
 
   // Admitted: on to the order page, with the admission token kept in memory for it (replace: Back must not reclaim).
   useEffect(() => {
     if (claim?.kind !== 'admitted') return;
-    analyticsAdapter.trackEvent('queue_claim', { eventId, outcome: 'admitted' });
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_CLAIM, { event_id: eventId, outcome: 'admitted' });
     router.replace(`${ROUTES.ORDER}?event=${encodeURIComponent(eventId)}`);
   }, [claim, analyticsAdapter, eventId, router]);
 
-  const claimedOutcome = claim && claim.kind !== 'admitted' && claim.kind !== 'retry' ? claim.kind : null;
+  // Tracking plan §2 step 5. "Sign in first" is not a claim answer: the claim comes after sign-in.
+  const claimedOutcome = claim && CLAIM_OUTCOMES[claim.kind];
   useEffect(() => {
-    if (claimedOutcome) analyticsAdapter.trackEvent('queue_claim', { eventId, outcome: claimedOutcome });
+    if (claimedOutcome) {
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_CLAIM, { event_id: eventId, outcome: claimedOutcome });
+    }
   }, [claimedOutcome, analyticsAdapter, eventId]);
 
   // Near the front: stream instead of polling while it is healthy; on a failure, poll and try again later.
@@ -483,7 +515,10 @@ const QueueController = ({
       toggleLoading();
       setLeaveOpen(false);
       setLeftSeq(seq);
-      analyticsAdapter.trackEvent('queue_leave', { eventId });
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_LEAVE, {
+        event_id: eventId,
+        ...(position !== null ? { position_bucket: positionBucket(position) } : {}),
+      });
     },
     onError: (error) => {
       toggleLoading();
@@ -554,7 +589,10 @@ const QueueController = ({
       void claimQuery.refetch();
     },
     queueAgain: () => {
-      analyticsAdapter.trackEvent('queue_rejoin', { eventId });
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_REJOIN, {
+        event_id: eventId,
+        reason: left ? 'left' : 'missed',
+      });
       setLeftSeq(undefined);
       rejoinNext.current = true;
       void joinQuery.refetch();

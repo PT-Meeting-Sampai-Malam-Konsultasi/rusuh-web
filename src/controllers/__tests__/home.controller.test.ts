@@ -119,24 +119,31 @@ describe('HomeController', () => {
     expect(render().result.current.locale).toBe('en');
   });
 
-  it('tracks which event was opened, from the poster or the list', () => {
+  it('tracks the list once and which event was opened (tracking plan view_item_list, select_item)', () => {
     queryState = { data: { featured: live, others: [sold], total: 2, serverNow: NOW } as HomeEvents };
     const d = deps();
-    const { result } = render(d);
+    const { result, rerender } = render(d);
     expect(result.current.featured?.join?.href).toBe('/queue?event=evt_live');
     expect(result.current.events[0].join).toBeNull();
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('view_item_list', {
+      item_list_name: 'home',
+      items: [
+        expect.objectContaining({ item_id: 'evt_live', item_name: live.name, index: 0 }),
+        expect.objectContaining({ item_id: sold.eventId, index: 1 }),
+      ],
+    });
+    rerender();
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledTimes(1);
+
     result.current.selectEvent('evt_live', 0);
-    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('home_event_select', {
-      eventId: 'evt_live',
-      state: 'on_sale',
-      position: 0,
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenLastCalledWith('select_item', {
+      item_list_name: 'home',
+      event_id: 'evt_live',
+      items: [expect.objectContaining({ item_id: 'evt_live', index: 0 })],
     });
+    // An event no longer in the list is not tracked.
     result.current.selectEvent('evt_gone', 3);
-    expect(d.analyticsAdapter.trackEvent).toHaveBeenLastCalledWith('home_event_select', {
-      eventId: 'evt_gone',
-      state: 'unknown',
-      position: 3,
-    });
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledTimes(2);
     expect(result.current.joinHint).toBe('home_join_hint');
   });
 

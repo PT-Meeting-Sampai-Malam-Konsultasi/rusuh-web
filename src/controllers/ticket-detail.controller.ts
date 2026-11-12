@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { TFunction } from 'i18next';
 
 import type { User } from '@core/entities/auth/auth.entity';
 import type { HttpError } from '@core/protocols/http.protocol';
 import type { ETicketResult } from '@core/use_case/ticket/get-e-ticket.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
+import { ANALYTICS_EVENTS } from '@utils/analytics';
 import { buildCalendarEvent, googleCalendarUrl, outlookCalendarUrl } from '@utils/calendar';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
 import { ROUTES, withQuery } from '@utils/constants/routes';
@@ -130,8 +131,21 @@ const TicketDetailController = ({
     [view, qrEncoder, t],
   );
 
+  // Tracking plan §2 step 13, once per booking shown.
+  const viewTrackedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!paid || viewTrackedFor.current === paid.booking.bookingId) return;
+    viewTrackedFor.current = paid.booking.bookingId;
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.VIEW_TICKET, {
+      event_id: paid.booking.eventId,
+      booking_id: paid.booking.bookingId,
+      ticket_count: paid.tickets.length,
+    });
+  }, [paid, analyticsAdapter]);
+
+  // Tracking plan §4: the web saves the PDF through the print dialog.
   const printTickets = () => {
-    analyticsAdapter.trackEvent('ticket_pdf_printed', { tickets: stubs.length });
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.TICKET_DOWNLOAD, { booking_id: bookingId, method: 'pdf_print' });
     printer.print();
   };
 
@@ -141,7 +155,8 @@ const TicketDetailController = ({
     const name = paid.booking.orderCode ?? bookingId;
     // Links leave the site: event, time, place and the KTP reminder only, never the order code or names.
     const link = { ...event, description: t('ticket_calendar_link_note') };
-    const picked = (via: CalendarVia) => analyticsAdapter.trackEvent('ticket_calendar_added', { via });
+    const picked = (via: CalendarVia) =>
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.TICKET_ADD_CALENDAR, { booking_id: bookingId, via });
     return {
       googleUrl: googleCalendarUrl(link),
       outlookUrl: outlookCalendarUrl(link),

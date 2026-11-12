@@ -112,6 +112,11 @@ describe('TicketDetailController', () => {
       code: 'SMD-FB-04827',
     });
     expect(d.qrEncoder.encode).toHaveBeenCalledWith('RSH1.a');
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('view_ticket', {
+      event_id: 'evt_samudra',
+      booking_id: 'bk_1',
+      ticket_count: 1,
+    });
   });
 
   it('says not found without a booking id or for an unknown one, and not paid for the rest', () => {
@@ -146,7 +151,10 @@ describe('TicketDetailController', () => {
     const { result } = render(d);
     result.current.printTickets();
     expect(d.printer.print).toHaveBeenCalledTimes(1);
-    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('ticket_pdf_printed', { tickets: 1 });
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('ticket_download', {
+      booking_id: 'bk_1',
+      method: 'pdf_print',
+    });
   });
 
   it('offers Google and Outlook links without the order code, and an .ics named after the order', () => {
@@ -161,7 +169,10 @@ describe('TicketDetailController', () => {
     expect(new URL(calendar.outlookUrl).searchParams.get('subject')).toBe('Samudra');
     expect(calendar.googleUrl + calendar.outlookUrl).not.toContain('RSH-26-084731');
     calendar.onPick('google');
-    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('ticket_calendar_added', { via: 'google' });
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('ticket_add_calendar', {
+      booking_id: 'bk_1',
+      via: 'google',
+    });
 
     act(() => calendar.downloadIcs());
     const [ics, name, type] = d.fileSaver.save.mock.calls[0] as unknown as [string, string, string];
@@ -170,7 +181,10 @@ describe('TicketDetailController', () => {
     expect(ics).toContain('UID:bk_1@rusuh-tiket.web.id');
     expect(ics).toContain('DTSTART:20261212T120000Z');
     expect(ics).toContain('DESCRIPTION:ticket_calendar_note');
-    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('ticket_calendar_added', { via: 'ics' });
+    expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('ticket_add_calendar', {
+      booking_id: 'bk_1',
+      via: 'ics',
+    });
   });
 
   it('has no calendar without the event or before the booking loads, and names the .ics by booking id without an order code', () => {

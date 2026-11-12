@@ -1,9 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { TFunction } from 'i18next';
 
+import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { HttpError } from '@core/protocols/http.protocol';
 import type { HomeEvents } from '@core/use_case/catalog/get-home-events.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
+import { ANALYTICS_EVENTS, eventItem } from '@utils/analytics';
 import type { FormatLocale } from '@utils/format/date';
 import { toEventCardView, type EventCardView } from '@utils/format/event-card';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
@@ -71,6 +73,18 @@ const HomeController = ({
     };
   }, [data, t, locale]);
 
+  // Tracking plan §2 step 1: once per visit, when the list first shows (the 30 s refresh does not count again).
+  const listTracked = useRef(false);
+  useEffect(() => {
+    if (!data || data.total === 0 || listTracked.current) return;
+    listTracked.current = true;
+    const listed = [data.featured, ...data.others].filter((event): event is EventSummary => event !== null);
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.VIEW_ITEM_LIST, {
+      item_list_name: 'home',
+      items: listed.map((event, index) => eventItem(event, index)),
+    });
+  }, [data, analyticsAdapter]);
+
   let status: HomeStatus = 'ready';
   if (!data) status = query.isError ? 'error' : 'loading';
   else if (data.total === 0) status = 'empty';
@@ -98,8 +112,14 @@ const HomeController = ({
     nav,
     joinHint: t('home_join_hint'),
     selectEvent: (eventId, position) => {
-      const state = [view.featured, ...view.events].find((card) => card?.id === eventId)?.state ?? 'unknown';
-      analyticsAdapter.trackEvent('home_event_select', { eventId, state, position });
+      const event = data && [data.featured, ...data.others].find((item) => item?.eventId === eventId);
+      if (!event) return;
+      // Tracking plan §2 step 2.
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.SELECT_ITEM, {
+        item_list_name: 'home',
+        event_id: eventId,
+        items: [eventItem(event, position)],
+      });
     },
   };
 };
