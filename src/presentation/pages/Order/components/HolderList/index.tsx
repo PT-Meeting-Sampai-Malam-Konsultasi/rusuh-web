@@ -7,7 +7,7 @@ import styles from './holder-list.module.css';
 
 interface HolderListProps {
   t: TFunction;
-  /** False when the profile has no name or /me failed: no radiogroup, plain fields. */
+  /** False when the profile has no name or could not be read: no radiogroup, plain fields. */
   showChoice: boolean;
   holders: OrderHolderView[];
 }
