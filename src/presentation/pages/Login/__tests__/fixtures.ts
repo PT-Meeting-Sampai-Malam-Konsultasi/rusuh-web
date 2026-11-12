@@ -35,6 +35,7 @@ export const loginController = (): LoginControllerInterface => ({
     onChangeEmail: vi.fn(),
     onSubmit: vi.fn(),
     submitting: false,
+    resending: false,
   },
   profileForm: {
     email: 'nadia.saputri@gmail.com',

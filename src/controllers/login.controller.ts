@@ -74,6 +74,8 @@ export interface LoginCodeView {
   onChangeEmail: () => void;
   onSubmit: () => void;
   submitting: boolean;
+  /** A new code is on its way (the resend button shows it). */
+  resending: boolean;
 }
 
 export interface LoginProfileForm {
@@ -189,13 +191,11 @@ const LoginController = ({
   const rateLimitText = (seconds: number | null) =>
     seconds !== null ? t('login_rate_limited_wait', { seconds }) : t('login_rate_limited');
 
+  // No loading overlay here: the request may wait for Turnstile, whose checkbox (when Cloudflare asks for one) shows in
+  // the page's Turnstile slot and must stay clickable. The buttons show the wait instead (`submitting`, `resending`).
   const requestCode = useMutationTanstack<RequestSignInCodeResult, HttpError, string>({
-    mutationFn: (email) => {
-      toggleLoading();
-      return requestSignInCodeUseCase.execute({ email, locale, ...(eventId ? { eventId } : {}) });
-    },
+    mutationFn: (email) => requestSignInCodeUseCase.execute({ email, locale, ...(eventId ? { eventId } : {}) }),
     onSuccess: (result) => {
-      toggleLoading();
       if (result.kind === 'sent') {
         setChallenge({
           challengeId: result.challengeId,
@@ -217,10 +217,7 @@ const LoginController = ({
       if (step === 'code') setResendError(message);
       else setEmailError(message);
     },
-    onError: (error) => {
-      toggleLoading();
-      popup(error);
-    },
+    onError: popup,
   });
 
   const verify = useMutationTanstack<VerifySignInCodeResult, HttpError, { challengeId: string; code: string }>({
@@ -353,7 +350,7 @@ const LoginController = ({
       resendError,
       validFor: formatCountdown(validLeft, t),
       onResend: () => {
-        if (challenge) requestCode.mutate(challenge.email);
+        if (challenge && !requestCode.isPending) requestCode.mutate(challenge.email);
       },
       onChangeEmail: () => {
         emailFormApi.reset({ email: challenge?.email ?? '' });
@@ -361,6 +358,7 @@ const LoginController = ({
       },
       onSubmit: () => submitCode(code),
       submitting: verify.isPending,
+      resending: requestCode.isPending,
     },
     profileForm: {
       email: user?.email ?? challenge?.email ?? '',

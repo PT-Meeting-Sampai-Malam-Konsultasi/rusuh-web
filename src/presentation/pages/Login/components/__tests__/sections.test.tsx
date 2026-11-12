@@ -71,6 +71,14 @@ describe('LoginCode', () => {
     expect(view.onResend).toHaveBeenCalled();
   });
 
+  it('shows a new code on its way on both resend buttons', () => {
+    const { unmount } = render(<LoginCode t={t} code={{ ...code(), resendIn: null, resending: true }} />);
+    expect(screen.getByRole('button', { name: 'login_resend' })).toBeDisabled();
+    unmount();
+    render(<LoginCode t={t} code={{ ...code(), state: 'expired', resendIn: null, resending: true }} />);
+    expect(screen.getByRole('button', { name: /login_send_new_code/ })).toHaveAttribute('aria-busy', 'true');
+  });
+
   it('shows a resend rate limit', () => {
     render(<LoginCode t={t} code={{ ...code(), resendError: 'wait 30' }} />);
     expect(screen.getByRole('alert')).toHaveTextContent('wait 30');

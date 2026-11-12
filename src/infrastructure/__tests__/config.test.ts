@@ -16,6 +16,7 @@ const env: RawEnv = {
   sentryEnvironment: undefined,
   sentryTracesSampleRate: undefined,
   sentryReplayOnErrorRate: undefined,
+  requestIdHeader: undefined,
 };
 
 describe('config', () => {
@@ -52,6 +53,11 @@ describe('config', () => {
         sentryReplayOnErrorRate: '0',
       }),
     ).toMatchObject({ sentryEnvironment: 'staging', sentryTracesSampleRate: 1, sentryReplayOnErrorRate: 0 });
+  });
+
+  it('sends no request ID header unless switched on', () => {
+    expect(createConfig(env).requestIdHeader).toBe(false);
+    expect(createConfig({ ...env, requestIdHeader: 'true' }).requestIdHeader).toBe(true);
   });
 
   it('accepts sample rates between 0 and 1 only', () => {
