@@ -105,6 +105,7 @@ describe('OrderController', () => {
     getOrderCategoriesUseCase: { execute: vi.fn().mockResolvedValue(okResult) },
     orderTicketSelectionUseCase: OrderTicketSelectionUseCase(),
     validateAttendeeUseCase: { checkNik, execute: vi.fn() },
+    endOrderWindowUseCase: { execute: vi.fn(() => ({ kind: 'ended' })) },
     admissionStore: { get: vi.fn().mockReturnValue('adm_token'), set: vi.fn(), clear: vi.fn() },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -1439,7 +1440,7 @@ describe('OrderController', () => {
       expect(render().result.current.timer?.seconds).toBe(seconds);
     });
 
-    it('stops at 0 with timeUp and does nothing else', () => {
+    it('stops at 0 with timeUp and does not navigate (the sheet is FR-18-W1)', () => {
       arrange();
       const d = deps();
       const { result } = render(d);
@@ -1458,7 +1459,7 @@ describe('OrderController', () => {
       expect(replace).not.toHaveBeenCalled();
       expect(router.push).not.toHaveBeenCalled();
       expect(mutate).not.toHaveBeenCalled();
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.trackEvent.mock.calls.map(([name]) => name)).toEqual(['order_time_up']);
       expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
     });
 
@@ -1592,6 +1593,182 @@ describe('OrderController', () => {
       expect(vi.getTimerCount()).toBe(1);
       unmount();
       expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('order time up (FR-18-W1)', () => {
+    const SERVER_NOW = '2026-11-09T03:00:00Z';
+    const sheet = {
+      stamp: 'order_time_up_stamp',
+      title: 'order_time_up_title',
+      body: 'order_time_up_body',
+      queueAgainLabel: 'order_time_up_queue_again',
+      homeLabel: 'action_back_home',
+      homeHref: '/',
+      queueAgain: expect.any(Function),
+    };
+    const arrange = (data: unknown = okResult) => {
+      vi.useFakeTimers({ now: new Date(SERVER_NOW) });
+      eventState = { data: event };
+      categoriesState = { data, dataUpdatedAt: Date.now() };
+    };
+    const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+    const timeUpCalls = (d: ReturnType<typeof deps>) =>
+      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === 'order_time_up');
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('shows no sheet and ends nothing before zero', () => {
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      for (const step of [0, 150_000, 149_000]) {
+        advance(step);
+        expect(result.current.timeUp).toBe(false);
+        expect(result.current.timeUpSheet).toBeNull();
+      }
+      expect(result.current.timer?.seconds).toBe(1);
+      expect(d.endOrderWindowUseCase.execute).not.toHaveBeenCalled();
+      expect(timeUpCalls(d)).toHaveLength(0);
+    });
+
+    it('shows the translated sheet at zero', () => {
+      arrange();
+      const { result } = render();
+      advance(300_000);
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+    });
+
+    it('shows the sheet at once for an answer already expired', () => {
+      arrange({ ...okResult, expiresAt: okResult.serverNow });
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends the window and tracks order_time_up exactly once, with the tickets at expiry', () => {
+      arrange(openResult);
+      const d = deps();
+      const { result, rerender } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.totalTickets).toBe(2);
+      advance(300_000);
+      act(() => result.current.decrement('cat_tribune'));
+      expect(result.current.totalTickets).toBe(1);
+      for (let i = 0; i < 6; i += 1) {
+        advance(10_000);
+        rerender();
+      }
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledWith('evt_samudra');
+      expect(timeUpCalls(d)).toEqual([['order_time_up', { eventId: 'evt_samudra', tickets: 2 }]]);
+    });
+
+    it('latches: the sheet stays when the event refetch fails afterwards', () => {
+      arrange();
+      const d = deps();
+      const { result, rerender } = render(d);
+      advance(300_000);
+      eventState = { isError: true, error: { status: 500, code: 'INTERNAL_ERROR', message: 'raw' } };
+      rerender();
+      expect(result.current.status).toBe('error');
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).not.toBeNull();
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the categories query after expiry, also after a language switch', () => {
+      arrange();
+      let current = { t, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { rerender } = renderHook(() => OrderController(d as never));
+      expect(categoriesOptions.enabled).toBe(true);
+      advance(300_000);
+      expect(categoriesOptions.enabled).toBe(false);
+      rerender();
+      expect(categoriesOptions.enabled).toBe(false);
+      current = { t, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: okResult, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      expect(categoriesOptions.queryKey).toEqual(['categories', 'evt_samudra', 'en']);
+      expect(categoriesOptions.enabled).toBe(false);
+    });
+
+    it('does not redirect for admission-invalid after expiry (categories or NIK check)', () => {
+      arrange();
+      const { rerender } = render();
+      advance(300_000);
+      categoriesState = { data: { kind: 'admission-invalid' } };
+      rerender();
+      rerender();
+      act(() => {
+        mutationOptions.onSuccess(
+          { kind: 'admission-invalid' } as never,
+          { slotKey: 's', fieldIndex: 0, fullName: 'Nadia', nik: '3174' } as never,
+        );
+      });
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('queueAgain tracks queue_rejoin and replaces the page with the waiting room', () => {
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      advance(300_000);
+      act(() => result.current.timeUpSheet?.queueAgain());
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_rejoin', {
+        eventId: 'evt_samudra',
+        from: 'order',
+      });
+      expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it('retranslates the sheet on a language switch while the timer stays at 0', () => {
+      arrange();
+      let current = { t: (key: string) => `id:${key}`, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      advance(300_000);
+      expect(result.current.timeUpSheet?.title).toBe('id:order_time_up_title');
+      current = { t: (key: string) => `en:${key}`, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: okResult, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      expect(result.current.timeUpSheet).toMatchObject({
+        stamp: 'en:order_time_up_stamp',
+        title: 'en:order_time_up_title',
+        body: 'en:order_time_up_body',
+        queueAgainLabel: 'en:order_time_up_queue_again',
+        homeLabel: 'en:action_back_home',
+      });
+      expect(result.current.timer?.seconds).toBe(0);
+    });
+
+    it('calls no service because of the expiry', () => {
+      arrange();
+      const d = deps();
+      const { rerender } = render(d);
+      advance(299_000);
+      const before = [
+        d.catalogService.getEvent.mock.calls.length,
+        d.accountService.getMe.mock.calls.length,
+        d.getOrderCategoriesUseCase.execute.mock.calls.length,
+      ];
+      advance(1000);
+      rerender();
+      expect([
+        d.catalogService.getEvent.mock.calls.length,
+        d.accountService.getMe.mock.calls.length,
+        d.getOrderCategoriesUseCase.execute.mock.calls.length,
+      ]).toEqual(before);
+      expect(mutate).not.toHaveBeenCalled();
     });
   });
 });

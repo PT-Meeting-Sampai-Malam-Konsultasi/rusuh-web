@@ -75,6 +75,7 @@ const base = (): OrderControllerInterface => ({
   allHoldersVerified: false,
   timer: null,
   timeUp: false,
+  timeUpSheet: null,
 });
 
 const holder: OrderControllerInterface['holders'][number] = {
