@@ -55,7 +55,7 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
   // Per factory, like the auth mock's sessions: each validation token is distinct.
   let validations = 0;
   return [
-    http.get(`${coreApiUrl}/events/:eventId/categories`, async ({ request, params }) => {
+    http.get(`${coreApiUrl}/core/events/:eventId/categories`, async ({ request, params }) => {
       const scenario = getScenario();
       const failed = await failure(scenario);
       if (failed) return failed;
@@ -80,7 +80,7 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
       });
     }),
     // FR-22-W1: My tickets (`?mock=empty` shows none), one booking, and its PDF.
-    http.get(`${coreApiUrl}/tickets`, async ({ request }) => {
+    http.get(`${coreApiUrl}/core/tickets`, async ({ request }) => {
       const scenario = getScenario();
       const failed = await failure(scenario);
       if (failed) return failed;
@@ -88,14 +88,14 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
       const items = scenario === 'empty' ? [] : bookingsFixture(now()).flatMap((b) => b.tickets ?? []);
       return HttpResponse.json<ListMyTicketsResponse>({ items });
     }),
-    http.get(`${coreApiUrl}/bookings/:bookingId`, async ({ request, params }) => {
+    http.get(`${coreApiUrl}/core/bookings/:bookingId`, async ({ request, params }) => {
       const failed = await failure(getScenario());
       if (failed) return failed;
       if (!hasSession(request)) return signedOut();
       const booking = bookingsFixture(now()).find((b) => b.bookingId === params.bookingId);
       return booking ? HttpResponse.json<Booking>(booking) : problem(404, 'NOT_FOUND', 'Pesanan tidak ditemukan');
     }),
-    http.get(`${coreApiUrl}/bookings/:bookingId/tickets.pdf`, async ({ request, params }) => {
+    http.get(`${coreApiUrl}/core/bookings/:bookingId/tickets.pdf`, async ({ request, params }) => {
       const failed = await failure(getScenario());
       if (failed) return failed;
       if (!hasSession(request)) return signedOut();
@@ -109,7 +109,7 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
         },
       });
     }),
-    http.post(`${coreApiUrl}/events/:eventId/attendees/validate`, async ({ request, params }) => {
+    http.post(`${coreApiUrl}/core/events/:eventId/attendees/validate`, async ({ request, params }) => {
       const scenario = getScenario();
       const failed = await failure(scenario);
       if (failed) return failed;

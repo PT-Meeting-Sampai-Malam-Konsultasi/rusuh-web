@@ -130,7 +130,8 @@ export function authHandlers({ coreApiUrl, getScenario, now }: MockContext): Htt
       return new HttpResponse(null, { status: 204 });
     }),
 
-    http.get(`${coreApiUrl}/me`, async ({ request }) => {
+    // The profile lives at `GET /auth/profile`; the backend no longer uses `GET /me` (12 Nov).
+    http.get(`${coreApiUrl}/auth/profile`, async ({ request }) => {
       const failed = await failure(getScenario());
       if (failed) return failed;
       const user = signedIn(request);

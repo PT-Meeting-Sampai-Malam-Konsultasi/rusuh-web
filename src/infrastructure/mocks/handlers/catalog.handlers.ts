@@ -7,7 +7,7 @@ import { failure, problem, type MockContext } from './shared';
 
 export function catalogHandlers({ coreApiUrl, getScenario, now }: MockContext) {
   return [
-    http.get(`${coreApiUrl}/events`, async () => {
+    http.get(`${coreApiUrl}/core/events`, async () => {
       const scenario = getScenario();
       const failed = await failure(scenario);
       if (failed) return failed;
@@ -24,7 +24,7 @@ export function catalogHandlers({ coreApiUrl, getScenario, now }: MockContext) {
         { headers: { 'Cache-Control': 'public, max-age=5, stale-while-revalidate=30' } },
       );
     }),
-    http.get(`${coreApiUrl}/events/:eventId`, async ({ params }) => {
+    http.get(`${coreApiUrl}/core/events/:eventId`, async ({ params }) => {
       const scenario = getScenario();
       const failed = await failure(scenario);
       if (failed) return failed;
