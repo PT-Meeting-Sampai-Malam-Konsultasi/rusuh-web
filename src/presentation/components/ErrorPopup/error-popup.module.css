@@ -19,7 +19,32 @@
 }
 
 .reference {
-  @apply mt-2 text-[13px] text-ink-2 tabular-nums;
+  @apply mt-2;
+}
+
+/* "Kode bantuan: 3f2a9c1e · Salin": the short code to read out; a tap copies the full request ID. */
+.copy {
+  @apply inline-flex min-h-11 cursor-pointer items-center gap-2 text-[13px] text-ink-2 tabular-nums;
+
+  &:hover .hint {
+    @apply text-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue;
+  }
+
+  &:active .hint {
+    @apply text-ink-2;
+  }
+}
+
+.code {
+  @apply font-medium;
+}
+
+.hint {
+  @apply font-semibold underline decoration-1 underline-offset-2;
 }
 
 .actions {

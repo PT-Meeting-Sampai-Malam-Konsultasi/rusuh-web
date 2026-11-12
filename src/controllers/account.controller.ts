@@ -10,7 +10,6 @@ import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import { QUERY_KEYS } from '@utils/constants/query-keys';
 import { ROUTES } from '@utils/constants/routes';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
-import { supportCode } from '@utils/format/support';
 import type { FormatLocale } from '@utils/format/date';
 import { mainNav, type NavItem } from '@utils/navigation';
 
@@ -111,7 +110,7 @@ const AccountController = ({
   const popup = (error: HttpError) =>
     openPopupError({
       message: t(ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR),
-      reference: supportCode(error),
+      reference: error.requestId,
     });
 
   const saveName = useMutationTanstack<User, HttpError, NameValues>({
