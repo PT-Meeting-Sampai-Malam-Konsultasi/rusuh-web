@@ -20,6 +20,15 @@ describe('ErrorPopup', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it('shows the support code under the message only when there is one', () => {
+    const { rerender } = render(
+      <ErrorPopup open message="Gangguan." reference="Kode bantuan: 3f2a9c1e" closeLabel="Tutup" onClose={vi.fn()} />,
+    );
+    expect(screen.getByText('Kode bantuan: 3f2a9c1e')).toBeInTheDocument();
+    rerender(<ErrorPopup open message="Gangguan." closeLabel="Tutup" onClose={vi.fn()} />);
+    expect(screen.queryByText(/Kode bantuan/)).toBeNull();
+  });
+
   it('runs the action and then closes', async () => {
     const onAction = vi.fn();
     const onClose = vi.fn();

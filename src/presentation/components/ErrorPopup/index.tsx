@@ -11,6 +11,8 @@ interface ErrorPopupProps {
   title?: string;
   message: string;
   closeLabel: string;
+  /** "Kode bantuan: 3f2a9c1e", already translated; nothing when empty. */
+  reference?: string;
   actionLabel?: string;
   onAction?: () => void;
   onClose: () => void;
@@ -22,6 +24,7 @@ export default function ErrorPopup({
   title,
   message,
   closeLabel,
+  reference,
   actionLabel,
   onAction,
   onClose,
@@ -56,6 +59,7 @@ export default function ErrorPopup({
         <p id="error-popup-message" className={styles.message}>
           {message}
         </p>
+        {reference && <p className={styles.reference}>{reference}</p>}
         <div className={styles.actions}>
           {actionLabel && onAction && (
             <Button

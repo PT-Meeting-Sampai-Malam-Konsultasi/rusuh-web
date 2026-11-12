@@ -75,6 +75,7 @@ function GlobalOverlays() {
         actionLabel={popup?.actionLabel}
         onAction={popup?.onAction}
         closeLabel={t('action_close')}
+        reference={popup?.reference ? t('error_reference', { code: popup.reference }) : undefined}
         onClose={closePopupError}
       />
     </>

@@ -53,6 +53,8 @@ export interface PopupErrorInput {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** "Kode bantuan" for support: the short request ID that finds the backend log line (NFR-09-W1). */
+  reference?: string;
 }
 export interface PopupErrorApi {
   openPopupError: (input: PopupErrorInput) => void;

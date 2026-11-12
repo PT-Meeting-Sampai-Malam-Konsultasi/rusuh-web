@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createHttpAdapter, HttpRequestError, toHttpError } from '../http.adapter';
+import { createHttpAdapter, HttpRequestError, randomRequestId, REQUEST_ID_HEADER, toHttpError } from '../http.adapter';
 
 const ok = (data: unknown, status = 200): AxiosAdapter =>
   vi.fn(async (config: InternalAxiosRequestConfig) => ({ data, status, statusText: 'OK', headers: {}, config }));
@@ -63,6 +63,99 @@ describe('createHttpAdapter', () => {
       data: { code: 'NIK_SEAT_TAKEN', title: 'NIK sudah terdaftar', traceId: 't1' },
       traceId: 't1',
     });
+  });
+
+  it('sends a new X-Request-ID on every call, but none on a cacheable read', async () => {
+    const transport = ok({});
+    let n = 0;
+    const http = createHttpAdapter({
+      baseUrl: 'https://api.test',
+      timeoutMs: 1000,
+      transport,
+      newRequestId: () => `req-${++n}`,
+    });
+    await http.get('/a');
+    await http.post('/b', {});
+    await http.get('/queue/evt/frontier', { cacheable: true });
+    await http.get('/c', { headers: { [REQUEST_ID_HEADER]: 'given' } });
+    const calls = (transport as ReturnType<typeof vi.fn>).mock.calls as [InternalAxiosRequestConfig][];
+    const sent = calls.map(([config]) => config.headers.get(REQUEST_ID_HEADER) ?? null);
+    expect(sent).toEqual(['req-1', 'req-2', null, 'given']);
+    expect(REQUEST_ID_HEADER).toBe('X-Request-ID');
+  });
+
+  it('keeps the request ID on the replay after a session refresh, and puts it on the error', async () => {
+    const seen: unknown[] = [];
+    let calls = 0;
+    const transport: AxiosAdapter = async (config) => {
+      calls += 1;
+      seen.push(config.headers.get(REQUEST_ID_HEADER));
+      if (calls === 1) return fail(401, { code: 'UNAUTHORIZED' })(config);
+      return fail(503, { code: 'INTERNAL_ERROR' })(config);
+    };
+    const http = createHttpAdapter({
+      baseUrl: 'https://api.test',
+      timeoutMs: 1000,
+      transport,
+      refreshSession: async () => true,
+      newRequestId: () => 'req-1',
+    });
+    await expect(http.get('/me')).rejects.toMatchObject({ status: 503, requestId: 'req-1' });
+    expect(seen).toEqual(['req-1', 'req-1']);
+  });
+
+  it("prefers the server's echoed request ID: the header, then the problem's traceId", async () => {
+    const echo = (headers: Record<string, string>, data: unknown) => (config: InternalAxiosRequestConfig) =>
+      Promise.reject(
+        new AxiosError('x', 'ERR_BAD_REQUEST', config, {}, { data, status: 500, statusText: '', headers, config }),
+      );
+    const make = (transport: AxiosAdapter) =>
+      createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport, newRequestId: () => 'sent' });
+    await expect(make(echo({ 'x-request-id': 'srv' }, { traceId: 't' })).get('/x')).rejects.toMatchObject({
+      requestId: 'srv',
+    });
+    await expect(make(echo({}, { traceId: 'trace-1' })).get('/x')).rejects.toMatchObject({ requestId: 'trace-1' });
+    await expect(make(echo({}, null)).get('/x')).rejects.toMatchObject({ requestId: 'sent' });
+    // A cacheable read has none to report.
+    const none = await make(echo({}, null))
+      .get('/f', { cacheable: true })
+      .catch((e: HttpRequestError) => e);
+    expect((none as HttpRequestError).requestId).toBeUndefined();
+  });
+
+  it('carries the request ID on network errors and timeouts too', async () => {
+    const drop = (code: string) => (config: InternalAxiosRequestConfig) =>
+      Promise.reject(new AxiosError('down', code, config));
+    const make = (transport: AxiosAdapter) =>
+      createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport, newRequestId: () => 'r' });
+    await expect(make(drop('ERR_NETWORK')).get('/x')).rejects.toMatchObject({ code: 'NETWORK_ERROR', requestId: 'r' });
+    await expect(make(drop('ECONNABORTED')).get('/x')).rejects.toMatchObject({ code: 'TIMEOUT', requestId: 'r' });
+  });
+
+  it('tells onError about each failure once, after any refresh', async () => {
+    const onError = vi.fn();
+    const http = createHttpAdapter({
+      baseUrl: 'https://api.test',
+      timeoutMs: 1000,
+      transport: fail(500, { code: 'INTERNAL_ERROR' }),
+      onError,
+      newRequestId: () => 'req-9',
+    });
+    await expect(http.get('/x')).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0][0]).toMatchObject({ status: 500, code: 'INTERNAL_ERROR', requestId: 'req-9' });
+  });
+
+  it('makes v4 UUIDs, with or without crypto.randomUUID', () => {
+    const v4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    expect(randomRequestId()).toMatch(v4);
+    const original = crypto.randomUUID;
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+    try {
+      expect(randomRequestId()).toMatch(v4);
+    } finally {
+      Object.defineProperty(crypto, 'randomUUID', { value: original, configurable: true });
+    }
   });
 
   it('refreshes the session once on 401 and retries', async () => {

@@ -38,11 +38,11 @@ describe('QueueService', () => {
     await expect(QueueService({ queueHttp }).joinQueue('e', 'd', 'ts')).rejects.toBe(error);
   });
 
-  it('reads the public frontier without token headers', async () => {
+  it('reads the public frontier without token headers, as a cacheable read (no request ID)', async () => {
     const response = { data: { event: 'a/b', state: 'open', served: 1, ts: 2 }, status: 200 };
     queueHttp.get.mockResolvedValue(response);
     await expect(QueueService({ queueHttp }).getFrontier('a/b')).resolves.toBe(response);
-    expect(queueHttp.get).toHaveBeenCalledWith('queue/a%2Fb/frontier');
+    expect(queueHttp.get).toHaveBeenCalledWith('queue/a%2Fb/frontier', { cacheable: true });
   });
 
   it('claims the turn and reads the place with the device and queue tokens', async () => {

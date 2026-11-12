@@ -33,6 +33,11 @@ jobs:
       PROJECT: ${{ startsWith(github.ref, 'refs/tags/v') && 'rusuh-web' || 'rusuh-web-staging' }}
       # A deploy on the project's production branch (main) becomes the live site; any other name is a preview.
       BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'main' }}
+      # Sentry (NFR-09-W1): the release is the tag or commit, as in NEXT_PUBLIC_APP_VERSION.
+      RELEASE: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+      SENTRY_ENV: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || (github.event_name == 'pull_request' && 'preview' || 'staging') }}
+      # Without the secret, no source maps are built or uploaded and the deploy goes on as before.
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -45,7 +50,7 @@ jobs:
         run: npm run build
         env:
           # Public values from the GitHub environment (Settings → Environments); read only in config.ts.
-          NEXT_PUBLIC_APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          NEXT_PUBLIC_APP_VERSION: ${{ env.RELEASE }}
           NEXT_PUBLIC_QUEUE_API_URL: ${{ vars.QUEUE_API_URL }}
           NEXT_PUBLIC_CORE_API_URL: ${{ vars.CORE_API_URL }}
           NEXT_PUBLIC_API_TIMEOUT_MS: ${{ vars.API_TIMEOUT_MS }}
@@ -54,6 +59,24 @@ jobs:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           NEXT_PUBLIC_DEFAULT_LOCALE: ${{ vars.DEFAULT_LOCALE }}
           NEXT_PUBLIC_API_MOCK: ${{ vars.API_MOCK }}
+          # Sentry: an empty DSN turns it off. Rates default to 0.05 (traces) and 0.1 (replay on error) in config.ts.
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${{ env.SENTRY_ENV }}
+          NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_TRACES_SAMPLE_RATE }}
+          NEXT_PUBLIC_SENTRY_REPLAY_ON_ERROR_RATE: ${{ vars.SENTRY_REPLAY_ON_ERROR_RATE }}
+          SOURCE_MAPS: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+
+      # Readable stack traces in Sentry: tie each chunk to its map (debug IDs), upload the maps under the release,
+      # then delete them so the site never serves them.
+      - name: Upload source maps to Sentry
+        if: env.SENTRY_AUTH_TOKEN != ''
+        env:
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          npx --yes @sentry/cli@3.8.2 sourcemaps inject out/_next/static
+          npx --yes @sentry/cli@3.8.2 sourcemaps upload --release "$RELEASE" out/_next/static
+          find out -name '*.map' -delete
 
       - name: Upload to Cloudflare Pages
         id: deploy

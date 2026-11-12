@@ -12,6 +12,14 @@ export interface AppConfig {
   defaultLocale: 'id' | 'en';
   /** Serve the API from MSW sample data (local dev, previews, demos before the backend is up). Never in production. */
   apiMock: boolean;
+  /** Sentry (NFR-09-W1). The DSN is public by design; empty turns Sentry off (local dev, tests). */
+  sentryDsn: string;
+  /** `staging`, `production`; `development` when unset. */
+  sentryEnvironment: string;
+  /** Share of page loads traced (web vitals, spans), 0–1. Low by default: 300,000 phones in a sale. */
+  sentryTracesSampleRate: number;
+  /** Share of errors that keep a session replay, 0–1 (replay only buffers, and never on the waiting room). */
+  sentryReplayOnErrorRate: number;
 }
 
 export type RawEnv = Record<keyof AppConfig, string | undefined>;
@@ -26,6 +34,10 @@ export const readEnv = (): RawEnv => ({
   turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   defaultLocale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,
   apiMock: process.env.NEXT_PUBLIC_API_MOCK,
+  sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  sentryEnvironment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+  sentryTracesSampleRate: process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+  sentryReplayOnErrorRate: process.env.NEXT_PUBLIC_SENTRY_REPLAY_ON_ERROR_RATE,
 });
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -42,6 +54,12 @@ export function boolEnv(value: string | undefined, fallback = false): boolean {
   return value === 'true' || value === '1';
 }
 
+/** A sample rate in 0–1; anything else falls back. */
+export function rateEnv(value: string | undefined, fallback: number): number {
+  const rate = Number(value);
+  return value !== undefined && value !== '' && Number.isFinite(rate) && rate >= 0 && rate <= 1 ? rate : fallback;
+}
+
 export function createConfig(env: RawEnv = readEnv()): AppConfig {
   const timeout = Number(optionalEnv(env.apiTimeoutMs, '10000'));
   const locale = optionalEnv(env.defaultLocale, 'id');
@@ -55,5 +73,9 @@ export function createConfig(env: RawEnv = readEnv()): AppConfig {
     turnstileSiteKey: requireEnv(env.turnstileSiteKey, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY'),
     defaultLocale: locale === 'en' ? 'en' : 'id',
     apiMock: boolEnv(env.apiMock),
+    sentryDsn: optionalEnv(env.sentryDsn, ''),
+    sentryEnvironment: optionalEnv(env.sentryEnvironment, 'development'),
+    sentryTracesSampleRate: rateEnv(env.sentryTracesSampleRate, 0.05),
+    sentryReplayOnErrorRate: rateEnv(env.sentryReplayOnErrorRate, 0.1),
   };
 }

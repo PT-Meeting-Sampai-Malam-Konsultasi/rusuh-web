@@ -13,6 +13,23 @@ export interface HttpAdapterOptions {
   refreshSession?: () => Promise<boolean>;
   /** Test seam: replaces the network transport. */
   transport?: AxiosAdapter;
+  /** Test seam: the `X-Request-ID` generator (a UUID v4 by default). */
+  newRequestId?: () => string;
+  /** Told about every failed call, after any refresh: monitoring keeps a trail with the request ID (NFR-09-W1). */
+  onError?: (error: HttpError) => void;
+}
+
+/** Sent on every call except cacheable ones; the backend logs it and echoes it back (NFR-09-W1). */
+export const REQUEST_ID_HEADER = 'X-Request-ID';
+
+/** `crypto.randomUUID` where the browser has it (secure contexts), otherwise a v4 built from `getRandomValues`. */
+export function randomRequestId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 interface Problem {
@@ -22,7 +39,7 @@ interface Problem {
   traceId?: string;
 }
 
-type RetryConfig = InternalAxiosRequestConfig & { _retried?: boolean; skipRefresh?: boolean };
+type RetryConfig = InternalAxiosRequestConfig & { _retried?: boolean; skipRefresh?: boolean; cacheable?: boolean };
 
 /** The `HttpError` contract as a real `Error`, so rejections carry a name and a stack trace. */
 export class HttpRequestError extends Error implements HttpError {
@@ -30,15 +47,27 @@ export class HttpRequestError extends Error implements HttpError {
   readonly code: string;
   readonly data?: unknown;
   readonly traceId?: string;
+  readonly requestId?: string;
 
-  constructor({ status, code, message, data, traceId }: HttpError, options?: { cause?: unknown }) {
+  constructor({ status, code, message, data, traceId, requestId }: HttpError, options?: { cause?: unknown }) {
     super(message, options);
     this.name = 'HttpError';
     this.status = status;
     this.code = code;
     if (data !== undefined) this.data = data;
     if (traceId !== undefined) this.traceId = traceId;
+    if (requestId !== undefined) this.requestId = requestId;
   }
+}
+
+/** The server's echo (header, then the problem's `traceId`), else the ID this request was sent with. */
+function requestIdOf(error: AxiosError<Problem>): string | undefined {
+  const echoed = error.response?.headers?.['x-request-id'];
+  if (typeof echoed === 'string' && echoed) return echoed;
+  const body = error.response?.data;
+  if (body && typeof body === 'object' && typeof body.traceId === 'string' && body.traceId) return body.traceId;
+  const sent = error.config?.headers?.[REQUEST_ID_HEADER];
+  return typeof sent === 'string' && sent ? sent : undefined;
 }
 
 export function toHttpError(error: unknown): HttpRequestError {
@@ -46,10 +75,14 @@ export function toHttpError(error: unknown): HttpRequestError {
   const cause = { cause: error };
   if (axios.isAxiosError(error)) {
     const e = error as AxiosError<Problem>;
+    const requestId = requestIdOf(e);
+    const withId = requestId ? { requestId } : {};
     if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT') {
-      return new HttpRequestError({ status: 0, code: 'TIMEOUT', message: e.message }, cause);
+      return new HttpRequestError({ status: 0, code: 'TIMEOUT', message: e.message, ...withId }, cause);
     }
-    if (!e.response) return new HttpRequestError({ status: 0, code: 'NETWORK_ERROR', message: e.message }, cause);
+    if (!e.response) {
+      return new HttpRequestError({ status: 0, code: 'NETWORK_ERROR', message: e.message, ...withId }, cause);
+    }
     const body = e.response.data;
     return new HttpRequestError(
       {
@@ -58,6 +91,7 @@ export function toHttpError(error: unknown): HttpRequestError {
         message: body?.title ?? e.message,
         data: body,
         traceId: body?.traceId,
+        ...withId,
       },
       cause,
     );
@@ -85,7 +119,12 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
     ...(options.transport ? { adapter: options.transport } : {}),
   });
 
+  const newRequestId = options.newRequestId ?? randomRequestId;
   client.interceptors.request.use((config) => {
+    // A replay after a session refresh keeps its ID: it is the same request.
+    if (!(config as RetryConfig).cacheable && !config.headers.has(REQUEST_ID_HEADER)) {
+      config.headers.set(REQUEST_ID_HEADER, newRequestId());
+    }
     const locale = options.getLocale?.();
     if (locale) config.headers.set('Accept-Language', locale);
     const token = options.getAccessToken?.();
@@ -104,7 +143,9 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
       }
     }
     if (axios.isAxiosError(error)) await readBlobProblem(error);
-    return Promise.reject(toHttpError(error));
+    const failure = toHttpError(error);
+    options.onError?.(failure);
+    return Promise.reject(failure);
   });
 
   const wrap = async <T>(promise: Promise<{ data: T; status: number }>): Promise<HttpResponse<T>> => {
@@ -117,6 +158,7 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
     ...(c?.withCredentials ? { withCredentials: true } : {}),
     ...(c?.skipRefresh ? { skipRefresh: true } : {}),
     ...(c?.responseType ? { responseType: c.responseType } : {}),
+    ...(c?.cacheable ? { cacheable: true } : {}),
   });
 
   return {
