@@ -46,6 +46,7 @@ const KEYS = {
   getOrderCategoriesUseCase: true,
   orderTicketSelectionUseCase: true,
   validateAttendeeUseCase: true,
+  endOrderWindowUseCase: true,
   joinQueueUseCase: true,
   followQueueUseCase: true,
   claimTurnUseCase: true,
@@ -137,6 +138,8 @@ describe('DI registries', () => {
     expect(container.resolve('validateAttendeeUseCase')).toBe(container.resolve('validateAttendeeUseCase'));
     expect(typeof container.resolve('validateAttendeeUseCase').checkNik).toBe('function');
     expect(typeof container.resolve('validateAttendeeUseCase').execute).toBe('function');
+    expect(container.resolve('endOrderWindowUseCase')).toBe(container.resolve('endOrderWindowUseCase'));
+    expect(typeof container.resolve('endOrderWindowUseCase').execute).toBe('function');
   });
 
   it('wires the order ticket selection use case as a singleton', () => {
