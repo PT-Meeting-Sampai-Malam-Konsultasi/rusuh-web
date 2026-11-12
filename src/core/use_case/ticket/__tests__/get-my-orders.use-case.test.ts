@@ -96,6 +96,20 @@ describe('GetMyOrdersUseCase', () => {
     expect(result.serverNow).toBe(NOW);
   });
 
+  it('takes the latest server clock by time, whatever the offset', async () => {
+    Object.assign(bookings, {
+      bk_x: { ...booking('bk_x', 'evt_x'), serverNow: '2026-11-12T03:00:05Z' },
+      // 02.00.10 at UTC−1 = 03.00.10 UTC: later in time, though it sorts first as text.
+      bk_y: { ...booking('bk_y', 'evt_x'), serverNow: '2026-11-12T02:00:10-01:00' },
+    });
+    events.evt_x = event('evt_x', '2026-12-01T12:00:00Z');
+    bookingService.listMyTickets.mockResolvedValue({
+      data: { items: [ticket('t1', 'bk_x'), ticket('t2', 'bk_y')] },
+      status: 200,
+    });
+    await expect(useCase.execute()).resolves.toMatchObject({ serverNow: '2026-11-12T02:00:10-01:00' });
+  });
+
   it('keeps an order whose event failed to load, last among the upcoming, and drops unpaid bookings', async () => {
     Object.assign(bookings, {
       bk_a: booking('bk_a', 'evt_a'),

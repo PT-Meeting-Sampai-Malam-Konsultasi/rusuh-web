@@ -60,11 +60,11 @@ export const GetMyOrdersUseCase = ({ bookingService, catalogService }: Deps): Ge
       ),
     );
 
-    const serverNow =
-      bookings
-        .map((b) => b.serverNow)
-        .sort()
-        .at(-1) ?? null;
+    // The latest server clock among the answers, compared as times (ISO strings may carry different offsets).
+    const serverNow = bookings.reduce<string | null>(
+      (latest, b) => (latest === null || Date.parse(b.serverNow) > Date.parse(latest) ? b.serverNow : latest),
+      null,
+    );
     const now = serverNow ? Date.parse(serverNow) : 0;
     const orders: MyOrder[] = bookings
       .filter((booking) => booking.status === 'PAID')
