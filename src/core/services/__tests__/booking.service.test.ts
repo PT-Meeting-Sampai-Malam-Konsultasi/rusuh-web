@@ -31,4 +31,30 @@ describe('BookingService', () => {
     coreHttp.get.mockRejectedValue(error);
     await expect(service.getCategories('evt_samudra', 'adm-1')).rejects.toBe(error);
   });
+
+  it('gets one booking, encoding its id', async () => {
+    const response = { data: { bookingId: 'bk_1', status: 'PAID' }, status: 200 };
+    coreHttp.get.mockResolvedValue(response);
+    await expect(service.getBooking('bk_1')).resolves.toBe(response);
+    await service.getBooking('a/b');
+    expect(coreHttp.get).toHaveBeenNthCalledWith(1, 'bookings/bk_1');
+    expect(coreHttp.get).toHaveBeenNthCalledWith(2, 'bookings/a%2Fb');
+  });
+
+  it('lists my tickets', async () => {
+    const response = { data: { items: [] }, status: 200 };
+    coreHttp.get.mockResolvedValue(response);
+    await expect(service.listMyTickets()).resolves.toBe(response);
+    expect(coreHttp.get).toHaveBeenCalledWith('tickets');
+  });
+
+  it('downloads the tickets PDF as a blob', async () => {
+    const response = { data: new Blob(['%PDF']), status: 200 };
+    coreHttp.get.mockResolvedValue(response);
+    await expect(service.downloadTickets('bk_1')).resolves.toBe(response);
+    expect(coreHttp.get).toHaveBeenCalledWith('bookings/bk_1/tickets.pdf', {
+      headers: { Accept: 'application/pdf' },
+      responseType: 'blob',
+    });
+  });
 });

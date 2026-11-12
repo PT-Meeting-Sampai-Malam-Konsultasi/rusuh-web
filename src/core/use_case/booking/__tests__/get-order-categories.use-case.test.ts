@@ -29,7 +29,12 @@ const response = (eventId = 'evt_1'): GetCategoriesResponse => ({
 });
 
 const setup = () => {
-  const bookingService = { getCategories: vi.fn() };
+  const bookingService = {
+    getCategories: vi.fn(),
+    getBooking: vi.fn(),
+    listMyTickets: vi.fn(),
+    downloadTickets: vi.fn(),
+  };
   const useCase = GetOrderCategoriesUseCase({ bookingService });
   return { bookingService, useCase };
 };

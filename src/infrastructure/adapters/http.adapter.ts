@@ -66,6 +66,17 @@ export function toHttpError(error: unknown): HttpRequestError {
   return new HttpRequestError({ status: 0, code: 'UNKNOWN_ERROR', message }, cause);
 }
 
+/** A file request (`responseType: 'blob'`) gets its problem body as a Blob too: read it so the error keeps its code. */
+async function readBlobProblem(error: AxiosError) {
+  const response = error.response;
+  if (!(response?.data instanceof Blob) || !response.data.type.includes('json')) return;
+  try {
+    response.data = JSON.parse(await response.data.text());
+  } catch {
+    // Not JSON after all: the status alone names the error.
+  }
+}
+
 export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
   const client = axios.create({
     baseURL: options.baseUrl,
@@ -92,6 +103,7 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
         return client.request(config);
       }
     }
+    if (axios.isAxiosError(error)) await readBlobProblem(error);
     return Promise.reject(toHttpError(error));
   });
 
@@ -104,6 +116,7 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
     signal: c?.signal,
     ...(c?.withCredentials ? { withCredentials: true } : {}),
     ...(c?.skipRefresh ? { skipRefresh: true } : {}),
+    ...(c?.responseType ? { responseType: c.responseType } : {}),
   });
 
   return {

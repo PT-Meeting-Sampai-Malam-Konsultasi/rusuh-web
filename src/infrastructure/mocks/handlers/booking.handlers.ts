@@ -1,7 +1,8 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 
-import type { GetCategoriesResponse } from '@core/entities/booking/booking.entity';
+import type { Booking, GetCategoriesResponse, ListMyTicketsResponse } from '@core/entities/booking/booking.entity';
 
+import { bookingsFixture, MOCK_TICKETS_PDF } from '../fixtures/bookings.fixture';
 import { categoriesFixture } from '../fixtures/categories.fixture';
 import { eventsFixture } from '../fixtures/events.fixture';
 import { failure, problem, type MockContext } from './shared';
@@ -9,6 +10,9 @@ import { failure, problem, type MockContext } from './shared';
 const ORDER_WINDOW_MS = 5 * 60_000;
 
 const admissionInvalid = () => problem(403, 'ADMISSION_INVALID', 'Giliran tidak berlaku');
+const signedOut = () => problem(401, 'UNAUTHORIZED', 'Sesi berakhir');
+/** Presence only, like the admission token: a token from the mocked sign-in (or the real auth API) passes. */
+const hasSession = (request: Request) => request.headers.get('Authorization')?.startsWith('Bearer ') === true;
 
 export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): HttpHandler[] {
   return [
@@ -34,6 +38,36 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
         adminFee: { amount: 10000, currency: 'IDR' },
         expiresAt: new Date(today.getTime() + ORDER_WINDOW_MS).toISOString(),
         serverNow: today.toISOString(),
+      });
+    }),
+    // FR-22-W1: My tickets (`?mock=empty` shows none), one booking, and its PDF.
+    http.get(`${coreApiUrl}/tickets`, async ({ request }) => {
+      const scenario = getScenario();
+      const failed = await failure(scenario);
+      if (failed) return failed;
+      if (!hasSession(request)) return signedOut();
+      const items = scenario === 'empty' ? [] : bookingsFixture(now()).flatMap((b) => b.tickets ?? []);
+      return HttpResponse.json<ListMyTicketsResponse>({ items });
+    }),
+    http.get(`${coreApiUrl}/bookings/:bookingId`, async ({ request, params }) => {
+      const failed = await failure(getScenario());
+      if (failed) return failed;
+      if (!hasSession(request)) return signedOut();
+      const booking = bookingsFixture(now()).find((b) => b.bookingId === params.bookingId);
+      return booking ? HttpResponse.json<Booking>(booking) : problem(404, 'NOT_FOUND', 'Pesanan tidak ditemukan');
+    }),
+    http.get(`${coreApiUrl}/bookings/:bookingId/tickets.pdf`, async ({ request, params }) => {
+      const failed = await failure(getScenario());
+      if (failed) return failed;
+      if (!hasSession(request)) return signedOut();
+      const booking = bookingsFixture(now()).find((b) => b.bookingId === params.bookingId);
+      if (!booking) return problem(404, 'NOT_FOUND', 'Pesanan tidak ditemukan');
+      if (booking.status !== 'PAID') return problem(409, 'BOOKING_NOT_PAID', 'Pesanan belum lunas');
+      return new HttpResponse(MOCK_TICKETS_PDF, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${booking.orderCode}.pdf"`,
+        },
       });
     }),
   ];

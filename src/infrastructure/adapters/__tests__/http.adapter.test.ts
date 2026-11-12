@@ -112,6 +112,38 @@ describe('createHttpAdapter', () => {
     expect(calls[1][0].withCredentials).toBeFalsy();
   });
 
+  it('asks for a blob when told, and reads a problem sent back as a blob', async () => {
+    const pdf = ok(new Blob(['%PDF']));
+    const http = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport: pdf });
+    await http.get('/bookings/bk_1/tickets.pdf', { responseType: 'blob' });
+    const calls = (pdf as ReturnType<typeof vi.fn>).mock.calls as [InternalAxiosRequestConfig][];
+    expect(calls[0][0].responseType).toBe('blob');
+
+    const refuse = (body: Blob) =>
+      vi.fn(async (config: InternalAxiosRequestConfig) =>
+        Promise.reject(
+          new AxiosError('409', 'ERR_BAD_REQUEST', config, null, {
+            data: body,
+            status: 409,
+            statusText: 'Conflict',
+            headers: {},
+            config,
+          }),
+        ),
+      );
+    const problemBlob = new Blob([JSON.stringify({ code: 'BOOKING_NOT_PAID', title: 'Belum lunas' })], {
+      type: 'application/problem+json',
+    });
+    const json = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport: refuse(problemBlob) });
+    await expect(json.get('/x', { responseType: 'blob' })).rejects.toMatchObject({
+      status: 409,
+      code: 'BOOKING_NOT_PAID',
+    });
+    const broken = new Blob(['{nope'], { type: 'application/json' });
+    const bad = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport: refuse(broken) });
+    await expect(bad.get('/x', { responseType: 'blob' })).rejects.toMatchObject({ status: 409, code: 'HTTP_409' });
+  });
+
   it('supports put, patch and delete', async () => {
     const http = createHttpAdapter({ baseUrl: 'https://api.test', timeoutMs: 1000, transport: ok('done') });
     await expect(http.put('/a', {})).resolves.toMatchObject({ data: 'done' });

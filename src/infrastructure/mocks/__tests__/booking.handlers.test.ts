@@ -101,3 +101,47 @@ describe('booking mock', () => {
     await expect(booking.getCategories('evt_samudra', 'adm-1')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   });
 });
+
+describe('tickets mock (FR-22-W1)', () => {
+  const signedIn = BookingService({
+    coreHttp: createHttpAdapter({ baseUrl: CORE, timeoutMs: 5000, getAccessToken: () => 'mock-access' }),
+  });
+
+  it('asks for a session', async () => {
+    await expect(booking.listMyTickets()).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
+    await expect(booking.getBooking('bk_mock_samudra')).rejects.toMatchObject({ status: 401 });
+    await expect(booking.downloadTickets('bk_mock_samudra')).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('lists the tickets of three paid orders, and none with ?mock=empty', async () => {
+    const { data } = await signedIn.listMyTickets();
+    expect(new Set(data.items.map((t) => t.bookingId))).toEqual(
+      new Set(['bk_mock_samudra', 'bk_mock_pelita', 'bk_mock_kelana']),
+    );
+    expect(data.items).toHaveLength(6);
+    scenario = 'empty';
+    await expect(signedIn.listMyTickets()).resolves.toMatchObject({ data: { items: [] } });
+    scenario = 'error';
+    await expect(signedIn.listMyTickets()).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('serves a paid booking with its tickets, an expired one, and 404 for the rest', async () => {
+    const { data } = await signedIn.getBooking('bk_mock_samudra');
+    expect(data).toMatchObject({ status: 'PAID', orderCode: 'RSH-26-084731', serverNow: NOW.toISOString() });
+    expect(data.tickets).toHaveLength(3);
+    expect(data.price.total.amount).toBe(data.price.ticketSubtotal.amount + data.price.adminFee.amount);
+    await expect(signedIn.getBooking('bk_mock_expired')).resolves.toMatchObject({ data: { status: 'EXPIRED' } });
+    await expect(signedIn.getBooking('bk_nope')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+    scenario = 'error';
+    await expect(signedIn.getBooking('bk_mock_samudra')).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('downloads the PDF of a paid booking only', async () => {
+    const { data } = await signedIn.downloadTickets('bk_mock_samudra');
+    expect(String(data).startsWith('%PDF')).toBe(true);
+    await expect(signedIn.downloadTickets('bk_mock_expired')).rejects.toMatchObject({ status: 409 });
+    await expect(signedIn.downloadTickets('bk_nope')).rejects.toMatchObject({ status: 404 });
+    scenario = 'error';
+    await expect(signedIn.downloadTickets('bk_mock_samudra')).rejects.toMatchObject({ status: 503 });
+  });
+});
