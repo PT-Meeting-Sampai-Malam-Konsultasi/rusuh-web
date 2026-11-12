@@ -196,7 +196,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
   };
 
   return [
-    http.post(`${queueApiUrl}/devices`, async ({ request }) => {
+    http.post(`${queueApiUrl}/queue/devices`, async ({ request }) => {
       const failed = await failure(getScenario());
       if (failed) return failed;
       if (!request.headers.get('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');

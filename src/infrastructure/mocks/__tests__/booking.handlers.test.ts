@@ -210,7 +210,7 @@ describe('validate attendee mock', () => {
       body,
     );
     expect(error.data?.retryAfter).toBe(MOCK_RETRY_AFTER_S);
-    const raw = await fetch(`${CORE}/events/evt_samudra/attendees/validate`, {
+    const raw = await fetch(`${CORE}/core/events/evt_samudra/attendees/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admission-Token': 'adm-1' },
       body: JSON.stringify(body),
@@ -228,7 +228,7 @@ describe('validate attendee mock', () => {
   });
 
   it('answers 422 VALIDATION_FAILED for a body that is not JSON', async () => {
-    const raw = await fetch(`${CORE}/events/evt_samudra/attendees/validate`, {
+    const raw = await fetch(`${CORE}/core/events/evt_samudra/attendees/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admission-Token': 'adm-1' },
       body: 'not json',

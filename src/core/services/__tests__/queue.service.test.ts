@@ -13,7 +13,7 @@ describe('DeviceService', () => {
     queueHttp.post.mockResolvedValue(response);
     await expect(DeviceService({ queueHttp }).registerDevice('ts')).resolves.toBe(response);
     expect(queueHttp.post).toHaveBeenCalledWith(
-      'devices',
+      'queue/devices',
       { platform: 'web' },
       { headers: { 'X-Turnstile-Token': 'ts' } },
     );
