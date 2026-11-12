@@ -59,4 +59,13 @@ describe('QueueService', () => {
       headers: { 'X-Device-Token': 'd', 'X-Queue-Token': 'q' },
     });
   });
+
+  it('leaves the queue with the device and queue tokens', async () => {
+    const response = { data: undefined, status: 204 };
+    queueHttp.delete.mockResolvedValue(response);
+    await expect(QueueService({ queueHttp }).leaveQueue('evt/1', 'dev-1', 'q-1')).resolves.toBe(response);
+    expect(queueHttp.delete).toHaveBeenCalledWith('queue/evt%2F1/me', {
+      headers: { 'X-Device-Token': 'dev-1', 'X-Queue-Token': 'q-1' },
+    });
+  });
 });

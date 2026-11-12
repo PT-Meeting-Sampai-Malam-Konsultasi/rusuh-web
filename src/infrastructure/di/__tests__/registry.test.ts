@@ -48,6 +48,7 @@ const KEYS = {
   joinQueueUseCase: true,
   followQueueUseCase: true,
   claimTurnUseCase: true,
+  leaveQueueUseCase: true,
   refreshSessionUseCase: true,
   signOutUseCase: true,
   requestSignInCodeUseCase: true,
@@ -112,6 +113,7 @@ describe('DI registries', () => {
     expect(container.resolve('joinQueueUseCase')).toBe(container.resolve('joinQueueUseCase'));
     expect(typeof container.resolve('followQueueUseCase').poll).toBe('function');
     expect(typeof container.resolve('claimTurnUseCase').execute).toBe('function');
+    expect(typeof container.resolve('leaveQueueUseCase').execute).toBe('function');
   });
 
   it('wires the auth and account services', () => {

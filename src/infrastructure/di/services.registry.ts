@@ -16,6 +16,7 @@ import { GetHomeEventsUseCase } from '@core/use_case/catalog/get-home-events.use
 import { ClaimTurnUseCase } from '@core/use_case/queue/claim-turn.use-case';
 import { FollowQueueUseCase } from '@core/use_case/queue/follow-queue.use-case';
 import { JoinQueueUseCase } from '@core/use_case/queue/join-queue.use-case';
+import { LeaveQueueUseCase } from '@core/use_case/queue/leave-queue.use-case';
 import { GetETicketUseCase } from '@core/use_case/ticket/get-e-ticket.use-case';
 import { GetMyOrdersUseCase } from '@core/use_case/ticket/get-my-orders.use-case';
 
@@ -36,6 +37,7 @@ export function registerServices() {
     joinQueueUseCase: asFunction(JoinQueueUseCase).singleton(),
     followQueueUseCase: asFunction(FollowQueueUseCase).singleton(),
     claimTurnUseCase: asFunction(ClaimTurnUseCase).singleton(),
+    leaveQueueUseCase: asFunction(LeaveQueueUseCase).singleton(),
     refreshSessionUseCase: asFunction(RefreshSessionUseCase).singleton(),
     signOutUseCase: asFunction(SignOutUseCase).singleton(),
     requestSignInCodeUseCase: asFunction(RequestSignInCodeUseCase).singleton(),

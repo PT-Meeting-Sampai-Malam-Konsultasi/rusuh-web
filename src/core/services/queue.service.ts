@@ -22,6 +22,11 @@ export interface QueueServiceInterface {
   claimTurn: (eventId: string, deviceToken: string, queueToken: string) => Promise<HttpResponse<Admission>>;
   /** `GET /queue/{eventId}/me`: this device's place, with `turnExpiresAt` from the turn on. 410 MISSED and the like. */
   getMyPlace: (eventId: string, deviceToken: string, queueToken: string) => Promise<HttpResponse<QueuePlace>>;
+  /**
+   * `DELETE /queue/{eventId}/me`: give the place up ("Keluar dari antrian", W-9). Idempotent: 204 also when the place
+   * already ended; a claimed admission is not affected.
+   */
+  leaveQueue: (eventId: string, deviceToken: string, queueToken: string) => Promise<HttpResponse<void>>;
 }
 
 export const QueueService = ({ queueHttp }: Pick<AwilixRegistry, 'queueHttp'>): QueueServiceInterface => ({
@@ -36,6 +41,10 @@ export const QueueService = ({ queueHttp }: Pick<AwilixRegistry, 'queueHttp'>): 
     }),
   getMyPlace: (eventId, deviceToken, queueToken) =>
     queueHttp.get<QueuePlace>(`queue/${encodeURIComponent(eventId)}/me`, {
+      headers: { [DEVICE_TOKEN_HEADER]: deviceToken, [QUEUE_TOKEN_HEADER]: queueToken },
+    }),
+  leaveQueue: (eventId, deviceToken, queueToken) =>
+    queueHttp.delete<void>(`queue/${encodeURIComponent(eventId)}/me`, {
       headers: { [DEVICE_TOKEN_HEADER]: deviceToken, [QUEUE_TOKEN_HEADER]: queueToken },
     }),
 });
