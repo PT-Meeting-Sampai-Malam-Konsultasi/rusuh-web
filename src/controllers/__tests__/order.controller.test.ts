@@ -50,6 +50,7 @@ const okResult: OrderCategoriesResult = {
   adminFee: { amount: 5000, currency: 'IDR' },
   expiresAt: '2026-11-09T03:05:00Z',
   serverNow: '2026-11-09T03:00:00Z',
+  resumed: false,
 };
 
 /** Tribun with stock left: the stepper and holder tests pick from two open categories. */
