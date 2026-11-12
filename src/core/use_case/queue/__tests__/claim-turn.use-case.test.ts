@@ -13,7 +13,13 @@ const problem = (status: number, code: string) => ({ status, code, message: code
 
 function setup({ device = 'device' as string | null, queueToken = 'queue' as string | null } = {}) {
   const deps = {
-    queueService: { joinQueue: vi.fn(), getFrontier: vi.fn(), claimTurn: vi.fn(), getMyPlace: vi.fn() },
+    queueService: {
+      joinQueue: vi.fn(),
+      getFrontier: vi.fn(),
+      claimTurn: vi.fn(),
+      getMyPlace: vi.fn(),
+      leaveQueue: vi.fn(),
+    },
     deviceTokenStore: { get: vi.fn(() => device), set: vi.fn(), clear: vi.fn() },
     queuePlaceStore: {
       get: vi.fn(() => (queueToken ? { queueToken, seq: 19700, joinedServed: 18452 } : null)),

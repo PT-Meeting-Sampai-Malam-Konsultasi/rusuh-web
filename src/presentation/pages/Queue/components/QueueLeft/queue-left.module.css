@@ -1,0 +1,14 @@
+@reference "../../../../../styles/app.css";
+
+/* The quiet second way out, beside "Antre lagi". */
+.link {
+  @apply inline-flex min-h-11 items-center font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-2 outline-offset-4 outline-blue;
+  }
+}

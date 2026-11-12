@@ -317,5 +317,17 @@
   "ticket_calendar_outlook": "Outlook",
   "ticket_calendar_ics": "Apple / other (.ics)",
   "ticket_calendar_link_note": "Bring the original KTP with the same NIK as the ticket. The ticket QR is in My Tickets.",
-  "ticket_print_note": "Bring the original KTP with the same NIK as the ticket. This QR scans once only."
+  "ticket_print_note": "Bring the original KTP with the same NIK as the ticket. This QR scans once only.",
+  "queue_leave_link": "Leave the queue",
+  "queue_leave_app_note": "In the app, we notify you when your turn is close.",
+  "queue_leave_title": "Leave the queue?",
+  "queue_leave_body": "Number {{seq}} will be given up for good. If you queue again later, you start at the back — {{ahead}} people are ahead of you now.",
+  "queue_leave_body_no_number": "Your place in the queue will be given up. If you queue again later, you get a new number at the back.",
+  "queue_leave_stay": "Stay in the queue",
+  "queue_leave_confirm": "Yes, leave",
+  "queue_left_lead": "Number {{seq}} has been given up.",
+  "queue_left_lead_no_number": "Your place has been given up.",
+  "queue_left_title": "You left the queue.",
+  "queue_left_body": "{{event}} tickets are still on sale. If you change your mind, queue again any time — you'll get a new number at the back.",
+  "queue_left_body_no_event": "Tickets are still on sale. If you change your mind, queue again any time — you'll get a new number at the back."
 }

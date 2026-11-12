@@ -30,6 +30,7 @@ import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-h
 import type { ClaimTurnUseCaseInterface } from '@core/use_case/queue/claim-turn.use-case';
 import type { FollowQueueUseCaseInterface } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
+import type { LeaveQueueUseCaseInterface } from '@core/use_case/queue/leave-queue.use-case';
 import type { GetETicketUseCaseInterface } from '@core/use_case/ticket/get-e-ticket.use-case';
 import type { GetMyOrdersUseCaseInterface } from '@core/use_case/ticket/get-my-orders.use-case';
 import type { AccountControllerInterface } from '@controllers/account.controller';
@@ -116,6 +117,7 @@ export interface AwilixRegistry {
   joinQueueUseCase: JoinQueueUseCaseInterface;
   followQueueUseCase: FollowQueueUseCaseInterface;
   claimTurnUseCase: ClaimTurnUseCaseInterface;
+  leaveQueueUseCase: LeaveQueueUseCaseInterface;
   refreshSessionUseCase: RefreshSessionUseCaseInterface;
   signOutUseCase: SignOutUseCaseInterface;
   requestSignInCodeUseCase: RequestSignInCodeUseCaseInterface;

@@ -1,0 +1,30 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .wr-notes .leave: right-aligned on desktop, under the notes on phones. */
+.leave {
+  @apply flex flex-col items-start gap-3;
+
+  @variant md {
+    @apply items-end text-right;
+  }
+}
+
+.note {
+  @apply max-w-[300px] text-sm text-ink-2;
+}
+
+.link {
+  @apply min-h-11 cursor-pointer font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-2 outline-offset-4 outline-blue;
+  }
+
+  &:active {
+    @apply text-ink-2;
+  }
+}

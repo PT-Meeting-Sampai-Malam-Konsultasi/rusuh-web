@@ -364,6 +364,19 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       return HttpResponse.json(body);
     }),
 
+    // FR-04-W2: "Keluar dari antrian". Idempotent like the API: 204 also when the place is already gone.
+    http.delete(`${queueApiUrl}/queue/:eventId/me`, async ({ request, params }) => {
+      const failed = await failure(getScenario());
+      if (failed) return failed;
+      const device = request.headers.get('X-Device-Token');
+      if (!device || !request.headers.get('X-Queue-Token')) {
+        return problem(401, 'UNAUTHORIZED', 'Token antrian tidak ada');
+      }
+      places.delete(`${device}|${String(params.eventId)}`);
+      persist();
+      return new HttpResponse(null, { status: 204 });
+    }),
+
     http.post(`${queueApiUrl}/queue/:eventId/claim`, async ({ request, params }) => {
       const failed = await failure(getScenario());
       if (failed) return failed;

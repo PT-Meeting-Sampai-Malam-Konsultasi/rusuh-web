@@ -318,4 +318,19 @@ describe('queue mock', () => {
     });
     expect(admission.admissionToken).toBe(`mock-admission.evt_pelita.${data.seq}`);
   });
+
+  it('leaves the queue: the place is forgotten, and a new join starts at the back (FR-04-W2)', async () => {
+    server.resetHandlers(...mockHandlers());
+    const device = await register();
+    const first = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+    await expect(queue.leaveQueue('evt_pelita', device, first.queueToken)).resolves.toMatchObject({ status: 204 });
+    await expect(queue.getMyPlace('evt_pelita', device, first.queueToken)).rejects.toMatchObject({ status: 404 });
+    // Idempotent: leaving again still answers 204.
+    await expect(queue.leaveQueue('evt_pelita', device, first.queueToken)).resolves.toMatchObject({ status: 204 });
+    const again = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
+    expect(again.seq).toBeGreaterThan(first.seq!);
+    await expect(queue.leaveQueue('evt_pelita', '', '')).rejects.toMatchObject({ status: 401 });
+    scenario = 'error';
+    await expect(queue.leaveQueue('evt_pelita', device, again.queueToken)).rejects.toMatchObject({ status: 503 });
+  });
 });

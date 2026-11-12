@@ -10,6 +10,8 @@ import TabBar from '@presentation/components/TabBar';
 
 import QueueEntering from './components/QueueEntering';
 import QueueJoining from './components/QueueJoining';
+import QueueLeaveSheet from './components/QueueLeaveSheet';
+import QueueLeft from './components/QueueLeft';
 import QueueMessage from './components/QueueMessage';
 import QueueMissed from './components/QueueMissed';
 import QueueNotes from './components/QueueNotes';
@@ -30,6 +32,7 @@ const ROOM: readonly QueueStatus[] = [
   'turn',
   'missed',
   'entering',
+  'left',
 ];
 /** States where the buyer holds a place, so the reassurance notes apply. */
 const WITH_NOTES: readonly QueueStatus[] = ['waiting', 'prequeue', 'paused'];
@@ -50,6 +53,8 @@ export default function QueueScreen() {
     prequeue,
     paused,
     turn,
+    leave,
+    left,
     claimNow,
     queueAgain,
     errorMessage,
@@ -82,6 +87,7 @@ export default function QueueScreen() {
               {paused && <QueuePaused t={t} paused={paused} />}
               {turn && <QueueTurn t={t} turn={turn} onClaim={claimNow} />}
               {status === 'missed' && <QueueMissed t={t} onQueueAgain={queueAgain} />}
+              {left && <QueueLeft t={t} left={left} homeHref={homeHref} onQueueAgain={queueAgain} />}
               {status === 'sold-out' && <QueueSoldOut t={t} eventName={event?.name ?? null} homeHref={homeHref} />}
             </div>
             {event && (
@@ -95,11 +101,12 @@ export default function QueueScreen() {
             )}
             {WITH_NOTES.includes(status) && (
               <div className={styles.notes}>
-                <QueueNotes t={t} />
+                <QueueNotes t={t} onLeave={leave?.ask} />
               </div>
             )}
           </div>
         )}
+        {leave && <QueueLeaveSheet t={t} leave={leave} />}
         {message && (
           <QueueMessage
             title={t(message[0])}

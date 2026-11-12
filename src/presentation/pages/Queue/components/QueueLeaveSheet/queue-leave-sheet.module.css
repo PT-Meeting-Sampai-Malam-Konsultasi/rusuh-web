@@ -1,0 +1,40 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .scrim / .sheet: a dialog on desktop, a sheet from the bottom on phones. */
+.scrim {
+  @apply fixed inset-0 z-[90] grid place-items-end bg-ink/55 p-0;
+
+  @variant md {
+    @apply place-items-center p-4;
+  }
+}
+
+.sheet {
+  @apply w-full border-t-[2.5px] border-ink bg-paper px-5 pt-[26px] pb-[30px];
+
+  @variant md {
+    @apply max-w-[520px] border-[2.5px] p-8;
+    box-shadow: 6px 6px 0 var(--color-pink);
+  }
+}
+
+.title {
+  @apply font-display text-[40px] leading-[0.9] font-extrabold;
+  font-stretch: 75%;
+}
+
+.body {
+  @apply mt-3.5 text-base leading-normal;
+
+  @variant md {
+    @apply text-[17px];
+  }
+}
+
+.actions {
+  @apply mt-[26px] flex flex-col gap-3;
+
+  @variant md {
+    @apply flex-row flex-wrap items-center gap-4;
+  }
+}

@@ -32,6 +32,7 @@ function setup({ deviceToken = 'device-old' as string | null, stored = null as S
       claimTurn: vi.fn(),
       // No place on the server unless a test says so: the use case joins.
       getMyPlace: vi.fn().mockRejectedValue(problem(404, 'NOT_FOUND')),
+      leaveQueue: vi.fn(),
     },
     deviceTokenStore: {
       get: vi.fn(() => device),
