@@ -1,0 +1,48 @@
+@reference "../../../../../styles/app.css";
+
+.intro {
+  @apply mt-1;
+}
+
+/* HiFi .blk-h.first (flow.css 23, 68, 91): heading over an ink rule. */
+.head {
+  @apply border-b-[2.5px] border-ink pb-3;
+}
+
+/* Display M: 26px on phones, clamp(28px, 3vw, 40px) from 720px. */
+.heading {
+  @apply font-display text-[26px] leading-none font-bold;
+  font-stretch: 85%;
+
+  @variant md {
+    font-size: clamp(28px, 3vw, 40px);
+  }
+}
+
+/* HiFi .no (flow.css 25, 71): the step number in an ink square. */
+.number {
+  @apply mr-2.5 inline-grid size-7 place-items-center bg-ink align-[3px] font-display text-lg leading-none font-extrabold text-paper;
+  font-stretch: 75%;
+
+  @variant md {
+    @apply mr-3.5 size-9 align-[4px] text-[22px];
+  }
+}
+
+/* HiFi .mid-p: lead. */
+.body {
+  @apply mt-5 max-w-[640px] text-base leading-[1.55];
+
+  @variant md {
+    @apply mt-6 text-lg;
+  }
+}
+
+/* HiFi .body-s */
+.note {
+  @apply mt-3 max-w-[640px] text-[13px] leading-normal text-ink-2;
+
+  @variant md {
+    @apply text-sm;
+  }
+}

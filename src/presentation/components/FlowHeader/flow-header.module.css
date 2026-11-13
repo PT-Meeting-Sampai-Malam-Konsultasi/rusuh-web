@@ -40,7 +40,8 @@
   }
 }
 
-.step {
+.step,
+.stepDone {
   @apply flex items-center gap-2 px-[18px] text-ink-3;
 
   & + &::before {
@@ -53,6 +54,11 @@
   }
 }
 
+/* HiFi .steps li.done (flow.css 9): a finished step, ink-2 with a paper-2 box and "✓". */
+.stepDone {
+  @apply text-ink-2;
+}
+
 .stepNumber {
   @apply grid size-[26px] place-items-center border-2 border-current font-display text-[15px] leading-none font-extrabold;
   font-stretch: 75%;
@@ -60,6 +66,14 @@
   [aria-current='step'] > & {
     @apply border-ink bg-ink text-paper;
   }
+
+  .stepDone > & {
+    @apply bg-paper-2;
+  }
+}
+
+.srOnly {
+  @apply sr-only;
 }
 
 .right {

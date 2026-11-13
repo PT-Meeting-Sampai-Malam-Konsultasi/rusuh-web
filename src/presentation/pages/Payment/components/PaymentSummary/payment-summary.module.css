@@ -1,0 +1,91 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .sum (flow.css 48–55, 108–111): a quiet trust-zone card, sticky under the header in the flow grid's right
+   column. On phones a flat card under the panel (HiFi), without the button: PaymentDock carries it there.
+   Quiet: no print effects. */
+.summary {
+  @apply mt-8 border-[2.5px] border-ink bg-card px-5 pt-5 pb-4;
+
+  @variant md {
+    @apply sticky top-[120px] mt-0 px-[26px] pt-[26px] pb-6;
+    box-shadow: var(--shadow-off);
+  }
+}
+
+/* Notice + Bayar: in the dock on phones, so hidden (and not announced twice) below 720px. */
+.action {
+  @apply hidden;
+
+  @variant md {
+    @apply block;
+  }
+}
+
+/* Display S */
+.heading {
+  @apply font-display text-[22px] leading-tight font-bold;
+  font-stretch: 85%;
+}
+
+/* HiFi .ord: body font, muted, tabular. */
+.orderCode {
+  @apply ml-1.5 font-sans text-sm font-medium text-ink-3 tabular-nums;
+  font-stretch: 100%;
+}
+
+.event {
+  @apply mt-1 text-sm text-ink-2;
+}
+
+.lines {
+  @apply mt-4 list-none border-t border-hair p-0;
+}
+
+.row,
+.fee {
+  @apply flex justify-between gap-3 border-b border-hair py-2.5 text-[15px] tabular-nums;
+}
+
+.nik {
+  @apply block text-[12.5px] tracking-[0.02em] text-ink-2 tabular-nums;
+}
+
+.fee {
+  @apply text-ink-2;
+}
+
+.total {
+  @apply mt-[18px] mb-[22px] flex items-baseline justify-between;
+
+  span {
+    @apply font-semibold;
+  }
+
+  strong {
+    @apply font-display text-[38px] leading-none font-extrabold tabular-nums;
+    font-stretch: 75%;
+  }
+}
+
+.notice,
+.noticeError {
+  @apply mb-3 text-[13px] leading-snug;
+}
+
+.notice {
+  @apply text-ink-2;
+}
+
+/* Error: word + mark, not colour alone. */
+.noticeError {
+  @apply flex items-start gap-1.5 font-semibold text-red;
+
+  &::before {
+    @apply size-4 flex-none rounded-full bg-red text-center text-[11px] leading-4 font-extrabold text-white;
+    content: '!';
+  }
+}
+
+.legal {
+  @apply mt-4 border-t border-hair pt-3.5 text-[13px] leading-normal text-ink-2;
+}

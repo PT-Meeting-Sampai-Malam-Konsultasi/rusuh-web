@@ -1,7 +1,7 @@
 // Product analytics, as the shared tracking plan names it (rusuh-documentation/tech/analytics-tracking-plan.md).
 // Web and Android send the same names and parameters, so one funnel covers both. Rename here and in the plan together.
 
-import type { Category } from '@core/entities/booking/booking.entity';
+import type { Category, PriceBreakdown } from '@core/entities/booking/booking.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { AnalyticsItem } from '@core/protocols/analytics.protocol';
 import { ROUTES } from '@utils/constants/routes';
@@ -94,4 +94,14 @@ export function categoryItem(
     price: category.price.amount,
     ...(quantity === undefined ? {} : { quantity }),
   };
+}
+
+/** One item per price line (`add_payment_info`, `purchase`): item_id is the category (plan §5). */
+export function priceItems(price: PriceBreakdown): AnalyticsItem[] {
+  return price.lines.map((line) => ({
+    item_id: line.categoryId,
+    item_name: line.name,
+    price: line.unitPrice.amount,
+    quantity: line.quantity,
+  }));
 }

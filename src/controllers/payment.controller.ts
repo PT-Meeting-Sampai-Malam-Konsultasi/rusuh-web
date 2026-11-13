@@ -1,0 +1,514 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
+
+import type { PaymentStatus, SnapTransaction } from '@core/entities/payment/payment.entity';
+import type { HttpError } from '@core/protocols/http.protocol';
+import type {
+  PayInput,
+  PayResult,
+  PaymentPageResult,
+  PaymentStep,
+  SnapHint,
+} from '@core/use_case/payment/pay-booking.use-case';
+import type { AwilixRegistry } from '@infrastructure/di/registry.types';
+import { ANALYTICS_CURRENCY, ANALYTICS_EVENTS, priceItems } from '@utils/analytics';
+import { MUTATION_KEYS, QUERY_KEYS } from '@utils/constants/query-keys';
+import { ROUTES, withQuery } from '@utils/constants/routes';
+import { STORAGE_KEYS } from '@utils/constants/storage-keys';
+import { formatEventDay, type FormatLocale } from '@utils/format/date';
+import { formatRupiah } from '@utils/format/number';
+import { randomUuid } from '@utils/random-uuid';
+
+export type PaymentScreenState =
+  'loading' | 'ready' | 'opening' | 'verifying' | 'failed' | 'busy' | 'inactive' | 'not-found' | 'error' | 'leaving';
+
+/** FlowHeader step; `done` draws "✓" (spec 78 adds it to FlowHeaderStep). */
+export interface PaymentFlowStep {
+  number: 1 | 2 | 3;
+  label: string;
+  current: boolean;
+  done: boolean;
+}
+
+export interface PaymentSummaryLine {
+  /** `${index}`: attendees can repeat a category. */
+  key: string;
+  /** "Festival B". */
+  category: string;
+  /** "NIK 3174 •••• •••• 0004". */
+  nik: string;
+  /** "Rp 850.000"; '' when the price is unknown. */
+  amount: string;
+}
+
+/** The "Pesanan" aside (trust zone: quiet). */
+export interface PaymentSummaryView {
+  /** "Pesanan" / "Order". */
+  heading: string;
+  /** "RSH-26-084731". */
+  orderCode: string;
+  /** "SAMUDRA · Sab, 12 Des 2026 · GBK"; '' when the view has no event fields. */
+  eventLine: string;
+  lines: PaymentSummaryLine[];
+  /** "Biaya layanan" / "Service fee". */
+  feeLabel: string;
+  /** Once per order (ADR-0010). */
+  fee: string;
+  totalLabel: string;
+  total: string;
+  /** "Pembayaran diproses oleh Midtrans. Rusuh tidak menyimpan data kartu Anda." */
+  legal: string;
+}
+
+/** "Bayar" in the aside and the phone dock. */
+export interface PaymentActionView {
+  /** Aside button: "Bayar" · "Bayar lagi" · "Coba lagi" · "Buka lagi pembayaran". */
+  label: string;
+  /** Dock button: "Bayar Rp 2.160.000" (or the label above when it is not a first pay). */
+  dockLabel: string;
+  /** Dock region name: "Pembayaran" / "Payment". */
+  dockRegionLabel: string;
+  /** Shown while busy: "Membuka pembayaran…". */
+  busyLabel: string;
+  /** The mutation is pending (Snap opening or open). */
+  busy: boolean;
+  enabled: boolean;
+  onPay: () => void;
+}
+
+export interface PaymentNotice {
+  text: string;
+  tone: 'error' | 'info';
+}
+
+/** Verifying / leaving panel (role="status"). */
+export interface PaymentProgressView {
+  reason: 'confirming' | 'waiting' | 'paid';
+  title: string;
+  body: string;
+  /** "Tiket Anda tetap ditahan selama pengecekan ini."; '' when paid. */
+  held: string;
+}
+
+/** Inactive / not-found / load error. */
+export interface PaymentMessageView {
+  title: string;
+  body: string;
+  /** H-4 refund note; null unless inactive with refund. */
+  note: string | null;
+  /** "Coba lagi" on the load error only. */
+  actionLabel: string | null;
+  onAction: (() => void) | null;
+  homeHref: string;
+  homeLabel: string;
+}
+
+export interface PaymentIntroView {
+  /** "Bayar dengan Midtrans". */
+  heading: string;
+  body: string;
+  note: string;
+}
+
+export interface PaymentControllerInterface {
+  t: TFunction;
+  state: PaymentScreenState;
+  steps: PaymentFlowStep[];
+  /** App bar title: "Pembayaran". */
+  title: string;
+  /** Main column copy in ready / opening / failed / busy; null otherwise. */
+  intro: PaymentIntroView | null;
+  summary: PaymentSummaryView | null;
+  pay: PaymentActionView | null;
+  notice: PaymentNotice | null;
+  progress: PaymentProgressView | null;
+  message: PaymentMessageView | null;
+  homeHref: string;
+  backHref: string;
+  locale: FormatLocale;
+  setLocale: (locale: FormatLocale) => void;
+}
+
+type PaymentControllerDeps = Pick<
+  AwilixRegistry,
+  | 'payBookingUseCase'
+  | 'snap'
+  | 'analyticsAdapter'
+  | 'storage'
+  | 'ERROR_CODE_MAP'
+  | 'useTranslation'
+  | 'useQueryTanstack'
+  | 'useMutationTanstack'
+  | 'useRouterNext'
+  | 'useSearchParamsNext'
+  | 'usePopupError'
+>;
+
+/** `round` gives every verifying stretch its own status query, so a cached step of an earlier one is never replayed. */
+type Phase =
+  | { kind: 'ready' }
+  | { kind: 'verifying'; hint: SnapHint; reason: 'confirming' | 'waiting'; round: number }
+  | { kind: 'failed'; paymentStatus: PaymentStatus }
+  | { kind: 'busy'; code: string }
+  | { kind: 'inactive'; refund: boolean }
+  | { kind: 'not-found' }
+  | { kind: 'paid' };
+
+/** The idempotency key and the transaction "Bayar" reopens; `reusable: undefined` = take the view's currentSnap. */
+interface Attempt {
+  key: string | null;
+  reusable: SnapTransaction | null | undefined;
+}
+
+const POLL_MS = 4000;
+
+const PaymentController = ({
+  payBookingUseCase,
+  snap,
+  analyticsAdapter,
+  storage,
+  ERROR_CODE_MAP,
+  useTranslation,
+  useQueryTanstack,
+  useMutationTanstack,
+  useRouterNext,
+  useSearchParamsNext,
+  usePopupError,
+}: PaymentControllerDeps): PaymentControllerInterface => {
+  const { t, i18n } = useTranslation();
+  const locale: FormatLocale = i18n.language === 'en' ? 'en' : 'id';
+  const router = useRouterNext();
+  const { openPopupError } = usePopupError();
+  const searchParams = useSearchParamsNext();
+  const bookingId = searchParams.get('booking')?.trim() ?? '';
+  const hasBookingId = bookingId !== '';
+
+  const signInHref = withQuery(ROUTES.LOGIN, { next: withQuery(ROUTES.PAYMENT, { booking: bookingId }) });
+  const eTicketHref = withQuery(ROUTES.TICKET_DETAIL, { booking: bookingId });
+
+  useEffect(() => {
+    analyticsAdapter.trackPageView('payment');
+  }, [analyticsAdapter]);
+
+  const pageQuery = useQueryTanstack<PaymentPageResult, HttpError>({
+    queryKey: [QUERY_KEYS.PAYMENT, bookingId],
+    queryFn: () => payBookingUseCase.load(bookingId),
+    enabled: hasBookingId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const loaded = pageQuery.data?.kind === 'ready' ? pageQuery.data : null;
+  const view = loaded?.view ?? null;
+
+  // Preload snap.js so the tap opens Snap at once; a failure changes nothing (snap.pay loads it again on the tap).
+  useQueryTanstack<boolean>({
+    queryKey: [QUERY_KEYS.SNAP_SCRIPT],
+    queryFn: async () => {
+      await snap.load();
+      return true;
+    },
+    enabled: view !== null,
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const [phase, setPhase] = useState<Phase>({ kind: 'ready' });
+  const attemptRef = useRef<Attempt>({ key: null, reusable: undefined });
+  const payGuard = useRef(false);
+  const trackedAttempts = useRef<Set<number>>(new Set());
+  const roundRef = useRef(0);
+
+  const verifying = phase.kind === 'verifying' ? phase : null;
+
+  const payMutation = useMutationTanstack<PayResult, HttpError, PayInput>({
+    mutationKey: [MUTATION_KEYS.PAYMENT_PAY],
+    retry: false,
+    // No overlay: the mutation stays pending while the Snap popup is open; pay.busy shows it on the button.
+    mutationFn: (input) => payBookingUseCase.pay(input),
+    onSuccess: (result) => {
+      payGuard.current = false;
+      switch (result.kind) {
+        case 'snap': {
+          attemptRef.current = { ...attemptRef.current, reusable: result.snap };
+          // Tracking plan §2 step 11: Snap opened for this attempt (once per attempt, never the token).
+          if (view && !trackedAttempts.current.has(result.snap.attemptId)) {
+            trackedAttempts.current.add(result.snap.attemptId);
+            analyticsAdapter.trackEvent(ANALYTICS_EVENTS.ADD_PAYMENT_INFO, {
+              booking_id: bookingId,
+              currency: ANALYTICS_CURRENCY,
+              value: view.price.total.amount,
+              payment_type: 'midtrans_snap',
+              items: priceItems(view.price),
+            });
+          }
+          // A Snap callback is a hint only: the server's status decides paid (LLD-03 §4.3).
+          if (result.outcome === 'closed') {
+            setPhase({ kind: 'ready' });
+            return;
+          }
+          roundRef.current += 1;
+          setPhase({
+            kind: 'verifying',
+            hint: result.outcome,
+            reason: result.outcome === 'pending' ? 'waiting' : 'confirming',
+            round: roundRef.current,
+          });
+          return;
+        }
+        case 'paid':
+          setPhase({ kind: 'paid' });
+          return;
+        case 'inactive':
+          setPhase({ kind: 'inactive', refund: result.refund });
+          return;
+        case 'retryable':
+          // Same key on the retry; snap null = start the attempt again, else reopen this one.
+          attemptRef.current = { ...attemptRef.current, reusable: result.snap };
+          setPhase({ kind: 'busy', code: result.code });
+          return;
+        case 'not-found':
+          setPhase({ kind: 'not-found' });
+          return;
+        case 'unauthorized':
+          router.replace(signInHref);
+          return;
+      }
+    },
+    onError: (error) => {
+      payGuard.current = false;
+      if (error.status === 401 || error.code === 'UNAUTHORIZED') {
+        router.replace(signInHref);
+        return;
+      }
+      openPopupError({
+        message: t(ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR),
+        reference: error.requestId,
+      });
+    },
+  });
+  const { mutate: mutatePay, isPending: paying } = payMutation;
+
+  const statusQuery = useQueryTanstack<PaymentStep, HttpError>({
+    queryKey: [QUERY_KEYS.PAYMENT_STATUS, bookingId, verifying?.hint ?? null, verifying?.round ?? 0],
+    queryFn: () => payBookingUseCase.checkStatus(bookingId, verifying?.hint ?? 'success'),
+    enabled: verifying !== null,
+    refetchInterval: POLL_MS,
+    refetchOnWindowFocus: true,
+    retry: false,
+    gcTime: 0,
+  });
+
+  // Each step once (render-time update, as the order countdown's anchor): the server's answer moves the phase.
+  const [handledAt, setHandledAt] = useState(0);
+  const step = statusQuery.data;
+  if (verifying && step && statusQuery.dataUpdatedAt !== handledAt) {
+    setHandledAt(statusQuery.dataUpdatedAt);
+    if (step.kind === 'paid') setPhase({ kind: 'paid' });
+    else if (step.kind === 'failed') setPhase({ kind: 'failed', paymentStatus: step.paymentStatus });
+    else if (step.kind === 'inactive') setPhase({ kind: 'inactive', refund: step.refund });
+    else if (step.reason !== verifying.reason) setPhase({ ...verifying, reason: step.reason });
+  }
+
+  // A failed attempt: the next "Bayar" starts a new one (new key, nothing to reopen). Once per failure.
+  useEffect(() => {
+    if (phase.kind !== 'failed') return;
+    attemptRef.current = { key: null, reusable: null };
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.PAYMENT_FAILED, {
+      booking_id: bookingId,
+      reason: phase.paymentStatus,
+    });
+  }, [phase, analyticsAdapter, bookingId]);
+
+  // Only the server's PAID leaves for the e-ticket; replace, so Back never reopens a paid payment page.
+  const leaving = pageQuery.data?.kind === 'paid' || phase.kind === 'paid';
+  const left = useRef(false);
+  useEffect(() => {
+    if (!leaving || left.current) return;
+    left.current = true;
+    // Tracking plan §2 step 12; not sent when the page opened already paid (no view to price it).
+    if (view) {
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.PURCHASE, {
+        transaction_id: bookingId,
+        booking_id: bookingId,
+        currency: ANALYTICS_CURRENCY,
+        value: view.price.total.amount,
+        items: priceItems(view.price),
+      });
+    }
+    router.replace(eTicketHref);
+  }, [leaving, view, analyticsAdapter, bookingId, router, eTicketHref]);
+
+  const loadUnauthorized =
+    pageQuery.data?.kind === 'unauthorized' || (pageQuery.isError && pageQuery.error?.status === 401);
+  const signInNeeded = loadUnauthorized || (statusQuery.isError && statusQuery.error?.status === 401);
+  const signedOut = useRef(false);
+  useEffect(() => {
+    if (!signInNeeded || signedOut.current) return;
+    signedOut.current = true;
+    router.replace(signInHref);
+  }, [signInNeeded, router, signInHref]);
+
+  const onPay = useCallback(() => {
+    if (!view || payGuard.current || paying) return;
+    payGuard.current = true;
+    attemptRef.current.key ??= randomUuid();
+    const { key, reusable } = attemptRef.current;
+    mutatePay({
+      bookingId,
+      idempotencyKey: key,
+      reusable: reusable === undefined ? (view.currentSnap ?? null) : reusable,
+    });
+  }, [view, paying, mutatePay, bookingId]);
+
+  const pageResult = pageQuery.data?.kind;
+  let state: PaymentScreenState;
+  if (!hasBookingId) state = 'not-found';
+  else if (pageQuery.isPending || loadUnauthorized) state = 'loading';
+  else if (pageQuery.isError) state = 'error';
+  else if (pageResult === 'not-found' || phase.kind === 'not-found') state = 'not-found';
+  else if (pageResult === 'inactive' || phase.kind === 'inactive') state = 'inactive';
+  else if (leaving) state = 'leaving';
+  else if (paying) state = 'opening';
+  else state = phase.kind as 'ready' | 'verifying' | 'failed' | 'busy';
+
+  const refund =
+    (pageQuery.data?.kind === 'inactive' && pageQuery.data.refund) || (phase.kind === 'inactive' && phase.refund);
+
+  const steps: PaymentFlowStep[] = [
+    { number: 1, label: t('order_step_choose'), current: false, done: true },
+    { number: 2, label: t('order_step_pay'), current: true, done: false },
+    { number: 3, label: t('order_step_ticket'), current: false, done: false },
+  ];
+
+  const showsOrder = ['ready', 'opening', 'verifying', 'failed', 'busy', 'leaving'].includes(state);
+  const total = view ? formatRupiah(view.price.total.amount, locale) : '';
+  const summary: PaymentSummaryView | null =
+    loaded && view && showsOrder
+      ? {
+          heading: t('payment_summary_heading'),
+          orderCode: view.orderCode,
+          eventLine: [
+            view.eventName?.toLocaleUpperCase(locale),
+            view.eventStartsAt ? formatEventDay(view.eventStartsAt, locale, view.timezone) : '',
+            view.venueShort,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          lines: loaded.tickets.map((ticket, index) => ({
+            key: String(index),
+            category: ticket.categoryName,
+            nik: t('payment_summary_nik', { nik: ticket.nikMasked }),
+            amount: ticket.unitPrice === null ? '' : formatRupiah(ticket.unitPrice, locale),
+          })),
+          feeLabel: t('order_summary_fee'),
+          fee: formatRupiah(view.price.adminFee.amount, locale),
+          totalLabel: t('order_summary_total'),
+          total,
+          legal: t('payment_legal'),
+        }
+      : null;
+
+  const intro: PaymentIntroView | null = ['ready', 'opening', 'failed', 'busy'].includes(state)
+    ? { heading: t('payment_heading'), body: t('payment_intro'), note: t('payment_intro_note') }
+    : null;
+
+  const showsPay =
+    view !== null &&
+    (['ready', 'opening', 'failed', 'busy'].includes(state) ||
+      (state === 'verifying' && verifying?.reason === 'waiting'));
+  let payLabel = t('payment_pay_label');
+  if (phase.kind === 'failed') payLabel = t('payment_pay_again');
+  else if (phase.kind === 'busy') payLabel = t('action_retry');
+  else if (verifying?.reason === 'waiting') payLabel = t('payment_pay_reopen');
+  const pay: PaymentActionView | null = showsPay
+    ? {
+        label: payLabel,
+        dockLabel: phase.kind === 'ready' ? t('payment_pay_amount', { amount: total }) : payLabel,
+        dockRegionLabel: t('payment_dock_label'),
+        busyLabel: t('payment_pay_busy'),
+        busy: paying,
+        enabled: !paying,
+        onPay,
+      }
+    : null;
+
+  let notice: PaymentNotice | null = null;
+  if (state === 'failed') notice = { text: t('payment_failed'), tone: 'error' };
+  else if (state === 'busy' && phase.kind === 'busy') {
+    notice = { text: t(ERROR_CODE_MAP[phase.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR), tone: 'error' };
+  }
+
+  let progress: PaymentProgressView | null = null;
+  if (state === 'leaving') {
+    progress = { reason: 'paid', title: t('payment_paid_title'), body: t('payment_paid_body'), held: '' };
+  } else if (state === 'verifying' && verifying?.reason === 'waiting') {
+    progress = {
+      reason: 'waiting',
+      title: t('payment_waiting_title'),
+      body: t('payment_waiting_body'),
+      held: t('payment_verifying_held'),
+    };
+  } else if (state === 'verifying') {
+    progress = {
+      reason: 'confirming',
+      title: t('payment_verifying_title'),
+      body: t('payment_verifying_body'),
+      held: t('payment_verifying_held'),
+    };
+  }
+
+  const home = { homeHref: ROUTES.HOME, homeLabel: t('action_back_home') };
+  let message: PaymentMessageView | null = null;
+  if (state === 'inactive') {
+    message = {
+      title: t('payment_inactive_title'),
+      body: t('payment_inactive_body'),
+      note: refund ? t('payment_inactive_refund') : null,
+      actionLabel: null,
+      onAction: null,
+      ...home,
+    };
+  } else if (state === 'not-found') {
+    message = {
+      title: t('payment_not_found_title'),
+      body: t('payment_not_found_body'),
+      note: null,
+      actionLabel: null,
+      onAction: null,
+      ...home,
+    };
+  } else if (state === 'error') {
+    const code = pageQuery.error?.code ?? 'UNKNOWN_ERROR';
+    message = {
+      title: t('payment_error_title'),
+      body: t(ERROR_CODE_MAP[code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR),
+      note: null,
+      actionLabel: t('action_retry'),
+      onAction: () => void pageQuery.refetch(),
+      ...home,
+    };
+  }
+
+  return {
+    t,
+    state,
+    steps,
+    title: t('payment_title'),
+    intro,
+    summary,
+    pay,
+    notice,
+    progress,
+    message,
+    homeHref: ROUTES.HOME,
+    backHref: ROUTES.HOME,
+    locale,
+    setLocale: (next) => {
+      storage.set(STORAGE_KEYS.LANGUAGE, next);
+      void i18n.changeLanguage(next);
+    },
+  };
+};
+
+export default PaymentController;

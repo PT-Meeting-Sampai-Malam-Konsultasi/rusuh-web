@@ -5,6 +5,7 @@ import { AuthService } from '@core/services/auth.service';
 import { BookingService } from '@core/services/booking.service';
 import { CatalogService } from '@core/services/catalog.service';
 import { DeviceService } from '@core/services/device.service';
+import { PaymentService } from '@core/services/payment.service';
 import { QueueService } from '@core/services/queue.service';
 import { SignOutUseCase } from '@core/use_case/auth/sign-out.use-case';
 import { RefreshSessionUseCase } from '@core/use_case/auth/refresh-session.use-case';
@@ -16,6 +17,7 @@ import { HoldBookingUseCase } from '@core/use_case/booking/hold-booking.use-case
 import { OrderTicketSelectionUseCase } from '@core/use_case/booking/order-ticket-selection.use-case';
 import { ValidateAttendeeUseCase } from '@core/use_case/booking/validate-attendee.use-case';
 import { GetHomeEventsUseCase } from '@core/use_case/catalog/get-home-events.use-case';
+import { PayBookingUseCase } from '@core/use_case/payment/pay-booking.use-case';
 import { ClaimTurnUseCase } from '@core/use_case/queue/claim-turn.use-case';
 import { FollowQueueUseCase } from '@core/use_case/queue/follow-queue.use-case';
 import { JoinQueueUseCase } from '@core/use_case/queue/join-queue.use-case';
@@ -34,6 +36,7 @@ export function registerServices() {
     bookingService: asFunction(BookingService).singleton(),
     deviceService: asFunction(DeviceService).singleton(),
     queueService: asFunction(QueueService).singleton(),
+    paymentService: asFunction(PaymentService).singleton(),
     getHomeEventsUseCase: asFunction(GetHomeEventsUseCase).singleton(),
     getOrderCategoriesUseCase: asFunction(GetOrderCategoriesUseCase).singleton(),
     orderTicketSelectionUseCase: asFunction(OrderTicketSelectionUseCase).singleton(),
@@ -50,5 +53,6 @@ export function registerServices() {
     verifySignInCodeUseCase: asFunction(VerifySignInCodeUseCase).singleton(),
     getMyOrdersUseCase: asFunction(GetMyOrdersUseCase).singleton(),
     getETicketUseCase: asFunction(GetETicketUseCase).singleton(),
+    payBookingUseCase: asFunction(PayBookingUseCase).singleton(),
   });
 }

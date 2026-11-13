@@ -1,0 +1,25 @@
+@reference "../../../styles/app.css";
+
+.page {
+  @apply flex min-h-screen flex-col;
+}
+
+/* Flow grid (as order.module.css): one column on phones; panel + aside from 720px (340px), 400px from 1180px.
+   PaymentSkeleton mirrors these boxes for the route fallback. */
+.main {
+  @apply mx-auto w-full max-w-[calc(1328px+112px)] flex-1 px-4 pt-[18px] pb-12;
+
+  @variant md {
+    @apply grid items-start gap-10 px-14 pt-10 pb-20;
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+
+  @variant lg {
+    @apply gap-[72px];
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+}
+
+.flowMain {
+  @apply min-w-0;
+}

@@ -25,6 +25,7 @@ const KEYS = {
   fileSaver: true,
   printer: true,
   qrEncoder: true,
+  snap: true,
   useTranslation: true,
   useQueryTanstack: true,
   useMutationTanstack: true,
@@ -44,6 +45,7 @@ const KEYS = {
   bookingService: true,
   deviceService: true,
   queueService: true,
+  paymentService: true,
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
   orderTicketSelectionUseCase: true,
@@ -60,12 +62,14 @@ const KEYS = {
   verifySignInCodeUseCase: true,
   getMyOrdersUseCase: true,
   getETicketUseCase: true,
+  payBookingUseCase: true,
   ERROR_CODE_MAP: true,
   accountController: true,
   homeController: true,
   loginController: true,
   notFoundController: true,
   orderController: true,
+  paymentController: true,
   queueController: true,
   ticketDetailController: true,
   ticketsController: true,
@@ -143,6 +147,22 @@ describe('DI registries', () => {
     expect(typeof container.resolve('validateAttendeeUseCase').execute).toBe('function');
     expect(container.resolve('endOrderWindowUseCase')).toBe(container.resolve('endOrderWindowUseCase'));
     expect(typeof container.resolve('endOrderWindowUseCase').execute).toBe('function');
+  });
+
+  it('wires the payment service and the page-scoped Snap adapter (FR-20-W1)', () => {
+    expect(container.resolve('paymentService')).toBe(container.resolve('paymentService'));
+    expect(typeof container.resolve('paymentService').startSnap).toBe('function');
+    expect(container.resolve('snap')).toBe(container.resolve('snap'));
+    expect(typeof container.resolve('snap').pay).toBe('function');
+    expect(typeof container.resolve('snap').load).toBe('function');
+  });
+
+  it('wires the pay booking use case as a singleton (FR-20-W1)', () => {
+    const useCase = container.resolve('payBookingUseCase');
+    expect(useCase).toBe(container.resolve('payBookingUseCase'));
+    expect(typeof useCase.load).toBe('function');
+    expect(typeof useCase.pay).toBe('function');
+    expect(typeof useCase.checkStatus).toBe('function');
   });
 
   it('wires the hold booking use case as a singleton', () => {

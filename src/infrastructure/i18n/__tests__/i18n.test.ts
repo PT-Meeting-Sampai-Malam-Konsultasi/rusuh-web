@@ -93,6 +93,84 @@ describe('translations', () => {
     );
   });
 
+  it('has the payment page copy in both locales (FR-20-W1)', () => {
+    const copy: Record<string, [string, string]> = {
+      payment_title: ['Pembayaran', 'Payment'],
+      payment_back_label: ['Kembali ke beranda', 'Back to home'],
+      payment_step_done: ['selesai', 'done'],
+      payment_heading: ['Bayar dengan Midtrans', 'Pay with Midtrans'],
+      payment_intro: [
+        'Tekan Bayar, lalu pilih cara bayar di halaman Midtrans yang terbuka di atas halaman ini.',
+        'Tap Pay, then choose how to pay on the Midtrans page that opens over this one.',
+      ],
+      payment_intro_note: [
+        'Biarkan halaman ini terbuka sampai pembayaran selesai.',
+        'Keep this page open until the payment is done.',
+      ],
+      payment_summary_heading: ['Pesanan', 'Order'],
+      payment_summary_nik: ['NIK {{nik}}', 'NIK {{nik}}'],
+      payment_legal: [
+        'Pembayaran diproses oleh Midtrans. Rusuh tidak menyimpan data kartu Anda.',
+        'Payments are processed by Midtrans. Rusuh never stores your card details.',
+      ],
+      payment_pay_label: ['Bayar', 'Pay'],
+      payment_pay_amount: ['Bayar {{amount}}', 'Pay {{amount}}'],
+      payment_pay_again: ['Bayar lagi', 'Pay again'],
+      payment_pay_reopen: ['Buka lagi pembayaran', 'Open the payment again'],
+      payment_pay_busy: ['Membuka pembayaran…', 'Opening the payment…'],
+      payment_dock_label: ['Pembayaran', 'Payment'],
+      payment_failed: [
+        'Pembayaran belum berhasil. Tiket Anda masih ditahan, jadi Anda bisa bayar lagi, juga dengan metode lain.',
+        "The payment didn't go through. Your tickets are still held, so you can pay again, with another method too.",
+      ],
+      payment_verifying_title: ['Memastikan pembayaran Anda…', 'Confirming your payment…'],
+      payment_verifying_body: [
+        'Kami menunggu konfirmasi Midtrans, biasanya beberapa detik. Jangan bayar ulang.',
+        "We're waiting for Midtrans to confirm, usually a few seconds. Please don't pay again.",
+      ],
+      payment_waiting_title: ['Menunggu pembayaran Anda', 'Waiting for your payment'],
+      payment_waiting_body: [
+        'Selesaikan pembayaran sesuai petunjuk Midtrans. Halaman ini berganti sendiri setelah dana masuk.',
+        'Finish the payment as Midtrans showed you. This page updates by itself once it arrives.',
+      ],
+      payment_verifying_held: [
+        'Tiket Anda tetap ditahan selama pengecekan ini.',
+        'Your tickets stay held while we check.',
+      ],
+      payment_paid_title: ['Pembayaran diterima.', 'Payment received.'],
+      payment_paid_body: ['Membuka e-tiket Anda…', 'Opening your e-tickets…'],
+      payment_inactive_title: ['Pesanan ini sudah tidak aktif.', 'This order is no longer active.'],
+      payment_inactive_body: [
+        'Waktu pembayaran sudah habis atau pesanan dibatalkan, jadi tiketnya kami lepas untuk pembeli lain.',
+        "The time to pay ran out or the order was cancelled, so we've released the tickets to other buyers.",
+      ],
+      payment_inactive_refund: [
+        'Saldo terpotong? Pembayaran Anda masuk setelah waktu habis. Dana akan kami kembalikan; rinciannya kami kirim ke email akun Anda.',
+        "Money already taken? Your payment arrived after the time ran out. We'll refund it and email the details to your account address.",
+      ],
+      payment_not_found_title: ['Pesanan tidak ditemukan.', 'Order not found.'],
+      payment_not_found_body: [
+        'Tautan pembayaran ini salah, atau pesanannya milik akun lain.',
+        'This payment link is wrong, or the order belongs to another account.',
+      ],
+      payment_error_title: ['Halaman pembayaran gagal dimuat.', "The payment page didn't load."],
+      payment_fallback_body: [
+        'Halaman pembayaran gagal dimuat. Tiket Anda tetap ditahan; coba lagi atau kembali nanti.',
+        "The payment page didn't load. Your tickets are still held; try again or come back soon.",
+      ],
+    };
+    for (const [key, [idValue, enValue]] of Object.entries(copy)) {
+      expect((id as Record<string, string>)[key], key).toBe(idValue);
+      expect((en as Record<string, string>)[key], key).toBe(enValue);
+    }
+    // H-4: the refund is promised, not "otomatis".
+    expect(id.payment_inactive_refund).not.toMatch(/otomatis/);
+    // Same order in both files.
+    const order = (strings: Record<string, string>) => Object.keys(strings).filter((k) => k.startsWith('payment_'));
+    expect(order(id)).toEqual(order(en));
+    expect(order(id)).toEqual(Object.keys(copy));
+  });
+
   it('uses a NIK hint example that passes the structure rule in both locales', () => {
     const useCase = ValidateAttendeeUseCase({ bookingService: {} as never });
     for (const hint of [id.order_holder_nik_hint, en.order_holder_nik_hint]) {

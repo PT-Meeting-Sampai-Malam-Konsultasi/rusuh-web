@@ -1,0 +1,51 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .mid (flow.css 133, 165): a centred block. */
+.progress {
+  @apply mx-auto flex max-w-[640px] flex-col items-center gap-[18px] pt-6 text-center;
+
+  @variant md {
+    @apply pt-[60px];
+  }
+}
+
+/* HiFi .spin (flow.css 136): ink ring with a pink arc. Static under reduced motion (the ring stays visible). */
+.spin {
+  @apply size-[72px] rounded-full border-[6px] border-ink border-r-pink;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: spin 0.9s linear infinite;
+  }
+}
+
+/* Display L: 34px on phones, clamp(40px, 5vw, 64px) from 720px. */
+.title {
+  @apply font-display text-[34px] leading-[0.92] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+
+  @variant md {
+    font-size: clamp(40px, 5vw, 64px);
+  }
+}
+
+/* HiFi .mid-p */
+.body {
+  @apply text-base leading-[1.55];
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+/* HiFi .body-s */
+.held {
+  @apply text-sm leading-normal text-ink-2;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

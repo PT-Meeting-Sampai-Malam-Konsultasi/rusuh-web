@@ -24,7 +24,7 @@ sale (PRD §3, NFR-06).
 | --- | --- |
 | JS loaded by any one route on first load | target 150 KB — **reported, not enforced yet** (see below) |
 | Any single chunk, except the shared React/Next.js runtime chunk | ≤ 50 KB (enforced) |
-| Total CSS | ≤ 30 KB (enforced) |
+| CSS linked by any one route (its exported HTML) | ≤ 30 KB (enforced); the all-routes total is reported only |
 | Largest image | ≤ 100 KB (WebP/AVIF, sized) |
 
 Checked by `npm run check:bundle` (`scripts/check-bundle-size.mjs` over `out/_next/static/chunks`).

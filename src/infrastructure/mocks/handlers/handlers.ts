@@ -3,6 +3,7 @@ import type { HttpHandler } from 'msw';
 import { authHandlers } from './auth.handlers';
 import { bookingHandlers } from './booking.handlers';
 import { catalogHandlers } from './catalog.handlers';
+import { paymentHandlers } from './payment.handlers';
 import { queueHandlers } from './queue.handlers';
 import { createMockBookingStore } from './mock-booking-store';
 import { createMockQueueState } from './mock-queue-state';
@@ -14,6 +15,7 @@ const HANDLER_FACTORIES: Array<(context: MockHandlerContext) => HttpHandler[]> =
   queueHandlers,
   authHandlers,
   bookingHandlers,
+  paymentHandlers,
 ];
 
 /**
