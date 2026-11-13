@@ -312,4 +312,54 @@ describe('OrderScreen', () => {
     await userEvent.click(within(dialogs[0]).getByRole('button', { name: 'order_time_up_queue_again' }));
     expect(queueAgain).toHaveBeenCalledTimes(1);
   });
+
+  describe("time's-up sheet after a reload (FR-19-W1)", () => {
+    const sheet = (): NonNullable<OrderControllerInterface['timeUpSheet']> => ({
+      stamp: 'order_time_up_stamp',
+      title: 'order_time_up_title',
+      body: 'order_time_up_body',
+      queueAgainLabel: 'order_time_up_queue_again',
+      homeLabel: 'action_back_home',
+      homeHref: '/',
+      queueAgain: vi.fn(),
+    });
+
+    it('shows the sheet over the loading state: skeleton under it, no timer', () => {
+      controller = {
+        ...base(),
+        status: 'loading',
+        event: null,
+        categories: [],
+        categoryNote: '',
+        timer: null,
+        timeUp: true,
+        timeUpSheet: sheet(),
+      };
+      render(<OrderScreen />);
+      const dialogs = screen.getAllByRole('dialog');
+      expect(dialogs).toHaveLength(1);
+      expect(dialogs[0]).toHaveAccessibleName('order_time_up_title');
+      expect(screen.getByRole('status')).toHaveTextContent('state_loading');
+      expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.queryByRole('timer')).toBeNull();
+    });
+
+    it('shows the sheet over the error message', () => {
+      controller = {
+        ...base(),
+        status: 'error',
+        event: null,
+        categories: [],
+        errorMessage: 'error_network_error',
+        timer: null,
+        timeUp: true,
+        timeUpSheet: sheet(),
+      };
+      render(<OrderScreen />);
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(screen.getByRole('heading', { level: 1, name: 'order_error_title' })).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('error_network_error');
+      expect(screen.queryByRole('timer')).toBeNull();
+    });
+  });
 });

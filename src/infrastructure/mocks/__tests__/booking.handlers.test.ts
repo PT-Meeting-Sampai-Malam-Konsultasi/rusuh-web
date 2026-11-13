@@ -7,7 +7,8 @@ import type { ValidateAttendeeRequest } from '@core/entities/booking/booking.ent
 import { BookingService } from '@core/services/booking.service';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 
-import { MOCK_RETRY_AFTER_S, MOCK_SHORT_ORDER_WINDOW_MS } from '../handlers/booking.handlers';
+import { MOCK_RETRY_AFTER_S } from '../handlers/booking.handlers';
+import { MOCK_SHORT_ORDER_WINDOW_MS } from '../handlers/mock-queue-state';
 import { createHandlers } from '../handlers/handlers';
 import type { MockScenario } from '../scenario';
 

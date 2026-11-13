@@ -112,6 +112,7 @@
   "error_verification_unavailable": "Pemeriksaan keamanan sedang tidak tersedia. Coba lagi sebentar lagi.",
   "error_unauthorized": "Sesi Anda berakhir. Silakan masuk lagi.",
   "error_admission_invalid": "Akses pemesanan Anda sudah tidak berlaku. Silakan antre lagi.",
+  "error_admission_unavailable": "Pesanan Anda sedang disiapkan. Giliran Anda tetap aman, coba lagi sebentar lagi.",
   "error_not_found": "Data tidak ditemukan.",
   "error_rate_limited": "Terlalu banyak percobaan. Coba lagi dalam 1 menit.",
   "error_queue_closed": "Antrian event ini sudah ditutup.",

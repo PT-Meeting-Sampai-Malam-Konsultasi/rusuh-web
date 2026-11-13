@@ -11,11 +11,8 @@ import type {
 import { bookingsFixture, MOCK_TICKETS_PDF } from '../fixtures/bookings.fixture';
 import { categoriesFixture } from '../fixtures/categories.fixture';
 import { eventsFixture } from '../fixtures/events.fixture';
-import { failure, problem, problemWith, type MockContext } from './shared';
-
-const ORDER_WINDOW_MS = 5 * 60_000;
-/** `?mock=short_window`: 15 s of the ink timer, pink from 1:00, then 0:00. */
-export const MOCK_SHORT_ORDER_WINDOW_MS = 75_000;
+import { ADMISSION_MS, orderWindowMs } from './mock-queue-state';
+import { failure, problem, problemWith, type MockHandlerContext } from './shared';
 
 const admissionInvalid = () => problem(403, 'ADMISSION_INVALID', 'Giliran tidak berlaku');
 const signedOut = () => problem(401, 'UNAUTHORIZED', 'Sesi berakhir');
@@ -53,7 +50,7 @@ const isValidBody = (body: unknown): body is ValidateAttendeeRequest => {
   );
 };
 
-export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): HttpHandler[] {
+export function bookingHandlers({ coreApiUrl, getScenario, now, queueState }: MockHandlerContext): HttpHandler[] {
   // Per factory, like the auth mock's sessions: each validation token is distinct.
   let validations = 0;
   return [
@@ -71,14 +68,18 @@ export function bookingHandlers({ coreApiUrl, getScenario, now }: MockContext): 
       const locale = request.headers.get('Accept-Language')?.toLowerCase().startsWith('en') ? 'en' : 'id';
       let categories = categoriesFixture(locale);
       if (scenario === 'sold_out') categories = categories.map((c) => ({ ...c, availability: 'sold_out' }));
-      const windowMs = scenario === 'short_window' ? MOCK_SHORT_ORDER_WINDOW_MS : ORDER_WINDOW_MS;
+      const time = today.getTime();
+      const admittedAt = queueState.lastAdmittedAt(eventId);
+      // FR-19-W1: like the server, the window is the claim's lease end, the same on every request; a past end is
+      // answered as is. No (recent) claim, e.g. /order opened directly in the mock: a window from now, as before.
+      const start = admittedAt !== null && time - admittedAt < ADMISSION_MS ? admittedAt : time;
       return HttpResponse.json<GetCategoriesResponse>({
         eventId,
         categories,
         maxTicketsPerOrder: 3,
         reservedUnits: 3,
         adminFee: { amount: 10000, currency: 'IDR' },
-        expiresAt: new Date(today.getTime() + windowMs).toISOString(),
+        expiresAt: new Date(start + orderWindowMs(scenario)).toISOString(),
         serverNow: today.toISOString(),
       });
     }),
