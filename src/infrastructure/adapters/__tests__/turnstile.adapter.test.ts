@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HttpRequestError } from '../http.adapter';
-import { createTurnstileAdapter, TURNSTILE_SCRIPT_URL, type TurnstileApi } from '../turnstile.adapter';
+import {
+  createDisabledTurnstile,
+  createTurnstileAdapter,
+  TURNSTILE_SCRIPT_URL,
+  type TurnstileApi,
+} from '../turnstile.adapter';
 
 type Win = Window & { turnstile?: TurnstileApi };
 type RenderOptions = Parameters<TurnstileApi['render']>[1];
@@ -118,5 +123,13 @@ describe('createTurnstileAdapter', () => {
     const promise = createTurnstileAdapter(options).getToken('join');
     (document.head.querySelector('script') as HTMLScriptElement).onload?.(new Event('load'));
     await expect(promise).rejects.toMatchObject({ code: 'VERIFICATION_UNAVAILABLE' });
+  });
+});
+
+describe('createDisabledTurnstile', () => {
+  it('gives an empty token without loading the script or rendering a widget', async () => {
+    await expect(createDisabledTurnstile().getToken('join')).resolves.toBe('');
+    expect(document.head.querySelector('script')).toBeNull();
+    expect(document.body.children).toHaveLength(0);
   });
 });

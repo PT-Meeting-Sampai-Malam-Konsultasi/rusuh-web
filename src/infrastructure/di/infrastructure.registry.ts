@@ -21,7 +21,7 @@ import { createQueuePlaceStore } from '@infrastructure/adapters/queue-place-stor
 import { createQueueStreamAdapter } from '@infrastructure/adapters/queue-stream.adapter';
 import { createStorageAdapter } from '@infrastructure/adapters/storage.adapter';
 import { createTokenStore } from '@infrastructure/adapters/token-store.adapter';
-import { createTurnstileAdapter } from '@infrastructure/adapters/turnstile.adapter';
+import { createDisabledTurnstile, createTurnstileAdapter } from '@infrastructure/adapters/turnstile.adapter';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
 import { singleFlight } from '@utils/single-flight';
 import { TURNSTILE_SLOT_ID } from '@utils/constants/turnstile';
@@ -57,7 +57,13 @@ export function registerInfrastructure() {
     queuePlaceStore: asFunction(({ storage }: Pick<Deps, 'storage'>) => createQueuePlaceStore({ storage })).singleton(),
     consentStore: asFunction(({ storage }: Pick<Deps, 'storage'>) => createConsentStore({ storage })).singleton(),
     turnstile: asFunction((d: Deps) =>
-      createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
+      d.config.turnstileEnabled
+        ? createTurnstileAdapter({
+            siteKey: d.config.turnstileSiteKey,
+            getLocale: locale(d),
+            slotId: TURNSTILE_SLOT_ID,
+          })
+        : createDisabledTurnstile(),
     ).singleton(),
     // Sentry only with a DSN (off in local dev and tests); the SDK itself loads after the page is interactive.
     analyticsAdapter: asFunction((d: Deps) =>

@@ -9,6 +9,7 @@ const env: RawEnv = {
   apiTimeoutMs: undefined,
   midtransClientKey: 'SB-key',
   midtransSnapUrl: 'https://snap',
+  turnstileEnabled: undefined,
   turnstileSiteKey: 'site',
   defaultLocale: undefined,
   apiMock: undefined,
@@ -59,6 +60,20 @@ describe('config', () => {
   it('sends no request ID header unless switched on', () => {
     expect(createConfig(env).requestIdHeader).toBe(false);
     expect(createConfig({ ...env, requestIdHeader: 'true' }).requestIdHeader).toBe(true);
+  });
+
+  it('keeps Turnstile off unless switched on, and needs the site key only when on', () => {
+    expect(createConfig({ ...env, turnstileSiteKey: undefined })).toMatchObject({
+      turnstileEnabled: false,
+      turnstileSiteKey: '',
+    });
+    expect(createConfig({ ...env, turnstileEnabled: 'true' })).toMatchObject({
+      turnstileEnabled: true,
+      turnstileSiteKey: 'site',
+    });
+    expect(() => createConfig({ ...env, turnstileEnabled: 'true', turnstileSiteKey: undefined })).toThrow(
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+    );
   });
 
   it('keeps product analytics off unless switched on', () => {
