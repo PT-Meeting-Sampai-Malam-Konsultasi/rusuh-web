@@ -1,4 +1,4 @@
-// Queue types, matching the API contract (QueueState, QueuePlace, Frontier, QueueTurn, registerDevice).
+// Queue types, matching the API contract (QueueState, QueuePlace, Frontier, registerDevice).
 
 /** `preopen`: numbers are drawn at opening; `paused`: nothing sellable but holds remain; `closed`: sold out. */
 export type QueueState = 'preopen' | 'open' | 'paused' | 'closed';
@@ -22,7 +22,7 @@ export interface QueuePlace {
 /** Why the queue is `paused` or `closed` (absent otherwise). */
 export type QueuePauseReason = 'stock' | 'operator' | 'sold_out' | 'cancelled' | 'ended';
 
-/** `getFrontier` and the stream's `frontier` event: the same public snapshot for every device. */
+/** `getFrontier`: the same public snapshot for every device. */
 export interface Frontier {
   event: string;
   state: QueueState;
@@ -38,23 +38,13 @@ export interface Frontier {
   /** Fast end of the speed: the lower end of the wait range (FR-09). */
   rateHigh?: number;
   rateSource?: 'prior' | 'measured';
-  /** Devices at or below this position may open the stream; 0 turns streaming off (ADR-0015). */
+  /** ADR-0015 stream threshold. Not used: the web follows the queue by polling only (SSE dropped, 13 Nov 2026). */
   streamFrom?: number;
   reason?: QueuePauseReason;
   /** Sale opening, Unix seconds. */
   opensAt?: number;
   /** Server time of the snapshot, Unix seconds. */
   ts: number;
-}
-
-/** The stream's `turn` event, once `seq <= served`. */
-export interface QueueTurn {
-  event: string;
-  seq: number;
-  served: number;
-  /** Claim before this or the turn is missed (60 s, FR-08). */
-  turnExpiresAt: string;
-  serverNow: string;
 }
 
 /** `claimTurn`: the admission for the order page (ADR-0021). */

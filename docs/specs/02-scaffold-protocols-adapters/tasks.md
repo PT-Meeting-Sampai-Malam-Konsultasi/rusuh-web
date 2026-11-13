@@ -1,5 +1,8 @@
 # Implementation Plan: Scaffold step 2 — protocols, config, adapters
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only.
+> `QueueStreamProtocol` and the queue-stream adapter were removed.
+
 ## Overview
 
 Define the framework-free contracts in src/core/protocols and their implementations in src/infrastructure (scaffold-app step 2).

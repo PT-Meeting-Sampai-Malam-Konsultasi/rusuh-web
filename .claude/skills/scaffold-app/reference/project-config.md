@@ -18,8 +18,7 @@ npm install -D vitest @vitejs/plugin-react vite-tsconfig-paths jsdom \
   husky lint-staged @commitlint/cli @commitlint/config-conventional
 ```
 
-Add later, when the feature needs it: an SSE client that can send headers (e.g. `@microsoft/fetch-event-source`) for the
-queue stream (ADR-0015); `openapi-typescript` to generate API types from `../rusuh-documentation/api/openapi.yaml`.
+Add later, when the feature needs it: `openapi-typescript` to generate API types from `../rusuh-documentation/api/openapi.yaml`.
 
 ## `tsconfig.json`
 

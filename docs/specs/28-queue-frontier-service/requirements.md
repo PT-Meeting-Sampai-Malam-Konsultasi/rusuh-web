@@ -1,5 +1,8 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. The
+> queue-stream adapter, its protocol and the stream mock (`stream_off`, `TOO_FAR`, `STREAM_FULL`) were removed.
+
 ## Introduction
 
 Wraps the queue frontier for FR-07-W1 (rusuh-web#7, parent FR-07): `GET /queue/{eventId}/frontier` (`getFrontier`) and

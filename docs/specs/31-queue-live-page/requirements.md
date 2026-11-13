@@ -1,5 +1,8 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. Nothing on
+> the page depended on the stream; only the wording about live updates no longer applies.
+
 ## Introduction
 
 Shows the live line under the big number (FR-07-W1, rusuh-web#7), as the HiFi `.wr-eta em`: "Diperbarui 2 detik

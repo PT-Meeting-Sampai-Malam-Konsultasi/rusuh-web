@@ -7,12 +7,10 @@
 | `src/core/protocols/http.protocol.ts` | `HttpProtocol`, `HttpResponse<T>`, `HttpError`, `RequestConfig` |
 | `src/core/protocols/storage.protocol.ts` | `StorageProtocol` (`get`, `set`, `remove`; string values) |
 | `src/core/protocols/analytics.protocol.ts` | `AnalyticsProtocol` (`trackPageView`, `trackEvent`, `reportError`) |
-| `src/core/protocols/queue-stream.protocol.ts` | `QueueStreamProtocol` (`open(eventId, handlers) → close()`) for SSE |
 | `src/infrastructure/config.ts` | `AppConfig`, `requireEnv`, `optionalEnv`, `boolEnv`, exported `config` |
 | `src/infrastructure/adapters/http.adapter.ts` | `createHttpAdapter({ baseUrl, timeoutMs, getAccessToken, getLocale, refreshSession })` with Axios |
 | `src/infrastructure/adapters/storage.adapter.ts` | `localStorage`-backed, safe when storage is unavailable |
 | `src/infrastructure/adapters/analytics.adapter.ts` | No-op or console-free implementation until a provider is chosen |
-| `src/infrastructure/adapters/queue-stream.adapter.ts` | Fetch-based SSE with device/queue tokens in headers; falls back by calling `onFallback` |
 | `__tests__` next to each adapter | Header injection, error normalisation, storage failure |
 
 ## Shapes

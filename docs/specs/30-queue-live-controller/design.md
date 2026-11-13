@@ -1,5 +1,8 @@
 # Design Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. The stream
+> effect, `queue_stream` analytics and the `fellBack` state were removed; the frontier query polls at every position.
+
 ## Overview
 
 Adds a frontier query, a stream effect and the live place to `queue.controller.ts`. No new route.

@@ -1,5 +1,8 @@
 # Design Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only.
+> `pollDelayMs` lost its `fellBack` argument; the backoff itself is unchanged.
+
 - `pollDelayMs(position, jitter, fellBack, failures = 0)`: `min(60 s, tier × 2^failures)` before the ±20% jitter.
 - Controller: failures in a row = `errorUpdateCount` minus its value at the last success (kept in a ref, updated in
   `refetchInterval`); the jitter comes from the newest answer's arrival millisecond (success or failure).

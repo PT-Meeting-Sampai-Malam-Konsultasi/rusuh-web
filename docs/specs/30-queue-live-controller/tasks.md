@@ -1,5 +1,8 @@
 # Implementation Plan: Queue live controller
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. The stream
+> effect, `queue_stream` analytics and the `fellBack` state were removed; the frontier query polls at every position.
+
 ## Tasks
 
 - [x] 1. Frontier query with `pollDelayMs`; live place through `applyFrontier`; status from it [Requirements 1, 3]

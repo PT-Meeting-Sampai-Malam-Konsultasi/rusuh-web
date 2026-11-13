@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { Frontier } from '@core/entities/queue/queue.entity';
-import type { FollowQueueHandlers } from '@core/use_case/queue/follow-queue.use-case';
 import type { HomeEvents } from '@core/use_case/catalog/get-home-events.use-case';
 import type { JoinedPlace, JoinQueueResult } from '@core/use_case/queue/join-queue.use-case';
 
@@ -49,7 +48,6 @@ const frontier = (patch: Partial<Frontier> = {}) => ({
     state: 'open' as const,
     served: 18452,
     ratePerMin: 300,
-    streamFrom: 0,
     ts: 1,
     ...patch,
   },
@@ -73,10 +71,6 @@ describe('QueueController', () => {
   let windowState: QueryState;
   let visible: boolean;
   const router = { replace: vi.fn(), push: vi.fn() };
-  let streamHandlers: FollowQueueHandlers | undefined;
-  const closeStream = vi.fn();
-  const setQueryData = vi.fn();
-  const queryClient = { setQueryData };
   let joinState: QueryState;
   let eventsState: QueryState;
   let search: string;
@@ -95,12 +89,7 @@ describe('QueueController', () => {
     joinQueueUseCase: { execute: vi.fn().mockResolvedValue('joined') },
     followQueueUseCase: {
       poll: vi.fn().mockResolvedValue('frontier'),
-      stream: vi.fn((_eventId: string, handlers: FollowQueueHandlers) => {
-        streamHandlers = handlers;
-        return closeStream;
-      }),
     },
-    useQueryClientTanstack: () => queryClient,
     claimTurnUseCase: {
       execute: vi.fn().mockResolvedValue('claimed'),
       turnWindow: vi.fn().mockResolvedValue('window'),
@@ -146,7 +135,6 @@ describe('QueueController', () => {
     claimState = {};
     windowState = {};
     visible = true;
-    streamHandlers = undefined;
     eventsState = { data: EVENTS };
     i18n.language = 'id';
   });
@@ -396,91 +384,23 @@ describe('QueueController', () => {
       expect(interval()).toBe(false);
     });
 
-    it('stops following at the turn: no more polls or stream, the turn view takes over', () => {
+    it('stops polling at the turn, and the turn view takes over', () => {
       joinState = { data: place() };
-      frontierState = { data: frontier({ served: 19700, streamFrom: 2000 }) };
-      const d = deps();
-      const { result } = render(d);
+      frontierState = { data: frontier({ served: 19700 }) };
+      const { result } = render();
       expect(result.current.status).toBe('turn');
       expect(result.current.waiting).toBeNull();
       expect(interval()).toBe(false);
-      expect(d.followQueueUseCase.stream).not.toHaveBeenCalled();
     });
 
-    it('streams near the front instead of polling, and closes the stream on unmount', () => {
-      const d = deps();
+    it('keeps polling near the front: no stream, even when the frontier offers one (SSE dropped)', () => {
       joinState = { data: place() };
-      frontierState = { data: frontier({ streamFrom: 2000 }) };
-      const { unmount } = render(d);
-      expect(d.followQueueUseCase.stream).toHaveBeenCalledWith('evt_pelita', expect.any(Object));
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_stream', {
-        eventId: 'evt_pelita',
-        outcome: 'open',
-      });
-
-      const next = frontier({ served: 18500, streamFrom: 2000 }).frontier;
-      act(() => streamHandlers?.onFrontier(next));
-      expect(setQueryData).toHaveBeenCalledWith(['queue-frontier', 'evt_pelita'], { kind: 'frontier', frontier: next });
-      expect(frontierOptions.enabled).toBe(false);
-      act(() => streamHandlers?.onTurn({ event: 'evt_pelita', seq: 1, served: 1, turnExpiresAt: 'a', serverNow: 'b' }));
-
-      unmount();
-      expect(closeStream).toHaveBeenCalled();
-    });
-
-    it('does not stream further back than streamFrom, or when streaming is off', () => {
+      frontierState = { data: frontier({ served: 19600, streamFrom: 2000 }) };
       const d = deps();
-      joinState = { data: place() };
-      frontierState = { data: frontier({ streamFrom: 1000 }) };
-      render(d);
-      frontierState = { data: frontier({ streamFrom: 0 }) };
-      render(d);
-      expect(d.followQueueUseCase.stream).not.toHaveBeenCalled();
-    });
-
-    it('falls back to polling and tries the stream again later', () => {
-      vi.useFakeTimers({ now: 1_000_000 });
-      const d = deps();
-      joinState = { data: place() };
-      frontierState = { data: frontier({ streamFrom: 2000 }) };
-      render(d);
-      act(() => streamHandlers?.onFrontier(frontier({ streamFrom: 2000 }).frontier));
-      expect(frontierOptions.enabled).toBe(false);
-
-      act(() => streamHandlers?.onFallback('silent'));
-      expect(frontierOptions.enabled).toBe(true);
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_stream', {
-        eventId: 'evt_pelita',
-        outcome: 'silent',
-      });
-      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(1);
-      act(() => vi.advanceTimersByTime(59_000));
-      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(1);
-      act(() => vi.advanceTimersByTime(2000));
-      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(2);
-    });
-
-    it('retries a first failed connect and a closed stream after 3 s', () => {
-      vi.useFakeTimers({ now: 1_000_000 });
-      const d = deps();
-      joinState = { data: place() };
-      frontierState = { data: frontier({ streamFrom: 2000 }) };
-      render(d);
-      act(() => streamHandlers?.onFallback('connect_failed'));
-      act(() => vi.advanceTimersByTime(4000));
-      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(2);
-      act(() => streamHandlers?.onClose());
-      act(() => vi.advanceTimersByTime(4000));
-      expect(d.followQueueUseCase.stream).toHaveBeenCalledTimes(3);
-    });
-
-    it('keeps polling when there is nothing to stream with', () => {
-      const d = deps();
-      d.followQueueUseCase.stream.mockReturnValueOnce(null as never);
-      joinState = { data: place() };
-      frontierState = { data: frontier({ streamFrom: 2000 }) };
       render(d);
       expect(frontierOptions.enabled).toBe(true);
+      expect(interval()).toEqual(expect.any(Number));
+      expect(Object.keys(d.followQueueUseCase)).toEqual(['poll']);
     });
   });
 

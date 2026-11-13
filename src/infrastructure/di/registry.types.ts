@@ -11,7 +11,6 @@ import type { PrinterProtocol } from '@core/protocols/printer.protocol';
 import type { HttpProtocol } from '@core/protocols/http.protocol';
 import type { QrEncoderProtocol } from '@core/protocols/qr-encoder.protocol';
 import type { QueuePlaceStoreProtocol } from '@core/protocols/queue-place-store.protocol';
-import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
 import type { SnapProtocol } from '@core/protocols/snap.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
@@ -102,7 +101,6 @@ export interface AwilixRegistry {
   analyticsAdapter: AnalyticsProtocol;
   queueHttp: HttpProtocol;
   coreHttp: HttpProtocol;
-  queueStream: QueueStreamProtocol;
   fileSaver: FileSaverProtocol;
   printer: PrinterProtocol;
   /** Registered by the e-ticket page only (di/controllers/ticket-detail.ts): the QR library loads with that page. */

@@ -1,5 +1,9 @@
 # Implementation Plan: Queue live use case
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. `stream`,
+> `canStream`, `streamRetryDelayMs` and the 2 s fallback cap in `pollDelayMs` were removed; polling by tier, ±20% jitter
+> and the backoff stay.
+
 ## Overview
 
 Shared place math, the pure rules, then the use case and its DI registration.

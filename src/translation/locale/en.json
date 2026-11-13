@@ -171,8 +171,6 @@
   "error_missed": "You missed your turn. Please queue again.",
   "error_expired": "Time is up.",
   "error_no_stock": "Tickets are sold out.",
-  "error_too_far": "Live updates start when you are close to your turn.",
-  "error_stream_full": "Live updates are busy; your position still refreshes regularly.",
   "error_account_has_place_elsewhere": "Your account already has a place in the queue on another device.",
   "error_wrong_code": "Wrong code.",
   "error_challenge_expired": "The code has expired. Request a new one.",

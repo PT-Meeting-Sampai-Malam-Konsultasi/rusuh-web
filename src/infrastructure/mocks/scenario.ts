@@ -10,10 +10,9 @@ export const MOCK_SCENARIOS = [
   'error',
   'offline',
   'admission_invalid',
-  'stream_off',
   /** FR-08: a new number joins 20 places back, so the turn comes in seconds. */
   'near_front',
-  /** FR-07/09: a new number joins 12.000 places back: a long wait estimate, slow polling, no stream. */
+  /** FR-07/09: a new number joins 12.000 places back: a long wait estimate, slow polling. */
   'far_back',
   /** FR-05: nobody ahead, so the buyer goes straight to the order page. */
   'no_queue',

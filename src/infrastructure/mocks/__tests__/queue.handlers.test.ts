@@ -143,7 +143,6 @@ describe('queue mock', () => {
       ratePerMin: 300,
       rateLow: 240,
       rateHigh: 360,
-      streamFrom: 2000,
       ts: Math.floor(now.getTime() / 1000),
     });
     now = new Date(now.getTime() + 60_000);
@@ -157,64 +156,14 @@ describe('queue mock', () => {
     expect((await queue.getFrontier('evt_pelita')).data.served).toBe(seq);
   });
 
-  it('pauses a temporarily full queue for stock, closes a sold-out one, and turns streaming off on request', async () => {
+  it('pauses a temporarily full queue for stock, and closes a sold-out one', async () => {
     expect((await queue.getFrontier('evt_rimba')).data).toMatchObject({
       state: 'paused',
       reason: 'stock',
       ratePerMin: 0,
     });
     expect((await queue.getFrontier('evt_deru')).data).toMatchObject({ state: 'closed', reason: 'sold_out' });
-    scenario = 'stream_off';
-    expect((await queue.getFrontier('evt_pelita')).data.streamFrom).toBe(0);
     await expect(queue.getFrontier('evt_nope')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
-  });
-
-  describe('stream', () => {
-    const open = (eventId: string, headers: Record<string, string>) =>
-      fetch(`${QUEUE}/queue/${eventId}/stream`, { headers: { Accept: 'text/event-stream', ...headers } });
-
-    const readUntil = async (res: Response, text: string) => {
-      const reader = (res.body as ReadableStream<Uint8Array>).getReader();
-      const decoder = new TextDecoder();
-      let seen = '';
-      while (!seen.includes(text)) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        seen += decoder.decode(value, { stream: true });
-      }
-      await reader.cancel();
-      return seen;
-    };
-
-    it('sends retry and a frontier at once, and the turn at the front', async () => {
-      const device = await register();
-      const { seq, queueToken } = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
-      const res = await open('evt_pelita', { 'X-Device-Token': device, 'X-Queue-Token': queueToken });
-      expect(res.headers.get('content-type')).toBe('text/event-stream');
-      const first = await readUntil(res, 'event: frontier');
-      expect(first).toContain('retry: 3000');
-      expect(first).toMatch(/event: frontier\nid: \d+\ndata: \{"event":"evt_pelita"/);
-
-      now = new Date(now.getTime() + 3_600_000);
-      const atFront = await open('evt_pelita', { 'X-Device-Token': device, 'X-Queue-Token': queueToken });
-      expect(await readUntil(atFront, 'event: turn')).toContain(`"seq":${seq}`);
-    });
-
-    it('refuses a device without tokens, too far back, or with streaming off', async () => {
-      expect((await open('evt_pelita', {})).status).toBe(401);
-      const far = await register();
-      const { queueToken } = (await queue.joinQueue('evt_pelita', far, 'ts')).data;
-      // 800 more places put the next one past streamFrom (1.248 + 800 > 2.000). The mock only checks that a device
-      // header is there, so the joins skip registering and go out in parallel (one by one is too slow on CI).
-      await Promise.all(Array.from({ length: 800 }, (_, i) => queue.joinQueue('evt_pelita', `device-${i}`, 'ts')));
-      const last = await register();
-      const lastPlace = (await queue.joinQueue('evt_pelita', last, 'ts')).data;
-      const tooFar = await open('evt_pelita', { 'X-Device-Token': last, 'X-Queue-Token': lastPlace.queueToken });
-      expect(tooFar.status).toBe(409);
-      expect(await tooFar.json()).toMatchObject({ code: 'TOO_FAR' });
-      scenario = 'stream_off';
-      expect((await open('evt_pelita', { 'X-Device-Token': far, 'X-Queue-Token': queueToken })).status).toBe(409);
-    }, 15_000);
   });
 
   describe('turn', () => {
@@ -290,7 +239,7 @@ describe('queue mock', () => {
     scenario = 'far_back';
     const far = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
     expect(far.seq! - far.served!).toBe(12_000);
-    scenario = 'stream_off'; // not a placement: same number
+    scenario = 'slow'; // not a placement: same number
     expect((await queue.joinQueue('evt_pelita', device, 'ts')).data.seq).toBe(far.seq);
     scenario = 'near_front';
     // A resumed page reads the place first: the old queue is gone, so it joins the new one.

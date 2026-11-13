@@ -19,7 +19,6 @@ import { createFileSaver } from '@infrastructure/adapters/file-saver.adapter';
 import { createPrinter } from '@infrastructure/adapters/printer.adapter';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 import { createQueuePlaceStore } from '@infrastructure/adapters/queue-place-store.adapter';
-import { createQueueStreamAdapter } from '@infrastructure/adapters/queue-stream.adapter';
 import { createStorageAdapter } from '@infrastructure/adapters/storage.adapter';
 import { createTokenStore } from '@infrastructure/adapters/token-store.adapter';
 import { createDisabledTurnstile, createTurnstileAdapter } from '@infrastructure/adapters/turnstile.adapter';
@@ -114,7 +113,6 @@ export function registerInfrastructure() {
         sendRequestId: d.config.requestIdHeader,
       }),
     ).singleton(),
-    queueStream: asFunction((d: Deps) => createQueueStreamAdapter({ baseUrl: d.config.queueApiUrl })).singleton(),
     fileSaver: asFunction(() => createFileSaver()).singleton(),
     printer: asFunction(() => createPrinter()).singleton(),
 
