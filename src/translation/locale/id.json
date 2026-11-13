@@ -308,7 +308,7 @@
   "login_send_new_code": "Kirim kode baru",
   "login_resend_in": "Kirim ulang kode dalam",
   "login_resend": "Kirim ulang kode",
-  "login_spam_note": "Tidak ada di kotak masuk? Cek folder Spam atau Promosi. Pengirim: no-reply@rusuh.id. Kode berlaku {{time}}.",
+  "login_spam_note": "Tidak ada di kotak masuk? Cek folder Spam atau Promosi. Pengirim: no-reply@rusuh-tiket.web.id. Kode berlaku {{time}}.",
   "login_stamp_new": "Akun baru dibuat",
   "login_title_profile": "Satu langkah lagi.",
   "login_verified_prefix": "Email",
