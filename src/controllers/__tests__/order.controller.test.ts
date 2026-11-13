@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Category } from '@core/entities/booking/booking.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { OrderCategoriesResult } from '@core/use_case/booking/get-order-categories.use-case';
+import { HoldBookingUseCase } from '@core/use_case/booking/hold-booking.use-case';
 import { OrderTicketSelectionUseCase } from '@core/use_case/booking/order-ticket-selection.use-case';
 import {
   ValidateAttendeeUseCase,
@@ -13,6 +14,9 @@ import { ERROR_CODE_MAP } from '@utils/constants/error-codes';
 import { retryTransientOnce } from '@utils/query/retry';
 
 import OrderController from '../order.controller';
+
+let uuidCount = 0;
+vi.mock('@utils/random-uuid', () => ({ randomUuid: () => `uuid-${++uuidCount}` }));
 
 const event: EventSummary = {
   eventId: 'evt_samudra',
@@ -104,6 +108,12 @@ describe('OrderController', () => {
   );
   const mutate = vi.fn();
   let mutationOptions: Record<string, (...args: never[]) => unknown>;
+  // FR-16-W1: the hold mutation is told apart by its key; holdPending is flipped between renders.
+  const holdMutate = vi.fn();
+  let holdOptions: Record<string, (...args: never[]) => unknown>;
+  let holdPending: boolean;
+  const toggleLoading = vi.fn();
+  const openPopupError = vi.fn();
   const { checkNik } = ValidateAttendeeUseCase({ bookingService: {} as never });
 
   const deps = () => ({
@@ -116,6 +126,7 @@ describe('OrderController', () => {
     orderTicketSelectionUseCase: OrderTicketSelectionUseCase(),
     validateAttendeeUseCase: { checkNik, execute: vi.fn() },
     endOrderWindowUseCase: { execute: vi.fn(() => ({ kind: 'ended' })) },
+    holdBookingUseCase: { ...HoldBookingUseCase({ bookingService: {} as never }), execute: vi.fn() },
     admissionStore: { get: vi.fn().mockReturnValue('adm_token'), set: vi.fn(), clear: vi.fn() },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -127,10 +138,16 @@ describe('OrderController', () => {
     },
     useTranslation: () => ({ t, i18n }),
     useRouterNext: () => router,
-    useMutationTanstack: (options: Record<string, (...args: never[]) => unknown>) => {
+    useMutationTanstack: (options: Record<string, (...args: never[]) => unknown> & { mutationKey?: unknown[] }) => {
+      if (options.mutationKey?.[0] === 'order-hold') {
+        holdOptions = options;
+        return { mutate: holdMutate, isPending: holdPending };
+      }
       mutationOptions = options;
       return { mutate, isPending: false };
     },
+    useLoading: () => ({ isLoading: false, toggleLoading }),
+    usePopupError: () => ({ openPopupError, closePopupError: vi.fn() }),
     useSearchParamsNext: () => ({ get: (key: string) => search[key] ?? null }),
     useQueryTanstack: (options: { queryKey: unknown[] } & Record<string, unknown>) => {
       if (options.queryKey[0] === 'event') {
@@ -168,6 +185,8 @@ describe('OrderController', () => {
     search = { event: 'evt_samudra' };
     i18n.language = 'id';
     answeredAt = Date.now();
+    holdPending = false;
+    uuidCount = 0;
   });
 
   describe('queries', () => {
@@ -2027,6 +2046,584 @@ describe('OrderController', () => {
         eventId: 'evt_samudra',
         admissionToken: null,
       });
+    });
+  });
+
+  describe('order hold (FR-16-W1)', () => {
+    const NIK_A = '3174055203960004';
+    const NIK_B = '3174055203960001';
+    const NIK_C = '3201014101900002';
+    const SIGN_IN = '/login?next=%2Forder%3Fevent%3Devt_samudra';
+    type Hook = { result: { current: ReturnType<typeof OrderController> }; rerender: () => void };
+    type Vars = { slotKey: string; fieldIndex: number; fullName: string; nik: string };
+    type HoldInput = {
+      eventId: string;
+      admissionToken: string | null;
+      idempotencyKey: string;
+      tickets: { categoryId: string; validationToken: string; nikLast4: string }[];
+      bookingId: string | null;
+    };
+
+    const festivalB: Category = {
+      categoryId: 'cat_b',
+      name: 'Festival B',
+      seating: 'standing',
+      price: { amount: 850000, currency: 'IDR' },
+      availability: 'available',
+    };
+    const tribunAtas: Category = {
+      categoryId: 'cat_t',
+      name: 'Tribun Atas',
+      seating: 'seated',
+      price: { amount: 450000, currency: 'IDR' },
+      availability: 'available',
+    };
+    const holdResult: OrderCategoriesResult = {
+      ...okResult,
+      categories: [festivalB, tribunAtas],
+      adminFee: { amount: 10000, currency: 'IDR' },
+    };
+    const names = ['Nadia', 'Sari', 'Dewi'];
+    const niks = [NIK_A, NIK_B, NIK_C];
+
+    /** The real error map: the hold maps codes the minimal test map does not have. */
+    const holdDeps = () => ({ ...deps(), ERROR_CODE_MAP });
+    const ready = () => {
+      eventState = { data: event };
+      categoriesState = { data: holdResult, dataUpdatedAt: answeredAt };
+    };
+    const valid = (token: string): ValidateAttendeeResult => ({
+      kind: 'valid',
+      validationToken: token,
+      nikMasked: '3174********0004',
+      expiresAt: '2026-11-09T03:10:00Z',
+    });
+    const holder = (hook: Hook, i: number) => hook.result.current.holders[i];
+    /** Fills ticket i and settles its Dukcapil check with `result`. */
+    const check = (hook: Hook, i: number, name: string, nik: string, result: ValidateAttendeeResult) => {
+      act(() => holder(hook, i).name.onChange(name));
+      act(() => holder(hook, i).nik.onFocus());
+      act(() => holder(hook, i).nik.onChange(nik));
+      act(() => holder(hook, i).nik.onBlur());
+      const v = mutate.mock.calls.at(-1)?.[0] as Vars;
+      act(() => void mutationOptions.onMutate(v as never));
+      act(() => void mutationOptions.onSuccess(result as never, v as never));
+    };
+    /** Picks the categories in order and verifies every holder (tokens vt_0, vt_1, …). */
+    const arrange = (picks: string[] = ['cat_b', 'cat_b'], d = holdDeps()) => {
+      ready();
+      const hook = renderHook(() => OrderController(d as never));
+      for (const id of picks) act(() => hook.result.current.increment(id));
+      picks.forEach((_, i) => check(hook, i, names[i], niks[i], valid(`vt_${i}`)));
+      return { hook, d };
+    };
+    const tap = (hook: Hook) => act(() => hook.result.current.checkout?.onContinue());
+    const lastInput = () => holdMutate.mock.calls.at(-1)?.[0] as HoldInput;
+    const succeed = (result: unknown, input: HoldInput = lastInput()) =>
+      act(() => void holdOptions.onSuccess(result as never, input as never));
+    const failWith = (error: Record<string, unknown>, input: HoldInput = lastInput()) =>
+      act(() => void holdOptions.onError({ message: 'raw', ...error } as never, input as never));
+    const failed = (d: ReturnType<typeof holdDeps>) =>
+      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === 'order_hold_failed').map(([, p]) => p);
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('registers one hold mutation by key, without retries', () => {
+      arrange([]);
+      expect(holdOptions.mutationKey).toEqual(['order-hold']);
+      expect(holdOptions.retry).toBe(false);
+    });
+
+    it('summarises lines in category order, the fee once per order and the total (ID and EN)', () => {
+      const { hook } = arrange(['cat_t', 'cat_b', 'cat_b']);
+      expect(hook.result.current.summary).toEqual({
+        heading: 'order_summary_heading',
+        lines: [
+          {
+            key: 'cat_b',
+            label: 'order_summary_line:{"quantity":2,"category":"Festival B"}',
+            amount: 'Rp 1.700.000',
+          },
+          { key: 'cat_t', label: 'order_summary_line:{"quantity":1,"category":"Tribun Atas"}', amount: 'Rp 450.000' },
+        ],
+        feeLabel: 'order_summary_fee',
+        fee: 'Rp 10.000',
+        totalLabel: 'order_summary_total',
+        total: 'Rp 2.160.000',
+        note: 'order_summary_note',
+        ticketCount: 'order_summary_tickets:{"count":3}',
+        dockLabel: 'order_summary_dock_label',
+      });
+      i18n.language = 'en';
+      hook.rerender();
+      expect(hook.result.current.summary?.total).toBe('Rp 2,160,000');
+      expect(hook.result.current.summary?.lines[0].amount).toBe('Rp 1,700,000');
+    });
+
+    it('charges the same fee for 1, 2 or 3 tickets', () => {
+      ready();
+      const hook = renderHook(() => OrderController(holdDeps() as never));
+      const fees: (string | undefined)[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        act(() => hook.result.current.increment('cat_b'));
+        fees.push(hook.result.current.summary?.fee);
+      }
+      expect(fees).toEqual(['Rp 10.000', 'Rp 10.000', 'Rp 10.000']);
+      expect(hook.result.current.summary?.total).toBe('Rp 2.560.000');
+    });
+
+    it.each<[string, () => void]>([
+      ['loading', () => {}],
+      ['error', () => void (eventState = err(0, 'NETWORK_ERROR'))],
+      ['not-found', () => void (search = {})],
+      ['0 tickets', () => ready()],
+    ])('has no summary and no checkout while %s', (_name, setup) => {
+      setup();
+      const { result } = renderHook(() => OrderController(holdDeps() as never));
+      expect(result.current.summary).toBeNull();
+      expect(result.current.checkout).toBeNull();
+    });
+
+    it('has no summary and no checkout once the time is up', () => {
+      vi.useFakeTimers({ now: new Date('2026-11-09T03:00:00Z') });
+      answeredAt = Date.now();
+      const { hook } = arrange(['cat_b']);
+      expect(hook.result.current.checkout?.enabled).toBe(true);
+      act(() => void vi.advanceTimersByTime(300_000));
+      expect(hook.result.current.timeUp).toBe(true);
+      expect(hook.result.current.summary).toBeNull();
+      expect(hook.result.current.checkout).toBeNull();
+    });
+
+    it('is enabled with no hint once every holder is verified', () => {
+      const { hook } = arrange();
+      expect(hook.result.current.checkout).toEqual({
+        label: 'order_checkout_label',
+        shortLabel: 'order_checkout_short_label',
+        enabled: true,
+        busy: false,
+        hint: null,
+        onContinue: expect.any(Function),
+      });
+    });
+
+    it('is disabled with the neutral holders hint until every holder is verified, and ignores a tap', () => {
+      ready();
+      const hook = renderHook(() => OrderController(holdDeps() as never));
+      act(() => hook.result.current.increment('cat_b'));
+      act(() => hook.result.current.increment('cat_b'));
+      check(hook, 0, 'Nadia', NIK_A, valid('vt_0'));
+      expect(hook.result.current.checkout).toMatchObject({
+        enabled: false,
+        busy: false,
+        hint: { text: 'order_checkout_hint_holders', error: false },
+      });
+      tap(hook);
+      expect(holdMutate).not.toHaveBeenCalled();
+    });
+
+    it('is busy, disabled and without a hint while the hold is in flight', () => {
+      const { hook } = arrange();
+      holdPending = true;
+      hook.rerender();
+      expect(hook.result.current.checkout).toMatchObject({ enabled: false, busy: true, hint: null });
+      tap(hook);
+      expect(holdMutate).not.toHaveBeenCalled();
+    });
+
+    it('sends the tickets in slot order with tokens and last 4 digits, once per double tap', () => {
+      const { hook, d } = arrange(['cat_b', 'cat_t']);
+      act(() => {
+        hook.result.current.checkout?.onContinue();
+        hook.result.current.checkout?.onContinue();
+      });
+      expect(holdMutate).toHaveBeenCalledTimes(1);
+      expect(holdMutate).toHaveBeenCalledWith({
+        eventId: 'evt_samudra',
+        admissionToken: 'adm_token',
+        idempotencyKey: 'uuid-1',
+        tickets: [
+          { categoryId: 'cat_b', validationToken: 'vt_0', nikLast4: '0004' },
+          { categoryId: 'cat_t', validationToken: 'vt_1', nikLast4: '0001' },
+        ],
+        bookingId: null,
+      });
+      expect(d.admissionStore.get).toHaveBeenLastCalledWith('evt_samudra');
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('order_continue_tapped', {
+        eventId: 'evt_samudra',
+        tickets: 2,
+      });
+    });
+
+    it('runs the use case with the loading overlay in all three paths', async () => {
+      const { hook, d } = arrange();
+      tap(hook);
+      const input = lastInput();
+      d.holdBookingUseCase.execute.mockResolvedValue({ kind: 'not-verified' });
+      await expect((holdOptions.mutationFn as (i: HoldInput) => Promise<unknown>)(input)).resolves.toEqual({
+        kind: 'not-verified',
+      });
+      expect(d.holdBookingUseCase.execute).toHaveBeenCalledWith(input);
+      expect(toggleLoading).toHaveBeenCalledTimes(1);
+      succeed({ kind: 'not-verified' });
+      expect(toggleLoading).toHaveBeenCalledTimes(2);
+      failWith({ status: 500, code: 'INTERNAL_ERROR' });
+      expect(toggleLoading).toHaveBeenCalledTimes(3);
+    });
+
+    it('keeps the key and the booking after a retryable failure, and renews both for a new selection', () => {
+      const { hook } = arrange();
+      tap(hook);
+      expect(lastInput()).toMatchObject({ idempotencyKey: 'uuid-1', bookingId: null });
+      succeed({ kind: 'retryable', code: 'PAYMENT_PROVIDER_BUSY', bookingId: 'bk1', requestId: 'req-123' });
+      tap(hook);
+      expect(lastInput()).toMatchObject({ idempotencyKey: 'uuid-1', bookingId: 'bk1' });
+      succeed({ kind: 'retryable', code: 'INTERNAL_ERROR', bookingId: 'bk1' });
+      check(hook, 0, 'Nadia Putri', NIK_A, valid('vt_new'));
+      tap(hook);
+      expect(lastInput()).toMatchObject({ idempotencyKey: 'uuid-2', bookingId: null });
+      expect(lastInput().tickets[0].validationToken).toBe('vt_new');
+    });
+
+    it('starts a new attempt after not-held', () => {
+      const { hook } = arrange();
+      tap(hook);
+      succeed({ kind: 'retryable', code: 'INTERNAL_ERROR', bookingId: 'bk1' });
+      tap(hook);
+      succeed({ kind: 'not-held' });
+      tap(hook);
+      expect(lastInput()).toMatchObject({ idempotencyKey: 'uuid-2', bookingId: null });
+    });
+
+    it('lets the retry popup run the latest checkout handler', () => {
+      const { hook } = arrange();
+      tap(hook);
+      succeed({ kind: 'retryable', code: 'PAYMENT_PROVIDER_BUSY', bookingId: 'bk1', requestId: 'req-123' });
+      expect(openPopupError).toHaveBeenCalledWith({
+        message: ERROR_CODE_MAP.PAYMENT_PROVIDER_BUSY,
+        reference: 'req-123',
+        actionLabel: 'action_retry',
+        onAction: expect.any(Function),
+      });
+      const { onAction } = openPopupError.mock.calls[0][0] as { onAction: () => void };
+      act(() => onAction());
+      expect(holdMutate).toHaveBeenCalledTimes(2);
+      expect(lastInput()).toMatchObject({ idempotencyKey: 'uuid-1', bookingId: 'bk1' });
+    });
+
+    it('goes to the payment page on held, stays busy and blocks every later redirect', () => {
+      const { hook, d } = arrange();
+      tap(hook);
+      succeed({ kind: 'held', bookingId: 'bk1', resumed: false });
+      expect(router.push).toHaveBeenCalledWith('/payment?booking=bk1');
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('order_hold_created', {
+        eventId: 'evt_samudra',
+        tickets: 2,
+        resumed: false,
+      });
+      expect(hook.result.current.checkout).toMatchObject({ enabled: false, busy: true, hint: null });
+      tap(hook);
+      expect(holdMutate).toHaveBeenCalledTimes(1);
+      categoriesState = { data: { kind: 'admission-invalid' } };
+      hook.rerender();
+      hook.rerender();
+      expect(replace).not.toHaveBeenCalled();
+      expect(openPopupError).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, unknown, Record<string, unknown>, () => void]>([
+      [
+        'not-verified',
+        { kind: 'not-verified' },
+        { outcome: 'not-verified' },
+        () => {
+          expect(openPopupError).not.toHaveBeenCalled();
+          expect(router.push).not.toHaveBeenCalled();
+        },
+      ],
+      [
+        'active-booking (selection)',
+        { kind: 'active-booking', bookingId: 'bk9', status: 'SELECTION' },
+        { outcome: 'active-booking', code: 'ACCOUNT_HAS_ACTIVE_BOOKING' },
+        () => {
+          expect(openPopupError).toHaveBeenCalledWith({ message: 'error_account_has_active_booking' });
+          expect(router.push).not.toHaveBeenCalled();
+        },
+      ],
+      [
+        'active-booking (unknown)',
+        { kind: 'active-booking', bookingId: null, status: null },
+        { outcome: 'active-booking', code: 'ACCOUNT_HAS_ACTIVE_BOOKING' },
+        () => expect(openPopupError).toHaveBeenCalledWith({ message: 'error_account_has_active_booking' }),
+      ],
+      [
+        'not-held',
+        { kind: 'not-held' },
+        { outcome: 'not-held', code: 'BOOKING_NOT_HELD' },
+        () => expect(openPopupError).toHaveBeenCalledWith({ message: 'error_booking_not_held' }),
+      ],
+      [
+        'admission-invalid',
+        { kind: 'admission-invalid' },
+        { outcome: 'admission-invalid' },
+        () => {
+          expect(replace).toHaveBeenCalledTimes(1);
+          expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+          expect(openPopupError).not.toHaveBeenCalled();
+        },
+      ],
+      [
+        'unauthorized',
+        { kind: 'unauthorized' },
+        { outcome: 'unauthorized' },
+        () => {
+          expect(router.push).toHaveBeenCalledWith(SIGN_IN);
+          expect(openPopupError).not.toHaveBeenCalled();
+        },
+      ],
+      [
+        'retryable NETWORK_ERROR',
+        { kind: 'retryable', code: 'NETWORK_ERROR', bookingId: null },
+        { outcome: 'retryable', code: 'NETWORK_ERROR' },
+        () =>
+          expect(openPopupError).toHaveBeenCalledWith({
+            message: 'error_network_error',
+            reference: undefined,
+            actionLabel: 'action_retry',
+            onAction: expect.any(Function),
+          }),
+      ],
+      [
+        'retryable with an unmapped code',
+        { kind: 'retryable', code: 'SOMETHING_NEW', bookingId: null, requestId: 'req-9' },
+        { outcome: 'retryable', code: 'SOMETHING_NEW' },
+        () =>
+          expect(openPopupError).toHaveBeenCalledWith(
+            expect.objectContaining({ message: ERROR_CODE_MAP.UNKNOWN_ERROR, reference: 'req-9' }),
+          ),
+      ],
+    ])('handles %s', (_name, result, params, expectEffect) => {
+      const { hook, d } = arrange();
+      tap(hook);
+      succeed(result);
+      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', ...params }]);
+      expect(categoriesRefetch).not.toHaveBeenCalled();
+      expectEffect();
+      // Every outcome but held lets the buyer tap again.
+      expect(hook.result.current.checkout?.busy).toBe(false);
+    });
+
+    it('admission-invalid redirects only once', () => {
+      const { hook } = arrange();
+      tap(hook);
+      succeed({ kind: 'admission-invalid' });
+      succeed({ kind: 'admission-invalid' });
+      expect(replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers the pending active booking and goes to its payment page', () => {
+      const { hook } = arrange();
+      tap(hook);
+      succeed({ kind: 'active-booking', bookingId: 'bk9', status: 'PAYMENT_PENDING' });
+      expect(openPopupError).toHaveBeenCalledWith({
+        message: 'error_account_has_active_booking',
+        actionLabel: 'order_hold_open_active',
+        onAction: expect.any(Function),
+      });
+      const { onAction } = openPopupError.mock.calls[0][0] as { onAction: () => void };
+      act(() => onAction());
+      expect(router.push).toHaveBeenCalledWith('/payment?booking=bk9');
+      expect(hook.result.current.checkout).toMatchObject({ enabled: false, busy: true });
+      categoriesState = { data: { kind: 'admission-invalid' } };
+      hook.rerender();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('marks a conflicting slot with the seat-taken field error and keeps the others', () => {
+      const { hook, d } = arrange();
+      tap(hook);
+      succeed({ kind: 'nik-conflict', code: 'NIK_SEAT_TAKEN', slotIndexes: [1], bookingId: 'bk1' });
+      expect(holder(hook, 0).nik.valid).toBe('order_nik_valid');
+      expect(holder(hook, 1).nik.error).toBe('error_nik_seat_taken order_nik_use_another');
+      expect(hook.result.current.allHoldersVerified).toBe(false);
+      expect(hook.result.current.checkout?.hint).toEqual({ text: 'order_checkout_hint_holders', error: false });
+      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: 'nik-conflict', code: 'NIK_SEAT_TAKEN' }]);
+      expect(openPopupError).not.toHaveBeenCalled();
+    });
+
+    it('marks a duplicate slot with the duplicate field error', () => {
+      const { hook } = arrange();
+      tap(hook);
+      succeed({ kind: 'nik-conflict', code: 'DUPLICATE_NIK', slotIndexes: [0], bookingId: null });
+      expect(holder(hook, 0).nik.error).toBe('error_duplicate_nik');
+      expect(holder(hook, 1).nik.valid).toBe('order_nik_valid');
+    });
+
+    it.each<[string, unknown, string]>([
+      [
+        'nik-conflict without a slot',
+        { kind: 'nik-conflict', code: 'NIK_SEAT_TAKEN', slotIndexes: [], bookingId: null },
+        'NIK_SEAT_TAKEN',
+      ],
+      ['attendees-stale', { kind: 'attendees-stale' }, 'ATTENDEE_NOT_VALIDATED'],
+    ])('%s asks every holder to recheck and says why', (_name, result, code) => {
+      const { hook, d } = arrange();
+      tap(hook);
+      succeed(result);
+      for (const i of [0, 1]) {
+        expect(holder(hook, i).nik).toMatchObject({
+          error: ERROR_CODE_MAP.ATTENDEE_NOT_VALIDATED,
+          canRecheck: true,
+          valid: undefined,
+        });
+      }
+      expect(hook.result.current.checkout).toMatchObject({
+        enabled: false,
+        hint: { text: ERROR_CODE_MAP[code], error: true },
+      });
+      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: (result as { kind: string }).kind, code }]);
+      mutate.mockClear();
+      act(() => holder(hook, 0).nik.recheck());
+      expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ slotKey: 'cat_b-1', nik: NIK_A }));
+    });
+
+    it('flags a sold-out category, refreshes the categories and clears the flag once it is removed', () => {
+      const { hook, d } = arrange(['cat_b', 'cat_t']);
+      tap(hook);
+      succeed({ kind: 'sold-out', categoryId: 'cat_b', bookingId: null });
+      expect(categoriesRefetch).toHaveBeenCalledTimes(1);
+      expect(hook.result.current.allHoldersVerified).toBe(true);
+      expect(hook.result.current.checkout).toMatchObject({
+        enabled: false,
+        hint: { text: 'order_hold_sold_out:{"category":"Festival B"}', error: true },
+      });
+      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: 'sold-out', code: 'CATEGORY_SOLD_OUT' }]);
+      act(() => hook.result.current.decrement('cat_b'));
+      expect(hook.result.current.checkout).toMatchObject({ enabled: true, hint: null });
+    });
+
+    it('blocks with the generic sold-out message when the category is unknown', () => {
+      const { hook } = arrange();
+      tap(hook);
+      succeed({ kind: 'sold-out', categoryId: null, bookingId: null });
+      expect(hook.result.current.checkout).toMatchObject({
+        enabled: false,
+        hint: { text: ERROR_CODE_MAP.CATEGORY_SOLD_OUT, error: true },
+      });
+    });
+
+    it('flags an over-reservation until the quantities change', () => {
+      const { hook, d } = arrange(['cat_b', 'cat_t']);
+      tap(hook);
+      succeed({ kind: 'over-reservation', categoryId: null });
+      expect(categoriesRefetch).toHaveBeenCalledTimes(1);
+      expect(hook.result.current.checkout).toMatchObject({
+        enabled: false,
+        hint: { text: 'order_hold_over_reservation', error: true },
+      });
+      expect(failed(d)).toEqual([
+        { eventId: 'evt_samudra', outcome: 'over-reservation', code: 'QUANTITY_OVER_RESERVATION' },
+      ]);
+      act(() => hook.result.current.decrement('cat_t'));
+      expect(hook.result.current.checkout).toMatchObject({ enabled: true, hint: null });
+    });
+
+    it('sends a 401 from onError to sign-in', () => {
+      const { hook, d } = arrange();
+      tap(hook);
+      failWith({ status: 401, code: 'UNAUTHORIZED' });
+      expect(router.push).toHaveBeenCalledWith(SIGN_IN);
+      expect(openPopupError).not.toHaveBeenCalled();
+      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: 'error', code: 'UNAUTHORIZED' }]);
+    });
+
+    it.each([
+      ['VALIDATION_FAILED', ERROR_CODE_MAP.VALIDATION_FAILED],
+      ['SOMETHING_NEW', ERROR_CODE_MAP.UNKNOWN_ERROR],
+    ])('maps a rethrown %s to a popup with the request id', (code, message) => {
+      const { hook, d } = arrange();
+      tap(hook);
+      failWith({ status: 422, code, requestId: 'req-422' });
+      expect(openPopupError).toHaveBeenCalledWith({ message, reference: 'req-422' });
+      expect(router.push).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
+      tap(hook);
+      expect(holdMutate).toHaveBeenCalledTimes(2);
+    });
+
+    describe('time up while holding', () => {
+      const start = () => {
+        vi.useFakeTimers({ now: new Date('2026-11-09T03:00:00Z') });
+        answeredAt = Date.now();
+        return arrange();
+      };
+
+      it('does not latch while the hold is in flight, then latches when it fails', () => {
+        const { hook, d } = start();
+        tap(hook);
+        holdPending = true;
+        hook.rerender();
+        act(() => void vi.advanceTimersByTime(300_000));
+        expect(hook.result.current.timer?.seconds).toBe(0);
+        expect(hook.result.current.timeUp).toBe(false);
+        expect(d.endOrderWindowUseCase.execute).not.toHaveBeenCalled();
+        succeed({ kind: 'retryable', code: 'INTERNAL_ERROR', bookingId: null });
+        holdPending = false;
+        hook.rerender();
+        expect(hook.result.current.timeUp).toBe(true);
+        expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      });
+
+      it('never latches or ends the window after held', () => {
+        const { hook, d } = start();
+        tap(hook);
+        holdPending = true;
+        hook.rerender();
+        succeed({ kind: 'held', bookingId: 'bk1', resumed: true });
+        holdPending = false;
+        hook.rerender();
+        act(() => void vi.advanceTimersByTime(300_000));
+        hook.rerender();
+        expect(hook.result.current.timeUp).toBe(false);
+        expect(hook.result.current.timeUpSheet).toBeNull();
+        expect(d.endOrderWindowUseCase.execute).not.toHaveBeenCalled();
+        expect(d.admissionStore.clear).not.toHaveBeenCalled();
+      });
+    });
+
+    it('never passes a name, NIK, last 4 digits, token or booking id to analytics', () => {
+      const { hook, d } = arrange();
+      tap(hook);
+      succeed({ kind: 'retryable', code: 'INTERNAL_ERROR', bookingId: 'bk_secret' });
+      tap(hook);
+      succeed({ kind: 'nik-conflict', code: 'NIK_SEAT_TAKEN', slotIndexes: [0], bookingId: 'bk_secret' });
+      failWith({ status: 500, code: 'INTERNAL_ERROR' });
+      check(hook, 0, 'Nadia', NIK_C, valid('vt_2'));
+      tap(hook);
+      succeed({ kind: 'held', bookingId: 'bk_secret', resumed: false });
+      const calls = JSON.stringify([
+        d.analyticsAdapter.trackEvent.mock.calls,
+        d.analyticsAdapter.trackPageView.mock.calls,
+      ]);
+      for (const secret of [
+        NIK_A,
+        NIK_B,
+        NIK_C,
+        'Nadia',
+        'Sari',
+        'vt_0',
+        'vt_1',
+        'vt_2',
+        'adm_token',
+        '0004',
+        '0001',
+        'bk_secret',
+      ]) {
+        expect(calls).not.toContain(secret);
+      }
+      expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
     });
   });
 });

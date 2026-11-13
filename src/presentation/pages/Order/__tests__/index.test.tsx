@@ -76,6 +76,8 @@ const base = (): OrderControllerInterface => ({
   timer: null,
   timeUp: false,
   timeUpSheet: null,
+  summary: null,
+  checkout: null,
 });
 
 const holder: OrderControllerInterface['holders'][number] = {
