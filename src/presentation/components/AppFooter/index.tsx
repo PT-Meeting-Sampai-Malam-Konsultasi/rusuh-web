@@ -1,4 +1,7 @@
+import Link from 'next/link';
 import type { TFunction } from 'i18next';
+
+import { ROUTES } from '@utils/constants/routes';
 
 import styles from './app-footer.module.css';
 
@@ -6,8 +9,12 @@ interface AppFooterProps {
   t: TFunction;
 }
 
-// Legal and help pages are not built yet; the links keep their place in the layout.
-const LINKS = ['footer_terms', 'footer_privacy', 'footer_refund', 'footer_help'] as const;
+const LINKS = [
+  ['footer_terms', ROUTES.TERMS],
+  ['footer_privacy', ROUTES.PRIVACY],
+  ['footer_refund', ROUTES.REFUND],
+  ['footer_help', ROUTES.HELP],
+] as const;
 
 /** Desktop footer (the phone has the tab bar instead). */
 export default function AppFooter({ t }: AppFooterProps) {
@@ -16,10 +23,10 @@ export default function AppFooter({ t }: AppFooterProps) {
       <div className={styles.inner}>
         <span>{t('footer_copyright')}</span>
         <nav className={styles.links}>
-          {LINKS.map((key) => (
-            <a key={key} className={styles.link} href="#">
+          {LINKS.map(([key, href]) => (
+            <Link key={key} className={styles.link} href={href}>
               {t(key)}
-            </a>
+            </Link>
           ))}
           {/* Opens the privacy settings (NFR-09-W2); shown only while analytics is on (`html[data-consent]`). */}
           <a className={`${styles.link} ${styles.cookies}`} href="#cookie-settings">

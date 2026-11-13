@@ -8,6 +8,10 @@ export const ROUTES = {
   TICKETS: '/tickets',
   TICKET_DETAIL: '/tickets/detail',
   ACCOUNT: '/account',
+  TERMS: '/terms',
+  PRIVACY: '/privacy',
+  REFUND: '/refund',
+  HELP: '/help',
 } as const;
 
 export const withQuery = (path: string, params: Record<string, string>) =>

@@ -64,6 +64,7 @@ const KEYS = {
   ERROR_CODE_MAP: true,
   accountController: true,
   homeController: true,
+  infoController: true,
   loginController: true,
   notFoundController: true,
   orderController: true,

@@ -1,0 +1,154 @@
+@reference "../../../styles/app.css";
+
+/* Leaves room for the phone tab bar; the desktop footer follows the content. */
+.page {
+  @apply flex min-h-screen flex-col pb-[84px];
+
+  @variant md {
+    @apply pb-0;
+  }
+}
+
+.main {
+  @apply mx-auto w-full max-w-[calc(1328px+112px)] flex-1 px-4 pt-[22px] pb-14;
+
+  @variant md {
+    @apply px-14 pt-9;
+  }
+}
+
+.hero {
+  @apply max-w-[880px];
+}
+
+.title {
+  @apply -ml-1 font-display text-[44px] leading-[0.88] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.02em;
+
+  @variant md {
+    font-size: clamp(64px, 8vw, 112px);
+  }
+}
+
+.lead {
+  @apply mt-3 text-base text-ink-2;
+
+  @variant md {
+    @apply mt-4 text-xl;
+  }
+}
+
+.updated {
+  @apply mt-3 text-[13px] text-ink-3;
+}
+
+.layout {
+  @apply mt-7 grid gap-7;
+
+  @variant lg {
+    @apply mt-12 grid-cols-[240px_minmax(0,760px)] gap-14;
+  }
+}
+
+/* Phone: a row of chips under the title. Desktop: a sticky list beside the text. */
+.side {
+  @variant lg {
+    @apply sticky top-24 self-start;
+  }
+}
+
+.sideList {
+  @apply flex list-none flex-wrap gap-2;
+
+  @variant lg {
+    @apply grid gap-0 border-t-[2.5px] border-ink;
+  }
+}
+
+.sideLink {
+  @apply inline-flex min-h-11 items-center border-[2.5px] border-ink bg-card px-3.5 text-sm font-semibold text-ink no-underline;
+  transition: background-color 150ms var(--ease-out-print);
+
+  &:hover {
+    @apply bg-paper-2;
+  }
+
+  &:focus-visible {
+    @apply outline-none;
+    box-shadow: var(--shadow-off-s);
+  }
+
+  &[aria-current='page'] {
+    @apply bg-ink text-paper;
+  }
+
+  @variant lg {
+    @apply flex border-0 border-b border-hair bg-transparent px-0 text-base;
+
+    &:hover {
+      @apply bg-transparent underline;
+    }
+
+    &[aria-current='page'] {
+      @apply bg-transparent text-pink-ink;
+    }
+  }
+}
+
+.body {
+  @apply grid gap-8;
+
+  @variant md {
+    @apply gap-10;
+  }
+}
+
+.section {
+  @apply grid gap-3;
+}
+
+.sectionTitle {
+  @apply font-display text-[24px] leading-none font-extrabold;
+  font-stretch: 85%;
+
+  @variant md {
+    @apply text-[30px];
+  }
+}
+
+.paragraph {
+  @apply text-[15px] leading-relaxed text-ink-2;
+
+  @variant md {
+    @apply text-base;
+  }
+}
+
+/* Quiet trust zone: no tilt, no print effects. */
+.contact {
+  @apply grid justify-items-start gap-3 border-[2.5px] border-ink bg-card p-5;
+
+  @variant md {
+    @apply p-7;
+  }
+}
+
+.contactTitle {
+  @apply font-display text-[22px] leading-none font-extrabold;
+  font-stretch: 85%;
+}
+
+.contactLink {
+  @apply text-base font-semibold text-ink underline;
+  text-underline-offset: 3px;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-none;
+    box-shadow: var(--shadow-off-s);
+  }
+}
