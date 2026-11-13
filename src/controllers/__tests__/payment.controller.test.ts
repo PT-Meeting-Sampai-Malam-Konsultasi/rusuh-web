@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PaymentView, SnapTransaction } from '@core/entities/payment/payment.entity';
 import type { PaymentPageResult, PaymentStep, PayResult } from '@core/use_case/payment/pay-booking.use-case';
@@ -67,6 +67,7 @@ interface QueryState {
   isError?: boolean;
   error?: { status: number; code: string; message: string; requestId?: string } | null;
   dataUpdatedAt?: number;
+  isPlaceholderData?: boolean;
 }
 
 type Options = Record<string, unknown> & { queryKey: unknown[] };
@@ -85,6 +86,8 @@ describe('PaymentController', () => {
   let mutationOptions: MutationOptions;
   let payPending: boolean;
   let search: Record<string, string>;
+  /** When the page answer "arrived": stable across renders, so the countdown anchors once (FR-21-W1). */
+  let answeredAt: number;
   const pageRefetch = vi.fn();
   const mutate = vi.fn();
   const replace = vi.fn();
@@ -118,7 +121,7 @@ describe('PaymentController', () => {
       const base = { data: undefined, isPending: false, isError: false, error: null, dataUpdatedAt: 0 };
       if (options.queryKey[0] === 'payment') {
         pageOptions = options;
-        return { ...base, refetch: pageRefetch, ...pageState };
+        return { ...base, dataUpdatedAt: answeredAt, refetch: pageRefetch, ...pageState };
       }
       if (options.queryKey[0] === 'snap-script') {
         snapOptions = options;
@@ -149,6 +152,7 @@ describe('PaymentController', () => {
     search = { booking: 'bk1' };
     i18n.language = 'id';
     uuidCount = 0;
+    answeredAt = Date.now();
   });
 
   describe('load (Requirement 1)', () => {
@@ -637,7 +641,10 @@ describe('PaymentController', () => {
       expect(c.notice).toBeNull();
       expect(c.progress).toBeNull();
       expect(c.message).toBeNull();
-      expect(c).not.toHaveProperty('timer');
+      expect(c.timer?.label).toBe('payment_timer_label');
+      expect(c.timer?.seconds).toBeGreaterThanOrEqual(599);
+      expect(c.timer?.seconds).toBeLessThanOrEqual(600);
+      expect(c.timeUp).toBe(false);
       expect(c).not.toHaveProperty('secondsLeft');
     });
 
@@ -718,6 +725,225 @@ describe('PaymentController', () => {
       for (const secret of ['Nadia', 'Raka', '3174', 'tok-secret', 'nadia@example.com', 'RSH-26']) {
         expect(all).not.toContain(secret);
       }
+    });
+  });
+
+  describe('payment countdown (FR-21-W1)', () => {
+    const START = new Date('2026-11-13T03:00:00Z');
+    const tick = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
+    beforeEach(() => {
+      vi.useFakeTimers({ now: START });
+      answeredAt = Date.now();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it.each([
+      ['a correct device clock', '2026-11-13T03:00:00Z'],
+      ['a clock ten hours behind', '2026-11-12T17:00:00Z'],
+      ['a clock in 2031', '2031-06-01T09:30:00Z'],
+    ])('Property 1: 600 s from server time with %s', (_name, device) => {
+      vi.setSystemTime(new Date(device));
+      answeredAt = Date.now();
+      const { result } = render();
+      expect(result.current.timer).toEqual({ seconds: 600, label: 'payment_timer_label' });
+      expect(result.current.timeUp).toBe(false);
+    });
+
+    it('Property 2: ticks every second, whole and never increasing, and stores no deadline', () => {
+      const { result, d } = render();
+      expect(vi.getTimerCount()).toBe(1);
+      let last = result.current.timer?.seconds ?? Infinity;
+      for (let i = 0; i < 48; i += 1) {
+        tick(1000);
+        const seconds = result.current.timer?.seconds ?? NaN;
+        expect(Number.isInteger(seconds)).toBe(true);
+        expect(seconds).toBeGreaterThanOrEqual(0);
+        expect(seconds).toBeLessThanOrEqual(last);
+        last = seconds;
+      }
+      expect(result.current.timer?.seconds).toBe(552);
+      result.current.setLocale('en');
+      expect(JSON.stringify(d.storage.set.mock.calls)).not.toContain(view.expiresAt);
+    });
+
+    it.each([
+      [30000, 570],
+      [30400, 569],
+    ])('Property 3: an answer that arrived %i ms before mount starts at %i', (ago, seconds) => {
+      answeredAt = Date.now() - ago;
+      const { result } = render();
+      expect(result.current.timer?.seconds).toBe(seconds);
+    });
+
+    it('Property 4: at zero the timer stays 0, the clock stops and "Bayar" does nothing', () => {
+      const { result } = render();
+      tick(600000);
+      expect(result.current.timer).toEqual({ seconds: 0, label: 'payment_timer_label' });
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.pay?.enabled).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      tap(result.current);
+      expect(mutate).not.toHaveBeenCalled();
+      expect(uuidCount).toBe(0);
+      tick(10000);
+      expect(result.current.timer?.seconds).toBe(0);
+      expect(result.current.timeUp).toBe(true);
+      expect(pageRefetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('Property 5: an answer already past its deadline is time up at once, without a clock', () => {
+      pageState = { data: ready({ ...view, expiresAt: '2026-11-13T02:59:00Z' }) };
+      const { result } = render();
+      expect(result.current.timer?.seconds).toBe(0);
+      expect(result.current.timeUp).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(pageRefetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('Properties 6-8, 10: zero asks the server once per edge; inactive, then a re-anchor; expired tracked once', () => {
+      const { result, rerender, d } = render();
+      tick(600000);
+      rerender();
+      rerender();
+      expect(pageRefetch).toHaveBeenCalledTimes(1);
+      expect(result.current.state).toBe('ready');
+      expect(result.current.message).toBeNull();
+      expect(replace).not.toHaveBeenCalled();
+      expect(openPopupError).not.toHaveBeenCalled();
+      expect(events(d, 'payment_expired')).toEqual([{ booking_id: 'bk1' }]);
+
+      pageState = { data: { kind: 'inactive', refund: false } };
+      rerender();
+      expect(result.current.state).toBe('inactive');
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(false);
+      expect(result.current.message).toMatchObject({ title: 'payment_inactive_title', note: null });
+
+      pageState = { data: ready({ ...view, serverNow: '2026-11-13T03:09:50Z' }), dataUpdatedAt: Date.now() };
+      rerender();
+      expect(result.current.state).toBe('ready');
+      expect(result.current.timer?.seconds).toBe(10);
+      expect(result.current.timeUp).toBe(false);
+      expect(result.current.pay?.enabled).toBe(true);
+      expect(vi.getTimerCount()).toBe(1);
+
+      tick(10000);
+      expect(result.current.timeUp).toBe(true);
+      expect(pageRefetch).toHaveBeenCalledTimes(2);
+      expect(events(d, 'payment_expired')).toEqual([{ booking_id: 'bk1' }]);
+    });
+
+    it('Property 7: a paid answer after zero leaves for the e-ticket', () => {
+      const { result, rerender } = render();
+      tick(600000);
+      pageState = { data: { kind: 'paid' } };
+      rerender();
+      expect(result.current.state).toBe('leaving');
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(false);
+      expect(replace).toHaveBeenCalledWith('/tickets/detail?booking=bk1');
+    });
+
+    it('Property 9: verifying keeps polling at zero and a paid step still leaves', () => {
+      const { result, rerender } = render();
+      tap(result.current);
+      succeed(rerender, { kind: 'snap', outcome: 'success', snap: S1 });
+      tick(600000);
+      expect(result.current.state).toBe('verifying');
+      expect(result.current.timeUp).toBe(true);
+      expect(statusOptions).toMatchObject({ enabled: true, refetchInterval: 4000 });
+      statusState = { data: { kind: 'paid' }, dataUpdatedAt: 5 };
+      rerender();
+      rerender();
+      expect(result.current.state).toBe('leaving');
+      expect(replace).toHaveBeenCalledWith('/tickets/detail?booking=bk1');
+    });
+
+    it('Requirement 4: placeholder data does not move the anchor', () => {
+      const { result, rerender } = render();
+      tick(5000);
+      pageState = {
+        data: ready({ ...view, serverNow: '2026-11-13T03:05:00Z' }),
+        dataUpdatedAt: Date.now(),
+        isPlaceholderData: true,
+      };
+      rerender();
+      expect(result.current.timer?.seconds).toBe(595);
+    });
+
+    it.each<[string, () => void, boolean]>([
+      ['loading', () => (pageState = { isPending: true }), false],
+      ['inactive', () => (pageState = { data: { kind: 'inactive', refund: true } }), false],
+      ['not-found', () => (pageState = { data: { kind: 'not-found' } }), false],
+      ['not-found', () => (search = {}), false],
+      [
+        'error',
+        () =>
+          (pageState = {
+            data: ready(),
+            isError: true,
+            error: { status: 503, code: 'SERVICE_UNAVAILABLE', message: 'raw' },
+          }),
+        false,
+      ],
+      ['leaving', () => (pageState = { data: { kind: 'paid' } }), false],
+      ['ready', () => undefined, true],
+      ['opening', () => (payPending = true), true],
+    ])('Property 11: %s has a timer: %s', (state, arrange, shown) => {
+      arrange();
+      const { result } = render();
+      expect(result.current.state).toBe(state);
+      expect(result.current.timer !== null).toBe(shown);
+      expect(result.current.timeUp).toBe(false);
+    });
+
+    it('Property 11: verifying, failed and busy show the timer; inactive and leaving from a pay result do not', () => {
+      const { result, rerender } = render();
+      succeed(rerender, { kind: 'snap', outcome: 'success', snap: S1 });
+      expect(result.current.state).toBe('verifying');
+      expect(result.current.timer?.seconds).toBe(600);
+      statusState = { data: { kind: 'failed', paymentStatus: 'denied' }, dataUpdatedAt: 5 };
+      rerender();
+      expect(result.current.state).toBe('failed');
+      expect(result.current.timer).not.toBeNull();
+      succeed(rerender, { kind: 'retryable', code: 'PAYMENT_PROVIDER_BUSY', snap: null });
+      expect(result.current.state).toBe('busy');
+      expect(result.current.timer).not.toBeNull();
+      succeed(rerender, { kind: 'inactive', refund: false });
+      expect(result.current.state).toBe('inactive');
+      expect(result.current.timer).toBeNull();
+
+      const other = render();
+      succeed(other.rerender, { kind: 'paid' });
+      expect(other.result.current.state).toBe('leaving');
+      expect(other.result.current.timer).toBeNull();
+      expect(other.result.current.timeUp).toBe(false);
+    });
+
+    it.each<[string, Partial<PaymentView>]>([
+      ['an unparseable expiresAt', { expiresAt: 'soon' }],
+      ['an empty serverNow', { serverNow: '' }],
+      ['a missing expiresAt', { expiresAt: undefined as unknown as string }],
+      ['a missing serverNow', { serverNow: undefined as unknown as string }],
+    ])('Property 12: %s gives no timer, no clock and a usable "Bayar"', (_name, patch) => {
+      pageState = { data: ready({ ...view, ...patch }) };
+      const { result } = render();
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(result.current.pay?.enabled).toBe(true);
+      expect(pageRefetch).not.toHaveBeenCalled();
+    });
+
+    it('Property 13: unmounting while counting clears the clock', () => {
+      const { unmount } = render();
+      expect(vi.getTimerCount()).toBe(1);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 });
