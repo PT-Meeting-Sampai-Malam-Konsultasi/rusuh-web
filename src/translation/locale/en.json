@@ -91,7 +91,7 @@
   "order_holder_name_hint": "Printed on the e-ticket.",
   "order_holder_nik_label": "NIK",
   "order_holder_nik_placeholder": "16 digits, as on the KTP",
-  "order_holder_nik_hint": "Example: 3201 1252 0396 0001",
+  "order_holder_nik_hint": "Example: 3312 3456 7890 1234",
   "order_nik_incomplete": "A NIK has 16 digits.",
   "order_nik_invalid_structure": "These digits don't follow the KTP NIK pattern. Please check them.",
   "order_nik_duplicate": "This NIK is already on Ticket {{index}}. Each ticket needs a different person's NIK.",

@@ -202,10 +202,12 @@ describe('translations', () => {
     expect(order(id)).toEqual(Object.keys(copy));
   });
 
-  it('uses a NIK hint example that passes the structure rule in both locales', () => {
+  it('uses the same 16-digit sequence as the NIK hint in both locales: plainly not a real NIK', () => {
     const useCase = ValidateAttendeeUseCase({ bookingService: {} as never });
     for (const hint of [id.order_holder_nik_hint, en.order_holder_nik_hint]) {
-      expect(useCase.checkNik(toNikDigits(hint), [])).toEqual({ kind: 'ok' });
+      expect(toNikDigits(hint)).toBe('3312345678901234');
+      // Month 78: the field refuses it, so the example can't be typed in as a holder's NIK.
+      expect(useCase.checkNik(toNikDigits(hint), [])).toEqual({ kind: 'invalid-structure' });
     }
   });
 

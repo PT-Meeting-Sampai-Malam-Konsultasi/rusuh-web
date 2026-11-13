@@ -91,7 +91,7 @@
   "order_holder_name_hint": "Dicetak di e-tiket.",
   "order_holder_nik_label": "NIK",
   "order_holder_nik_placeholder": "16 digit sesuai KTP",
-  "order_holder_nik_hint": "Contoh: 3201 1252 0396 0001",
+  "order_holder_nik_hint": "Contoh: 3312 3456 7890 1234",
   "order_nik_incomplete": "NIK terdiri dari 16 digit.",
   "order_nik_invalid_structure": "Susunan angka ini bukan NIK KTP. Periksa lagi.",
   "order_nik_duplicate": "NIK ini sudah dipakai di Tiket {{index}}. Setiap tiket butuh NIK orang yang berbeda.",

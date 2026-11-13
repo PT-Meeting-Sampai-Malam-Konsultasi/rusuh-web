@@ -17,7 +17,7 @@ const tFrom = (dict: Record<string, string>) => ((k: string) => dict[k] ?? k) as
 
 const nikField = (index: number, overrides: Partial<OrderHolderView['nik']> = {}): OrderHolderView['nik'] => ({
   id: `order-holder-${index}-nik`,
-  value: '3201 1252 0396 0001',
+  value: '3312 3456 7890 1234',
   onChange: vi.fn(),
   onFocus: vi.fn(),
   onBlur: vi.fn(),
@@ -150,7 +150,7 @@ describe('HolderList', () => {
     );
     const nik = screen.getAllByRole('textbox', { name: 'NIK' })[0];
     expect(nik).toHaveAttribute('placeholder', '16 digit sesuai KTP');
-    expect(nik).toHaveAccessibleDescription('Contoh: 3201 1252 0396 0001');
+    expect(nik).toHaveAccessibleDescription('Contoh: 3312 3456 7890 1234');
   });
 
   it('renders the English strings', () => {
@@ -166,7 +166,7 @@ describe('HolderList', () => {
     expect(names[0]).toHaveAccessibleDescription('Printed on the e-ticket.');
     expect(names[1]).toHaveAttribute('placeholder', 'Full name');
     expect(screen.getAllByRole('textbox', { name: 'NIK' })[0]).toHaveAccessibleDescription(
-      'Example: 3201 1252 0396 0001',
+      'Example: 3312 3456 7890 1234',
     );
   });
 
@@ -195,7 +195,7 @@ describe('HolderList', () => {
       expect(screen.getByRole('status')).toHaveTextContent('order_nik_checking');
       expect(screen.queryByRole('alert')).toBeNull();
       await userEvent.type(input, '2');
-      expect(view.nik.onChange).toHaveBeenCalledWith('3201 1252 0396 00012');
+      expect(view.nik.onChange).toHaveBeenCalledWith('3312 3456 7890 12342');
       expect(input).toHaveFocus();
     });
 
