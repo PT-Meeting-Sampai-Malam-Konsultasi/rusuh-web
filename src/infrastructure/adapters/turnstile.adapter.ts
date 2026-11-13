@@ -104,3 +104,8 @@ export function createTurnstileAdapter({
     },
   };
 }
+
+/** Turnstile switched off (`NEXT_PUBLIC_TURNSTILE_ENABLED`): no script, no widget, an empty token in the header. */
+export function createDisabledTurnstile(): TurnstileProtocol {
+  return { getToken: async () => '' };
+}

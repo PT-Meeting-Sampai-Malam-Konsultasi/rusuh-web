@@ -8,6 +8,12 @@ export interface AppConfig {
   apiTimeoutMs: number;
   midtransClientKey: string;
   midtransSnapUrl: string;
+  /**
+   * Run Cloudflare Turnstile before gated calls (ADR-0003). Off by default while the backend can skip the check (the
+   * mobile app has no Turnstile): the calls still send `X-Turnstile-Token`, empty.
+   */
+  turnstileEnabled: boolean;
+  /** Required only when Turnstile is on. */
   turnstileSiteKey: string;
   defaultLocale: 'id' | 'en';
   /** Serve the API from MSW sample data (local dev, previews, demos before the backend is up). Never in production. */
@@ -38,6 +44,7 @@ export const readEnv = (): RawEnv => ({
   apiTimeoutMs: process.env.NEXT_PUBLIC_API_TIMEOUT_MS,
   midtransClientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,
   midtransSnapUrl: process.env.NEXT_PUBLIC_MIDTRANS_SNAP_URL,
+  turnstileEnabled: process.env.NEXT_PUBLIC_TURNSTILE_ENABLED,
   turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
   defaultLocale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,
   apiMock: process.env.NEXT_PUBLIC_API_MOCK,
@@ -72,6 +79,7 @@ export function rateEnv(value: string | undefined, fallback: number): number {
 export function createConfig(env: RawEnv = readEnv()): AppConfig {
   const timeout = Number(optionalEnv(env.apiTimeoutMs, '10000'));
   const locale = optionalEnv(env.defaultLocale, 'id');
+  const turnstileEnabled = boolEnv(env.turnstileEnabled);
   return {
     appVersion: requireEnv(env.appVersion, 'NEXT_PUBLIC_APP_VERSION'),
     queueApiUrl: requireEnv(env.queueApiUrl, 'NEXT_PUBLIC_QUEUE_API_URL'),
@@ -79,7 +87,10 @@ export function createConfig(env: RawEnv = readEnv()): AppConfig {
     apiTimeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 10000,
     midtransClientKey: requireEnv(env.midtransClientKey, 'NEXT_PUBLIC_MIDTRANS_CLIENT_KEY'),
     midtransSnapUrl: requireEnv(env.midtransSnapUrl, 'NEXT_PUBLIC_MIDTRANS_SNAP_URL'),
-    turnstileSiteKey: requireEnv(env.turnstileSiteKey, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY'),
+    turnstileEnabled,
+    turnstileSiteKey: turnstileEnabled
+      ? requireEnv(env.turnstileSiteKey, 'NEXT_PUBLIC_TURNSTILE_SITE_KEY')
+      : optionalEnv(env.turnstileSiteKey, ''),
     defaultLocale: locale === 'en' ? 'en' : 'id',
     apiMock: boolEnv(env.apiMock),
     sentryDsn: optionalEnv(env.sentryDsn, ''),
