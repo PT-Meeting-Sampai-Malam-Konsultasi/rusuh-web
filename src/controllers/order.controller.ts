@@ -8,12 +8,14 @@ import type { User } from '@core/entities/auth/auth.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { HttpError } from '@core/protocols/http.protocol';
 import type { OrderCategoriesResult } from '@core/use_case/booking/get-order-categories.use-case';
+import type { HoldBookingInput, HoldBookingResult, HoldTicket } from '@core/use_case/booking/hold-booking.use-case';
 import type { HolderType, TicketQuantities } from '@core/use_case/booking/order-ticket-selection.use-case';
 import type { ValidateAttendeeResult } from '@core/use_case/booking/validate-attendee.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import { ANALYTICS_CURRENCY, ANALYTICS_EVENTS, categoryItem } from '@utils/analytics';
 import type { FormatLocale } from '@utils/format/date';
 import { maskNik, toNikDigits } from '@utils/format/nik';
+import { formatRupiah } from '@utils/format/number';
 import {
   toOrderCategoryView,
   toOrderEventView,
@@ -21,9 +23,10 @@ import {
   type OrderEventView,
 } from '@utils/format/order-event';
 import { retryTransientOnce } from '@utils/query/retry';
-import { QUERY_KEYS } from '@utils/constants/query-keys';
+import { MUTATION_KEYS, QUERY_KEYS } from '@utils/constants/query-keys';
 import { ROUTES, withQuery } from '@utils/constants/routes';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
+import { randomUuid } from '@utils/random-uuid';
 
 export type OrderStatus = 'loading' | 'error' | 'not-found' | 'ready';
 
@@ -130,6 +133,57 @@ export interface OrderTimeUpView {
   queueAgain: () => void;
 }
 
+/** One summary row: "2 × Festival B" and its line total. */
+export interface OrderSummaryLine {
+  /** categoryId: React key. */
+  key: string;
+  /** "2 × Festival B". */
+  label: string;
+  /** "Rp 1.700.000" (ID) / "Rp 1,700,000" (EN). */
+  amount: string;
+}
+
+/** The "Ringkasan" aside and the phone dock (FR-16-W1). Texts translated, money formatted. */
+export interface OrderSummaryView {
+  /** "Ringkasan" / "Summary". */
+  heading: string;
+  lines: OrderSummaryLine[];
+  /** "Biaya layanan" / "Service fee". */
+  feeLabel: string;
+  /** The admin fee, once per order (ADR-0010). */
+  fee: string;
+  /** "Total". */
+  totalLabel: string;
+  total: string;
+  /** "Tiket ditahan untuk Anda selama 10 menit saat Anda lanjut. Belum ada biaya sampai Anda membayar." */
+  note: string;
+  /** Dock: "3 tiket" / "3 tickets". */
+  ticketCount: string;
+  /** Dock region label: "Ringkasan pesanan" / "Order summary". */
+  dockLabel: string;
+}
+
+export interface OrderCheckoutHint {
+  text: string;
+  /** True for a hold refusal (red, role="alert"); false for the neutral "complete the holders" hint. */
+  error: boolean;
+}
+
+/** "Lanjut ke pembayaran" (FR-16-W1). */
+export interface OrderCheckoutView {
+  /** "Lanjut ke pembayaran" / "Continue to payment" (the arrow is drawn by the section, aria-hidden). */
+  label: string;
+  /** Dock: "Lanjut bayar" / "Continue". */
+  shortLabel: string;
+  enabled: boolean;
+  /** A hold is in flight, or it succeeded and the page is navigating. */
+  busy: boolean;
+  /** Why the button is disabled; null when enabled or busy. */
+  hint: OrderCheckoutHint | null;
+  /** No-op unless enabled; a second tap while one is in flight is ignored. */
+  onContinue: () => void;
+}
+
 export interface OrderControllerInterface {
   t: TFunction;
   status: OrderStatus;
@@ -173,6 +227,10 @@ export interface OrderControllerInterface {
   timeUp: boolean;
   /** Non-null exactly when timeUp. */
   timeUpSheet: OrderTimeUpView | null;
+  /** Non-null exactly when status is 'ready', totalTickets ≥ 1 and not timeUp (FR-16-W1). */
+  summary: OrderSummaryView | null;
+  /** Non-null exactly when summary is. */
+  checkout: OrderCheckoutView | null;
 }
 
 /** How long the ticket count must stay still before add_to_cart is sent. */
@@ -194,6 +252,7 @@ type OrderControllerDeps = Pick<
   | 'orderTicketSelectionUseCase'
   | 'validateAttendeeUseCase'
   | 'endOrderWindowUseCase'
+  | 'holdBookingUseCase'
   | 'admissionStore'
   | 'analyticsAdapter'
   | 'storage'
@@ -203,6 +262,8 @@ type OrderControllerDeps = Pick<
   | 'useMutationTanstack'
   | 'useRouterNext'
   | 'useSearchParamsNext'
+  | 'useLoading'
+  | 'usePopupError'
 >;
 
 /** The event header barely changes during a sale. */
@@ -246,6 +307,20 @@ interface TimerAnchor {
   receivedAt: number;
 }
 
+/** The selection one Idempotency-Key belongs to, and the booking it already created. */
+interface HoldAttempt {
+  /** `${categoryId}:${validationToken}` per ticket, slot order, joined by '|'. */
+  signature: string;
+  idempotencyKey: string;
+  bookingId: string | null;
+}
+
+/** A hold refusal the page keeps showing until the selection changes. */
+type HoldFlag =
+  | { kind: 'sold-out'; categoryId: string | null }
+  | { kind: 'over-reservation' }
+  | { kind: 'holders'; code: 'NIK_SEAT_TAKEN' | 'DUPLICATE_NIK' | 'ATTENDEE_NOT_VALIDATED' };
+
 /** Stable empty list for summarize before the categories load (constant, not mutable state). */
 const NO_CATEGORIES: readonly [] = [];
 /** No-op handler for a holder view whose form entry is missing (not expected after reconcileHolders). */
@@ -258,6 +333,7 @@ const OrderController = ({
   orderTicketSelectionUseCase,
   validateAttendeeUseCase,
   endOrderWindowUseCase,
+  holdBookingUseCase,
   admissionStore,
   analyticsAdapter,
   storage,
@@ -267,10 +343,14 @@ const OrderController = ({
   useMutationTanstack,
   useRouterNext,
   useSearchParamsNext,
+  useLoading,
+  usePopupError,
 }: OrderControllerDeps): OrderControllerInterface => {
   const { t, i18n } = useTranslation();
   const locale: FormatLocale = i18n.language === 'en' ? 'en' : 'id';
   const router = useRouterNext();
+  const { toggleLoading } = useLoading();
+  const { openPopupError } = usePopupError();
   const searchParams = useSearchParamsNext();
   const eventId = searchParams.get('event')?.trim() ?? '';
   const hasEventId = eventId !== '';
@@ -390,6 +470,16 @@ const OrderController = ({
   const [checks, setChecks] = useState<Record<string, NikCheckRun>>({});
   const [touchedNik, setTouchedNik] = useState<Record<string, true>>({});
 
+  // FR-16-W1. leaving: the hold succeeded (or the buyer opened the active booking) and the page is navigating away.
+  const [leaving, setLeaving] = useState(false);
+  // A hold refusal shown in the checkout hint until the quantities change (or the next tap).
+  const [holdFlag, setHoldFlag] = useState<HoldFlag | null>(null);
+  // Written only in handlers and mutation callbacks: the Idempotency-Key per selection, and the double-tap guard.
+  const attemptRef = useRef<HoldAttempt | null>(null);
+  const holdGuard = useRef(false);
+  // The latest checkout handler, for the retry popup's "Coba lagi" (set in an effect below).
+  const continueRef = useRef<() => void>(IGNORE);
+
   // One mutation for every slot: the callbacks get the variables, so each result lands on its own slot.
   // No loading overlay: a field check leaves the page usable (spec 55). The retry is in the use case.
   const { mutate: mutateNikCheck } = useMutationTanstack<ValidateAttendeeResult, HttpError, NikCheckVariables>({
@@ -471,6 +561,7 @@ const OrderController = ({
     const kept = new Set(nextSlots.map((slot) => slot.key));
     setChecks((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => kept.has(key))));
     setTouchedNik((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => kept.has(key))));
+    setHoldFlag(null);
   };
 
   const { holders, allHoldersVerified } = useMemo(() => {
@@ -695,6 +786,141 @@ const OrderController = ({
     [status, selection, limit, t],
   );
 
+  const signInHref = withQuery(ROUTES.LOGIN, { next: withQuery(ROUTES.ORDER, { event: eventId }) });
+
+  // FR-16-W1: createBooking → enterPayment as one async operation (the use case sequences the calls). The overlay
+  // freezes the selection the hold read; nothing here retries on its own (the buyer taps "Coba lagi").
+  const holdMutation = useMutationTanstack<HoldBookingResult, HttpError, HoldBookingInput>({
+    mutationKey: [MUTATION_KEYS.ORDER_HOLD],
+    retry: false,
+    mutationFn: (input) => {
+      toggleLoading();
+      return holdBookingUseCase.execute(input);
+    },
+    onSuccess: (result) => {
+      toggleLoading();
+      if (result.kind === 'held') {
+        setLeaving(true);
+        redirected.current = true;
+        // Tracking plan §2 step 10: the tickets are held and the 10-minute payment window starts.
+        if (ok) {
+          const held = holdBookingUseCase.quote(ok.categories, quantities, ok.adminFee.amount);
+          const picked = ok.categories.filter((category) => (quantities[category.categoryId] ?? 0) > 0);
+          analyticsAdapter.trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
+            event_id: eventId,
+            booking_id: result.bookingId,
+            currency: ANALYTICS_CURRENCY,
+            value: held.total,
+            items: analyticsEvent
+              ? picked.map((category) => categoryItem(category, analyticsEvent, quantities[category.categoryId]))
+              : [],
+          });
+        }
+        router.push(withQuery(ROUTES.PAYMENT, { booking: result.bookingId }));
+        return;
+      }
+      holdGuard.current = false;
+      switch (result.kind) {
+        case 'not-verified':
+          return;
+        case 'nik-conflict':
+        case 'attendees-stale': {
+          const code = result.kind === 'nik-conflict' ? result.code : 'ATTENDEE_NOT_VALIDATED';
+          // Tracking plan §3: a NIK the hold refused, by reason only (never the NIK).
+          if (result.kind === 'nik-conflict') {
+            analyticsAdapter.trackEvent(ANALYTICS_EVENTS.NIK_REJECTED, { event_id: eventId, reason: result.code });
+          }
+          const values = formApi.getValues('holders');
+          const marked = result.kind === 'nik-conflict' ? result.slotIndexes : [];
+          // Slot known: that field shows the existing seat-taken / duplicate error. Otherwise every holder rechecks.
+          const slots =
+            marked.length > 0
+              ? marked.flatMap((i) => (selection.slots[i] ? [selection.slots[i]] : []))
+              : selection.slots;
+          setChecks((prev) => {
+            const next = { ...prev };
+            for (const slot of slots) {
+              const entry = values.find((holder) => holder.slotKey === slot.key);
+              const nik = entry?.nik ?? '';
+              const fullName = entry?.fullName ?? '';
+              next[slot.key] =
+                marked.length > 0
+                  ? {
+                      nik,
+                      fullName,
+                      phase: 'done',
+                      result: { kind: code === 'NIK_SEAT_TAKEN' ? 'seat-taken' : 'duplicate' },
+                    }
+                  : { nik, fullName, phase: 'failed', code: 'ATTENDEE_NOT_VALIDATED' };
+            }
+            return next;
+          });
+          if (marked.length === 0) setHoldFlag({ kind: 'holders', code });
+          return;
+        }
+        case 'sold-out':
+          setHoldFlag({ kind: 'sold-out', categoryId: result.categoryId });
+          void categoriesQuery.refetch();
+          return;
+        case 'over-reservation':
+          setHoldFlag({ kind: 'over-reservation' });
+          void categoriesQuery.refetch();
+          return;
+        case 'active-booking': {
+          const { bookingId } = result;
+          openPopupError(
+            result.status === 'PAYMENT_PENDING' && bookingId
+              ? {
+                  message: t('error_account_has_active_booking'),
+                  actionLabel: t('order_hold_open_active'),
+                  onAction: () => {
+                    setLeaving(true);
+                    redirected.current = true;
+                    router.push(withQuery(ROUTES.PAYMENT, { booking: bookingId }));
+                  },
+                }
+              : { message: t('error_account_has_active_booking') },
+          );
+          return;
+        }
+        case 'not-held':
+          attemptRef.current = null;
+          openPopupError({ message: t('error_booking_not_held') });
+          return;
+        case 'admission-invalid':
+          if (redirected.current) return;
+          redirected.current = true;
+          router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
+          return;
+        case 'unauthorized':
+          router.push(signInHref);
+          return;
+        case 'retryable':
+          if (attemptRef.current) attemptRef.current = { ...attemptRef.current, bookingId: result.bookingId };
+          openPopupError({
+            message: t(ERROR_CODE_MAP[result.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR),
+            reference: result.requestId,
+            actionLabel: t('action_retry'),
+            onAction: () => continueRef.current(),
+          });
+          return;
+      }
+    },
+    // No reportError: the HTTP adapter already reports 5xx, and the error's cause holds the validation tokens.
+    onError: (error) => {
+      toggleLoading();
+      holdGuard.current = false;
+      if (error.status === 401 || error.code === 'UNAUTHORIZED') {
+        router.push(signInHref);
+        return;
+      }
+      openPopupError({
+        message: t(ERROR_CODE_MAP[error.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR),
+        reference: error.requestId,
+      });
+    },
+  });
+
   // The 5-minute order window: server times give its length, the device clock only measures the time since the
   // answer arrived (elapsed time, never a deadline against the device clock).
   const [now, setNow] = useState(() => Date.now());
@@ -714,7 +940,9 @@ const OrderController = ({
   const windowOver = status === 'ready' && secondsLeft === 0;
   // FR-19-W1: a reload's re-claim found the turn over: the same time's-up state, without a ready page under it.
   const windowEnded = categoriesData?.kind === 'window-ended';
-  if ((windowOver || windowEnded) && !expired) setExpired(true);
+  // FR-16-W1: never while a hold is in flight or after it succeeded; a hold that fails after zero re-renders the page
+  // (the mutation's state changes) and the latch fires then.
+  if ((windowOver || windowEnded) && !expired && !leaving && !holdMutation.isPending) setExpired(true);
 
   // Once per visit: end the window on this device and block every later admission-invalid redirect (the buyer leaves
   // through the sheet). The use case is synchronous and local (spec 61), not async work for TanStack.
@@ -726,6 +954,88 @@ const OrderController = ({
     endOrderWindowUseCase.execute(eventId);
     analyticsAdapter.trackEvent('order_time_up', { eventId, tickets: selection.total });
   }, [expired, endOrderWindowUseCase, analyticsAdapter, eventId, selection.total]);
+
+  // FR-16-W1: the summary and the "Lanjut ke pembayaran" state.
+  const quote = useMemo(
+    () => (ok ? holdBookingUseCase.quote(ok.categories, quantities, ok.adminFee.amount) : null),
+    [holdBookingUseCase, ok, quantities],
+  );
+  const showCheckout = status === 'ready' && selection.total >= 1 && !expired;
+  const soldOutBlocks =
+    holdFlag?.kind === 'sold-out' && (holdFlag.categoryId === null || (quantities[holdFlag.categoryId] ?? 0) > 0);
+  const flagBlocks = holdFlag?.kind === 'over-reservation' || soldOutBlocks;
+  const busy = holdMutation.isPending || leaving;
+  const enabled = showCheckout && allHoldersVerified && (secondsLeft ?? 0) > 0 && !busy && !flagBlocks;
+  const { mutate: mutateHold } = holdMutation;
+
+  const onContinue = useCallback(() => {
+    if (!enabled || holdGuard.current) return;
+    holdGuard.current = true;
+    // Slot order; the token only from a valid check of exactly the values in the form.
+    const values = formApi.getValues('holders');
+    const tickets: HoldTicket[] = selection.slots.map((slot) => {
+      const entry = values.find((holder) => holder.slotKey === slot.key);
+      const run = checks[slot.key];
+      const validationToken =
+        run?.phase === 'done' &&
+        run.result.kind === 'valid' &&
+        run.nik === entry?.nik &&
+        run.fullName === entry?.fullName
+          ? run.result.validationToken
+          : '';
+      return { categoryId: slot.categoryId, validationToken, nikLast4: entry?.nik.slice(-4) ?? '' };
+    });
+    const signature = tickets.map((ticket) => `${ticket.categoryId}:${ticket.validationToken}`).join('|');
+    if (attemptRef.current?.signature !== signature) {
+      attemptRef.current = { signature, idempotencyKey: randomUuid(), bookingId: null };
+    }
+    const { idempotencyKey, bookingId } = attemptRef.current;
+    setHoldFlag(null);
+    mutateHold({ eventId, admissionToken: admissionStore.get(eventId), idempotencyKey, tickets, bookingId });
+  }, [enabled, formApi, selection.slots, checks, eventId, admissionStore, mutateHold]);
+
+  useEffect(() => {
+    continueRef.current = onContinue;
+  });
+
+  let hint: OrderCheckoutHint | null = null;
+  if (!enabled && !busy) {
+    const soldOutName =
+      holdFlag?.kind === 'sold-out' && holdFlag.categoryId !== null
+        ? ok?.categories.find((category) => category.categoryId === holdFlag.categoryId)?.name
+        : undefined;
+    if (soldOutBlocks) {
+      hint = {
+        text: soldOutName ? t('order_hold_sold_out', { category: soldOutName }) : t(ERROR_CODE_MAP.CATEGORY_SOLD_OUT),
+        error: true,
+      };
+    } else if (holdFlag?.kind === 'over-reservation') {
+      hint = { text: t('order_hold_over_reservation'), error: true };
+    } else if (!allHoldersVerified && holdFlag?.kind === 'holders') {
+      hint = { text: t(ERROR_CODE_MAP[holdFlag.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR), error: true };
+    } else if (!allHoldersVerified) {
+      hint = { text: t('order_checkout_hint_holders'), error: false };
+    }
+  }
+
+  const summary: OrderSummaryView | null =
+    showCheckout && quote
+      ? {
+          heading: t('order_summary_heading'),
+          lines: quote.lines.map((line) => ({
+            key: line.categoryId,
+            label: t('order_summary_line', { quantity: line.quantity, category: line.name }),
+            amount: formatRupiah(line.lineTotal, locale),
+          })),
+          feeLabel: t('order_summary_fee'),
+          fee: formatRupiah(quote.adminFee, locale),
+          totalLabel: t('order_summary_total'),
+          total: formatRupiah(quote.total, locale),
+          note: t('order_summary_note'),
+          ticketCount: t('order_summary_tickets', { count: quote.ticketCount }),
+          dockLabel: t('order_summary_dock_label'),
+        }
+      : null;
 
   const errorCode = (eventError ?? categoriesError)?.code;
   const errorMessage =
@@ -788,6 +1098,17 @@ const OrderController = ({
             analyticsAdapter.trackEvent('queue_rejoin', { eventId, from: 'order' });
             router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
           },
+        }
+      : null,
+    summary,
+    checkout: summary
+      ? {
+          label: t('order_checkout_label'),
+          shortLabel: t('order_checkout_short_label'),
+          enabled,
+          busy,
+          hint,
+          onContinue,
         }
       : null,
   };

@@ -30,6 +30,9 @@ const setup = () => {
     listMyTickets: vi.fn(),
     downloadTickets: vi.fn(),
     validateAttendee: vi.fn(),
+    createBooking: vi.fn(),
+    enterPayment: vi.fn(),
+    getActiveBooking: vi.fn(),
   };
   const useCase = ValidateAttendeeUseCase({ bookingService });
   return { bookingService, useCase };

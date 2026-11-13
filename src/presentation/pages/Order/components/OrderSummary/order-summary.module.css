@@ -1,0 +1,67 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .sum (flow.css 48–55): a quiet trust-zone card, sticky under the header in the flow grid's right column.
+   Hidden on phones, where OrderDock carries the total and the button. Quiet: flat card, no print effects. */
+.summary {
+  @apply hidden;
+
+  @variant md {
+    @apply sticky top-[120px] block border-[2.5px] border-ink bg-card px-[26px] pt-[26px] pb-6;
+    box-shadow: var(--shadow-off);
+  }
+}
+
+/* Display S */
+.heading {
+  @apply font-display text-[22px] leading-tight font-bold;
+  font-stretch: 85%;
+}
+
+.lines {
+  @apply mt-4 list-none border-t border-hair p-0;
+}
+
+.row,
+.fee {
+  @apply flex justify-between gap-3 border-b border-hair py-2.5 text-[15px] tabular-nums;
+}
+
+.fee {
+  @apply text-ink-2;
+}
+
+.total {
+  @apply mt-[18px] mb-[22px] flex items-baseline justify-between;
+
+  span {
+    @apply font-semibold;
+  }
+
+  strong {
+    @apply font-display text-[38px] leading-none font-extrabold tabular-nums;
+    font-stretch: 75%;
+  }
+}
+
+.hint,
+.hintError {
+  @apply mt-3 text-[13px] leading-snug;
+}
+
+.hint {
+  @apply text-ink-2;
+}
+
+/* Error: word + mark, not colour alone. */
+.hintError {
+  @apply flex items-start gap-1.5 font-semibold text-red;
+
+  &::before {
+    @apply size-4 flex-none rounded-full bg-red text-center text-[11px] leading-4 font-extrabold text-white;
+    content: '!';
+  }
+}
+
+.note {
+  @apply mt-4 text-[13px] leading-normal text-ink-2;
+}

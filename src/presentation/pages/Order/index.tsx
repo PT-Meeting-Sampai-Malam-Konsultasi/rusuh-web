@@ -9,8 +9,10 @@ import Timer from '@presentation/components/Timer';
 import CategoryList from './components/CategoryList';
 import HolderList from './components/HolderList';
 import OrderEventHeader from './components/OrderEventHeader';
+import OrderDock from './components/OrderDock';
 import OrderMessage from './components/OrderMessage';
 import OrderSkeleton from './components/OrderSkeleton';
+import OrderSummary from './components/OrderSummary';
 import OrderTimeUpSheet from './components/OrderTimeUpSheet';
 import styles from './order.module.css';
 
@@ -36,6 +38,8 @@ export default function OrderScreen() {
     setLocale,
     timer,
     timeUpSheet,
+    summary,
+    checkout,
   } = container.resolve<OrderControllerInterface>('orderController');
 
   return (
@@ -89,8 +93,9 @@ export default function OrderScreen() {
           )}
           {status === 'ready' && showHolders && <HolderList t={t} showChoice={showHolderChoice} holders={holders} />}
         </div>
-        {/* Summary aside: deferred (FR-14-W1 and the hold) */}
+        {summary && checkout && <OrderSummary summary={summary} checkout={checkout} />}
       </main>
+      {summary && checkout && <OrderDock summary={summary} checkout={checkout} />}
       {timeUpSheet && <OrderTimeUpSheet sheet={timeUpSheet} />}
     </div>
   );

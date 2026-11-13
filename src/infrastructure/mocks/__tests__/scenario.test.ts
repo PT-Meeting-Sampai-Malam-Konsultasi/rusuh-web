@@ -28,4 +28,11 @@ describe('resolveScenario', () => {
     expect(resolveScenario('', 'short_window')).toBe('short_window');
     expect(resolveScenario('?mock=ok', 'short_window')).toBe('ok');
   });
+
+  it('knows the hold scenarios (FR-16-W1)', () => {
+    expect(resolveScenario('?mock=nik_seat_taken', null)).toBe('nik_seat_taken');
+    expect(resolveScenario('?mock=category_sold_out', null)).toBe('category_sold_out');
+    expect(resolveScenario('?mock=payment_busy', null)).toBe('payment_busy');
+    expect(resolveScenario('', 'payment_busy')).toBe('payment_busy');
+  });
 });

@@ -11,3 +11,8 @@ export const QUERY_KEYS = {
   MY_ORDERS: 'my-orders',
   BOOKING: 'booking',
 } as const;
+
+/** TanStack mutation keys; tests tell mutations apart by them. */
+export const MUTATION_KEYS = {
+  ORDER_HOLD: 'order-hold',
+} as const;

@@ -176,4 +176,49 @@ describe('i18n instance', () => {
     expect(i18n.t('action_back_home')).toBe('Go home');
     await i18n.changeLanguage('id');
   });
+
+  it('has the summary, checkout and hold copy in both locales (FR-16-W1)', async () => {
+    expect(i18n.t('order_summary_heading')).toBe('Ringkasan');
+    expect(i18n.t('order_summary_line', { quantity: 2, category: 'Festival B' })).toBe('2 × Festival B');
+    expect(i18n.t('order_summary_fee')).toBe('Biaya layanan');
+    expect(i18n.t('order_summary_total')).toBe('Total');
+    expect(i18n.t('order_summary_note')).toBe(
+      'Tiket ditahan untuk Anda selama 10 menit saat Anda lanjut. Belum ada biaya sampai Anda membayar.',
+    );
+    expect(i18n.t('order_summary_tickets', { count: 1 })).toBe('1 tiket');
+    expect(i18n.t('order_summary_tickets', { count: 3 })).toBe('3 tiket');
+    expect(i18n.t('order_summary_dock_label')).toBe('Ringkasan pesanan');
+    expect(i18n.t('order_checkout_label')).toBe('Lanjut ke pembayaran');
+    expect(i18n.t('order_checkout_short_label')).toBe('Lanjut bayar');
+    expect(i18n.t('order_checkout_hint_holders')).toBe('Lengkapi data pemegang tiket untuk lanjut.');
+    expect(i18n.t('order_hold_sold_out', { category: 'Festival B' })).toBe(
+      'Festival B sudah habis. Kurangi tiketnya atau pilih kategori lain.',
+    );
+    expect(i18n.t('order_hold_over_reservation')).toBe(
+      'Jumlah tiket melebihi kuota giliran Anda. Kurangi tiketnya lalu lanjut lagi.',
+    );
+    expect(i18n.t('order_hold_open_active')).toBe('Buka pesanan itu');
+    await i18n.changeLanguage('en');
+    expect(i18n.t('order_summary_heading')).toBe('Summary');
+    expect(i18n.t('order_summary_line', { quantity: 2, category: 'Festival B' })).toBe('2 × Festival B');
+    expect(i18n.t('order_summary_fee')).toBe('Service fee');
+    expect(i18n.t('order_summary_total')).toBe('Total');
+    expect(i18n.t('order_summary_note')).toBe(
+      'We hold the tickets for 10 minutes once you continue. Nothing is charged until you pay.',
+    );
+    expect(i18n.t('order_summary_tickets', { count: 1 })).toBe('1 ticket');
+    expect(i18n.t('order_summary_tickets', { count: 3 })).toBe('3 tickets');
+    expect(i18n.t('order_summary_dock_label')).toBe('Order summary');
+    expect(i18n.t('order_checkout_label')).toBe('Continue to payment');
+    expect(i18n.t('order_checkout_short_label')).toBe('Continue');
+    expect(i18n.t('order_checkout_hint_holders')).toBe("Complete the ticket holders' details to continue.");
+    expect(i18n.t('order_hold_sold_out', { category: 'Festival B' })).toBe(
+      'Festival B has sold out. Remove those tickets or pick another category.',
+    );
+    expect(i18n.t('order_hold_over_reservation')).toBe(
+      'You picked more tickets than your turn allows. Remove some and continue again.',
+    );
+    expect(i18n.t('order_hold_open_active')).toBe('Open that order');
+    await i18n.changeLanguage('id');
+  });
 });

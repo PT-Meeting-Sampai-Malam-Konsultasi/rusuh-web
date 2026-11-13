@@ -52,6 +52,9 @@ const setup = () => {
     listMyTickets: vi.fn(),
     downloadTickets: vi.fn(),
     validateAttendee: vi.fn(),
+    createBooking: vi.fn(),
+    enterPayment: vi.fn(),
+    getActiveBooking: vi.fn(),
   };
   const claimTurnUseCase = { execute: vi.fn(), turnWindow: vi.fn() };
   const queuePlaceStore = { get: vi.fn().mockReturnValue(place), set: vi.fn(), remove: vi.fn() };

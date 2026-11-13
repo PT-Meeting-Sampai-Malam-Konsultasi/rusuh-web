@@ -5,7 +5,8 @@
 }
 
 /* Flow grid: one column on phones; main + summary column from 720px (340px), 400px from 1180px.
-   The summary column stays empty until FR-13/14-W1. OrderSkeleton mirrors these boxes for the route fallback. */
+   The second column holds OrderSummary (FR-16-W1) once a ticket is picked; it stays empty at 0 tickets.
+   OrderSkeleton mirrors these boxes for the route fallback. */
 .main {
   @apply mx-auto w-full max-w-[calc(1328px+112px)] flex-1 px-4 pt-[18px] pb-12;
 

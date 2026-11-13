@@ -1,6 +1,7 @@
 import axios, { type AxiosAdapter, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import type { HttpError, HttpProtocol, HttpResponse, RequestConfig } from '@core/protocols/http.protocol';
+import { randomUuid } from '@utils/random-uuid';
 
 export interface HttpAdapterOptions {
   baseUrl: string;
@@ -24,15 +25,8 @@ export interface HttpAdapterOptions {
 /** Sent on every call except cacheable ones; the backend logs it and echoes it back (NFR-09-W1). */
 export const REQUEST_ID_HEADER = 'X-Request-ID';
 
-/** `crypto.randomUUID` where the browser has it (secure contexts), otherwise a v4 built from `getRandomValues`. */
-export function randomRequestId(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
+/** Kept for the adapter tests and callers; same function as `randomUuid`. */
+export const randomRequestId = randomUuid;
 
 interface Problem {
   code?: string;

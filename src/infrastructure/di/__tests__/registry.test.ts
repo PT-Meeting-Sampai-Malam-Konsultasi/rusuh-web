@@ -49,6 +49,7 @@ const KEYS = {
   orderTicketSelectionUseCase: true,
   validateAttendeeUseCase: true,
   endOrderWindowUseCase: true,
+  holdBookingUseCase: true,
   joinQueueUseCase: true,
   followQueueUseCase: true,
   claimTurnUseCase: true,
@@ -142,6 +143,12 @@ describe('DI registries', () => {
     expect(typeof container.resolve('validateAttendeeUseCase').execute).toBe('function');
     expect(container.resolve('endOrderWindowUseCase')).toBe(container.resolve('endOrderWindowUseCase'));
     expect(typeof container.resolve('endOrderWindowUseCase').execute).toBe('function');
+  });
+
+  it('wires the hold booking use case as a singleton', () => {
+    expect(container.resolve('holdBookingUseCase')).toBe(container.resolve('holdBookingUseCase'));
+    expect(typeof container.resolve('holdBookingUseCase').quote).toBe('function');
+    expect(typeof container.resolve('holdBookingUseCase').execute).toBe('function');
   });
 
   it('wires the order ticket selection use case as a singleton', () => {

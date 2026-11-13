@@ -34,10 +34,22 @@ export interface GetCategoriesResponse {
   serverNow: string;
 }
 
-// Bookings and tickets (Booking, Ticket, listMyTickets, getBooking).
+// Bookings and tickets (Booking, Ticket, listMyTickets, getBooking, createBooking, enterPayment, getActiveBooking).
 
-/** Only PAID bookings have tickets. */
-export type BookingStatus = 'HELD' | 'PAID' | 'EXPIRED' | 'CANCELLED';
+/**
+ * v1 (D5): SELECTION (5 min from create) → PAYMENT_PENDING (10 min from payment entry) → PAID; or EXPIRED / CANCELLED.
+ * HELD is the pre-v1 name: core v1 never produces it, old records may still carry it. Only PAID bookings have tickets.
+ */
+export type BookingStatus = 'SELECTION' | 'PAYMENT_PENDING' | 'HELD' | 'PAID' | 'EXPIRED' | 'CANCELLED';
+
+/** One ticket's holder as the booking stores it (ADR-0007, ADR-0024). The full NIK never reaches the web. */
+export interface Attendee {
+  categoryId: string;
+  categoryName: string;
+  fullName: string;
+  /** First 4 and last 4 digits: "3174 •••• •••• 0004". */
+  nikMasked: string;
+}
 
 export type PaymentMethod =
   'qris' | 'gopay' | 'shopeepay' | 'bca_va' | 'mandiri_va' | 'bni_va' | 'bri_va' | 'permata_va' | 'cimb_va' | 'card';
@@ -94,6 +106,40 @@ export interface Booking {
   paymentMethod?: PaymentMethod | null;
   createdAt: string;
   serverNow: string;
+  /** One per ticket, in request order. */
+  attendees?: Attendee[];
+  /** Deadline of the current step (end of SELECTION or of PAYMENT_PENDING); null once PAID or EXPIRED. */
+  expiresAt?: string | null;
+  /** A payment arrived after expiry (ADR-0009). */
+  refundRequired?: boolean;
+}
+
+/** One ticket of createBooking: its category and its holder's validation token (spec 53). */
+export interface CreateBookingTicket {
+  categoryId: string;
+  /** From validateAttendee; carries the attendee name and NIK (opaque to the web, never logged). */
+  validationToken: string;
+}
+
+/** createBooking body: 1–3 tickets, one entry per ticket (N-1, ADR-0024). */
+export interface CreateBookingRequest {
+  eventId: string;
+  tickets: CreateBookingTicket[];
+}
+
+/** enterPayment 200: the booking is PAYMENT_PENDING; the Snap token is for the payment page (FR-20-W1). */
+export interface EnterPaymentResponse {
+  bookingId: string;
+  snapToken: string;
+  /** End of the 10-minute payment window (server time). */
+  paymentExpiresAt: string;
+  redirectUrl?: string | null;
+  serverNow: string;
+}
+
+/** getActiveBooking 200. */
+export interface ActiveBookingsResponse {
+  items: Booking[];
 }
 
 /** `validateAttendee` body: one ticket holder (ADR-0007). */
