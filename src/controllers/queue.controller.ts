@@ -285,15 +285,6 @@ const QueueController = ({
   // FR-05: the join answer itself is at the turn, so there is no queue: straight on, no turn screen or 60 s timer.
   const skipping =
     joined?.state === 'open' && joined.seq !== null && joined.served !== null && joined.served >= joined.seq;
-  const windowQuery = useQueryTanstack<TurnWindowResult, HttpError>({
-    queryKey: [QUERY_KEYS.QUEUE_TURN, eventId, place?.seq],
-    queryFn: () => claimTurnUseCase.turnWindow(eventId),
-    enabled: atTurn && !skipping,
-    staleTime: Infinity,
-    gcTime: 0,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
   const claimQuery = useQueryTanstack<ClaimTurnResult, HttpError>({
     queryKey: [QUERY_KEYS.QUEUE_CLAIM, eventId, place?.seq],
     queryFn: () => claimTurnUseCase.execute(eventId),
@@ -308,6 +299,18 @@ const QueueController = ({
     refetchInterval: (query) => (query.state.data?.kind === 'retry' ? query.state.data.afterMs : false),
   });
   const claim = claimQuery.data;
+  // The 60 s window is only needed while the turn waits: a background tab, or a claim that did not admit (FULL,
+  // NO_STOCK, sign-in). Not alongside the claim: an admitted claim uses the place up, and `/me` then answers 410
+  // EXPIRED, which would read as a missed turn.
+  const windowQuery = useQueryTanstack<TurnWindowResult, HttpError>({
+    queryKey: [QUERY_KEYS.QUEUE_TURN, eventId, place?.seq],
+    queryFn: () => claimTurnUseCase.turnWindow(eventId),
+    enabled: atTurn && !skipping && (!visible || (!!claim && claim.kind !== 'admitted')),
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
   const turnWindow = windowQuery.data;
   const summary = findHomeEvent(eventsQuery.data, eventId);
 
@@ -351,6 +354,8 @@ const QueueController = ({
     if (left) return 'left';
     if (claim?.kind === 'sold-out' || turnWindow?.kind === 'sold-out') return 'sold-out';
     if (!atTurn) return baseStatus;
+    // Admitted wins over any window answer: the page is on its way to the order page.
+    if (admitted) return skipping ? 'entering' : 'turn';
     if (claim?.kind === 'missed' || turnWindow?.kind === 'missed' || (turnSeconds === 0 && !admitted)) return 'missed';
     if (claim?.kind === 'paused') return 'paused';
     return skipping ? 'entering' : 'turn';
