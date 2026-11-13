@@ -2,8 +2,14 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PaymentView, SnapTransaction } from '@core/entities/payment/payment.entity';
-import type { PaymentPageResult, PaymentStep, PayResult } from '@core/use_case/payment/pay-booking.use-case';
+import type {
+  InactiveOutcome,
+  PaymentPageResult,
+  PaymentStep,
+  PayResult,
+} from '@core/use_case/payment/pay-booking.use-case';
 import { ERROR_CODE_MAP } from '@utils/constants/error-codes';
+import { formatRupiah } from '@utils/format/number';
 
 import PaymentController, { type PaymentControllerInterface } from '../payment.controller';
 
@@ -61,6 +67,17 @@ const ready = (v: PaymentView = view): PaymentPageResult => ({
   })),
 });
 
+const expiredOutcome = (overrides: Partial<InactiveOutcome> = {}): InactiveOutcome => ({
+  kind: 'inactive',
+  refund: false,
+  reason: 'expired',
+  eventId: 'evt_1',
+  ticketCount: 3,
+  ...overrides,
+});
+const otherOutcome = (overrides: Partial<InactiveOutcome> = {}): InactiveOutcome =>
+  expiredOutcome({ reason: 'other', ...overrides });
+
 interface QueryState {
   data?: unknown;
   isPending?: boolean;
@@ -105,6 +122,7 @@ describe('PaymentController', () => {
       pay: vi.fn().mockResolvedValue({ kind: 'snap', outcome: 'closed', snap: S1 }),
       checkStatus: vi.fn().mockResolvedValue({ kind: 'paid' }),
     },
+    endOrderWindowUseCase: { execute: vi.fn(() => ({ kind: 'ended' })) },
     snap: { load: vi.fn().mockResolvedValue(undefined), pay: vi.fn() },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -198,7 +216,7 @@ describe('PaymentController', () => {
     });
 
     it('Property 2: inactive with and without the refund note', () => {
-      pageState = { data: { kind: 'inactive', refund: true } };
+      pageState = { data: otherOutcome({ refund: true }) };
       const { result, rerender } = render();
       expect(result.current.state).toBe('inactive');
       expect(result.current.message).toMatchObject({
@@ -206,7 +224,7 @@ describe('PaymentController', () => {
         body: 'payment_inactive_body',
         note: 'payment_inactive_refund',
       });
-      pageState = { data: { kind: 'inactive', refund: false } };
+      pageState = { data: otherOutcome() };
       rerender();
       expect(result.current.message?.note).toBeNull();
     });
@@ -400,7 +418,7 @@ describe('PaymentController', () => {
 
     it('Property 4: inactive, not-found and unauthorized results', () => {
       const { result, rerender } = render();
-      succeed(rerender, { kind: 'inactive', refund: true });
+      succeed(rerender, otherOutcome({ refund: true, eventId: null, ticketCount: null }));
       expect(result.current.state).toBe('inactive');
       expect(result.current.message?.note).toBe('payment_inactive_refund');
 
@@ -560,7 +578,7 @@ describe('PaymentController', () => {
 
     it('Property 5: inactive shows the no-longer-active message with the refund', () => {
       const { result, rerender } = verify();
-      statusState = { data: { kind: 'inactive', refund: true }, dataUpdatedAt: 5 };
+      statusState = { data: otherOutcome({ refund: true }), dataUpdatedAt: 5 };
       rerender();
       expect(result.current.state).toBe('inactive');
       expect(result.current.message?.note).toBe('payment_inactive_refund');
@@ -816,7 +834,7 @@ describe('PaymentController', () => {
       expect(openPopupError).not.toHaveBeenCalled();
       expect(events(d, 'payment_expired')).toEqual([{ booking_id: 'bk1' }]);
 
-      pageState = { data: { kind: 'inactive', refund: false } };
+      pageState = { data: otherOutcome() };
       rerender();
       expect(result.current.state).toBe('inactive');
       expect(result.current.timer).toBeNull();
@@ -877,7 +895,7 @@ describe('PaymentController', () => {
 
     it.each<[string, () => void, boolean]>([
       ['loading', () => (pageState = { isPending: true }), false],
-      ['inactive', () => (pageState = { data: { kind: 'inactive', refund: true } }), false],
+      ['inactive', () => (pageState = { data: otherOutcome({ refund: true }) }), false],
       ['not-found', () => (pageState = { data: { kind: 'not-found' } }), false],
       ['not-found', () => (search = {}), false],
       [
@@ -913,7 +931,7 @@ describe('PaymentController', () => {
       succeed(rerender, { kind: 'retryable', code: 'PAYMENT_PROVIDER_BUSY', snap: null });
       expect(result.current.state).toBe('busy');
       expect(result.current.timer).not.toBeNull();
-      succeed(rerender, { kind: 'inactive', refund: false });
+      succeed(rerender, otherOutcome({ eventId: null, ticketCount: null }));
       expect(result.current.state).toBe('inactive');
       expect(result.current.timer).toBeNull();
 
@@ -944,6 +962,192 @@ describe('PaymentController', () => {
       expect(vi.getTimerCount()).toBe(1);
       unmount();
       expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+  describe('payment expired (FR-23-W1)', () => {
+    const START = new Date('2026-11-13T03:00:00Z');
+    const tick = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+    const hidden = (current: PaymentControllerInterface) => {
+      const { timer, timeUp, intro, pay, notice, progress, message } = current;
+      expect({ timer, timeUp, intro, pay, notice, progress, message }).toEqual({
+        timer: null,
+        timeUp: false,
+        intro: null,
+        pay: null,
+        notice: null,
+        progress: null,
+        message: null,
+      });
+    };
+
+    it('Property 1: a first load that is already expired gives the full expired view and no summary', () => {
+      pageState = { data: expiredOutcome() };
+      const { result } = render();
+      expect(result.current.state).toBe('expired');
+      expect(result.current.summary).toBeNull();
+      hidden(result.current);
+      expect(result.current.expired).toEqual({
+        stamp: 'payment_expired_stamp',
+        title: 'payment_expired_title',
+        body: 'payment_expired_body:{"count":3}',
+        noteLead: 'payment_expired_note_lead',
+        note: 'payment_expired_note_account',
+        queueAgainLabel: 'payment_expired_queue_again',
+        onQueueAgain: expect.any(Function),
+        homeHref: '/',
+        homeLabel: 'action_back_home',
+      });
+      expect(pageRefetch).not.toHaveBeenCalled();
+      expect(statusOptions.enabled).toBe(false);
+      expect(snapOptions.enabled).toBe(false);
+    });
+
+    describe('after the countdown', () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ now: START });
+        answeredAt = Date.now();
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('Property 2: zero → refetch → expired keeps the seen order and tracks payment_expired once', () => {
+        const { result, rerender, d } = render();
+        tick(600000);
+        expect(pageRefetch).toHaveBeenCalledTimes(1);
+        pageState = { data: expiredOutcome(), dataUpdatedAt: Date.now() };
+        rerender();
+        rerender();
+        expect(result.current.state).toBe('expired');
+        hidden(result.current);
+        expect(result.current.summary?.orderCode).toBe('RSH-26-900001');
+        expect(result.current.summary?.lines).toHaveLength(3);
+        expect(result.current.summary?.total).toBe(formatRupiah(2160000, 'id'));
+        expect(result.current.expired?.note).toBe('payment_expired_note_email:{"email":"nadia@example.com"}');
+        expect(vi.getTimerCount()).toBe(0);
+        expect(pageRefetch).toHaveBeenCalledTimes(1);
+        expect(events(d, 'payment_expired')).toEqual([{ booking_id: 'bk1' }]);
+        expect(replace).not.toHaveBeenCalled();
+        expect(d.endOrderWindowUseCase.execute).not.toHaveBeenCalled();
+      });
+
+      it('Property 5: getBooking failed after zero: the count comes from the seen order, no "Antre lagi"', () => {
+        pageState = { data: ready({ ...view, attendees: view.attendees.slice(0, 2) }) };
+        const { result, rerender } = render();
+        tick(600000);
+        pageState = { data: expiredOutcome({ eventId: null, ticketCount: null }), dataUpdatedAt: Date.now() };
+        rerender();
+        expect(result.current.expired?.body).toBe('payment_expired_body:{"count":2}');
+        expect(result.current.expired?.onQueueAgain).toBeNull();
+        expect(result.current.summary).not.toBeNull();
+      });
+    });
+
+    it('Property 3: a pay result and a status step both reach expired and stop polling', () => {
+      const first = render();
+      succeed(first.rerender, expiredOutcome());
+      expect(first.result.current.state).toBe('expired');
+      expect(first.result.current.summary?.orderCode).toBe('RSH-26-900001');
+      expect(first.result.current.pay).toBeNull();
+      expect(first.result.current.expired?.body).toBe('payment_expired_body:{"count":3}');
+
+      const second = render();
+      tap(second.result.current);
+      succeed(second.rerender, { kind: 'snap', outcome: 'success', snap: S1 });
+      expect(statusOptions.enabled).toBe(true);
+      statusState = { data: expiredOutcome() satisfies PaymentStep, dataUpdatedAt: 5 };
+      second.rerender();
+      second.rerender();
+      expect(second.result.current.state).toBe('expired');
+      expect(statusOptions.enabled).toBe(false);
+      hidden(second.result.current);
+      expect(second.result.current.expired).not.toBeNull();
+    });
+
+    it('Property 4: reason other stays inactive with the existing message', () => {
+      pageState = { data: otherOutcome() };
+      const { result } = render();
+      expect(result.current.state).toBe('inactive');
+      expect(result.current.expired).toBeNull();
+      expect(result.current.message).toMatchObject({ title: 'payment_inactive_title', note: null });
+    });
+
+    it('ready and the other states have no expired view', () => {
+      expect(render().result.current.expired).toBeNull();
+      pageState = { data: { kind: 'not-found' } };
+      expect(render().result.current.expired).toBeNull();
+    });
+
+    it('Property 5: the body uses ticketCount, else the seen order, else the count-free text', () => {
+      pageState = { data: expiredOutcome({ ticketCount: null }) };
+      expect(render().result.current.expired?.body).toBe('payment_expired_body_unknown');
+
+      pageState = { data: ready() };
+      const { result, rerender } = render();
+      pageState = { data: expiredOutcome({ ticketCount: null }) };
+      rerender();
+      expect(result.current.expired?.body).toBe('payment_expired_body:{"count":3}');
+
+      pageState = { data: expiredOutcome({ ticketCount: 0 }) };
+      expect(render().result.current.expired?.body).toBe('payment_expired_body_unknown');
+    });
+
+    it('Property 6: the refund note, the seen e-mail and the account fallback', () => {
+      pageState = { data: expiredOutcome({ refund: true }) };
+      const refunded = render().result.current.expired;
+      expect(refunded?.noteLead).toBeNull();
+      expect(refunded?.note).toBe('payment_inactive_refund');
+
+      pageState = { data: ready() };
+      const withEmail = render();
+      pageState = { data: expiredOutcome() };
+      withEmail.rerender();
+      expect(withEmail.result.current.expired?.noteLead).toBe('payment_expired_note_lead');
+      expect(t).toHaveBeenCalledWith('payment_expired_note_email', { email: 'nadia@example.com' });
+
+      pageState = { data: ready({ ...view, customerEmail: '  ' }) };
+      const blank = render();
+      pageState = { data: expiredOutcome() };
+      blank.rerender();
+      expect(blank.result.current.expired?.note).toBe('payment_expired_note_account');
+    });
+
+    it('Property 7: "Antre lagi" forgets the turn, tracks queue_rejoin, then replaces the page, once', () => {
+      pageState = { data: expiredOutcome() };
+      const { result, d } = render();
+      act(() => result.current.expired?.onQueueAgain?.());
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledWith('evt_1');
+      expect(events(d, 'queue_rejoin')).toEqual([{ eventId: 'evt_1', from: 'payment' }]);
+      expect(replace).toHaveBeenCalledWith('/queue?event=evt_1');
+      const executed = d.endOrderWindowUseCase.execute.mock.invocationCallOrder[0];
+      const tracked = d.analyticsAdapter.trackEvent.mock.invocationCallOrder.at(-1) ?? 0;
+      const replaced = replace.mock.invocationCallOrder[0];
+      expect(executed).toBeLessThan(tracked);
+      expect(tracked).toBeLessThan(replaced);
+
+      act(() => result.current.expired?.onQueueAgain?.());
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(events(d, 'queue_rejoin')).toHaveLength(1);
+
+      pageState = { data: expiredOutcome({ eventId: null }) };
+      expect(render().result.current.expired?.onQueueAgain).toBeNull();
+    });
+
+    it('Property 8: showing expired forgets nothing, navigates nowhere and never tracks the e-mail', () => {
+      const { result, rerender, d } = render();
+      pageState = { data: expiredOutcome() };
+      rerender();
+      rerender();
+      expect(result.current.state).toBe('expired');
+      expect(d.endOrderWindowUseCase.execute).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+      expect(events(d, 'payment_expired')).toEqual([]);
+      act(() => result.current.expired?.onQueueAgain?.());
+      const all = JSON.stringify(d.analyticsAdapter.trackEvent.mock.calls);
+      for (const secret of ['nadia@example.com', 'Nadia', '3174', 'RSH-26', 'tok-secret']) {
+        expect(all).not.toContain(secret);
+      }
     });
   });
 });

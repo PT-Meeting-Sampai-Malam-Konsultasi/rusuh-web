@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 
-import type { PaymentStatus, SnapTransaction } from '@core/entities/payment/payment.entity';
+import type { PaymentStatus, PaymentView, SnapTransaction } from '@core/entities/payment/payment.entity';
 import type { HttpError } from '@core/protocols/http.protocol';
 import type {
+  InactiveOutcome,
   PayInput,
   PayResult,
   PaymentPageResult,
   PaymentStep,
+  PaymentTicketLine,
   SnapHint,
 } from '@core/use_case/payment/pay-booking.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
@@ -20,7 +22,17 @@ import { formatRupiah } from '@utils/format/number';
 import { randomUuid } from '@utils/random-uuid';
 
 export type PaymentScreenState =
-  'loading' | 'ready' | 'opening' | 'verifying' | 'failed' | 'busy' | 'inactive' | 'not-found' | 'error' | 'leaving';
+  | 'loading'
+  | 'ready'
+  | 'opening'
+  | 'verifying'
+  | 'failed'
+  | 'busy'
+  | 'inactive'
+  | 'expired'
+  | 'not-found'
+  | 'error'
+  | 'leaving';
 
 /** FlowHeader step; `done` draws "✓" (spec 78 adds it to FlowHeaderStep). */
 export interface PaymentFlowStep {
@@ -118,6 +130,27 @@ export interface PaymentTimerView {
   label: string;
 }
 
+/** The "Waktu habis" screen (FR-23-W1, HiFi payment.html 84–90). Texts are translated. */
+export interface PaymentExpiredView {
+  /** "Waktu habis" / "Time's up" (Stamp uppercases it). */
+  stamp: string;
+  /** "Pesanan dibatalkan." / "Order cancelled." */
+  title: string;
+  /** With the held-ticket count, or the count-free text. */
+  body: string;
+  /** "Saldo terpotong?" shown bold before `note`; null when `note` is the definite refund text (it carries the lead). */
+  noteLead: string | null;
+  note: string;
+  /** "Antre lagi" / "Queue again". */
+  queueAgainLabel: string;
+  /** Null when the event is unknown: the page hides the button. */
+  onQueueAgain: (() => void) | null;
+  /** ROUTES.HOME. */
+  homeHref: string;
+  /** "Ke beranda" / "Go home". */
+  homeLabel: string;
+}
+
 export interface PaymentControllerInterface {
   t: TFunction;
   state: PaymentScreenState;
@@ -139,11 +172,14 @@ export interface PaymentControllerInterface {
   timer: PaymentTimerView | null;
   /** Seconds left reached 0 in a timer state: "Bayar" is off and the page has asked the server again. */
   timeUp: boolean;
+  /** Non-null exactly when state is 'expired' (FR-23-W1). */
+  expired: PaymentExpiredView | null;
 }
 
 type PaymentControllerDeps = Pick<
   AwilixRegistry,
   | 'payBookingUseCase'
+  | 'endOrderWindowUseCase'
   | 'snap'
   | 'analyticsAdapter'
   | 'storage'
@@ -162,7 +198,7 @@ type Phase =
   | { kind: 'verifying'; hint: SnapHint; reason: 'confirming' | 'waiting'; round: number }
   | { kind: 'failed'; paymentStatus: PaymentStatus }
   | { kind: 'busy'; code: string }
-  | { kind: 'inactive'; refund: boolean }
+  | { kind: 'inactive'; outcome: InactiveOutcome }
   | { kind: 'not-found' }
   | { kind: 'paid' };
 
@@ -173,6 +209,12 @@ interface Attempt {
 }
 
 /** The answer the countdown runs from: its server times and when it arrived (the query's dataUpdatedAt). */
+/** The last real ready answer of this visit: survives the refetch that turns the page inactive. */
+interface SeenOrder {
+  view: PaymentView;
+  tickets: PaymentTicketLine[];
+}
+
 interface TimerAnchor {
   expiresAt: string;
   serverNow: string;
@@ -186,6 +228,7 @@ const TIMER_STATES: ReadonlySet<PaymentScreenState> = new Set(['ready', 'opening
 
 const PaymentController = ({
   payBookingUseCase,
+  endOrderWindowUseCase,
   snap,
   analyticsAdapter,
   storage,
@@ -222,10 +265,17 @@ const PaymentController = ({
   const loaded = pageQuery.data?.kind === 'ready' ? pageQuery.data : null;
   const view = loaded?.view ?? null;
 
-  // The countdown's anchor (FR-21-W1): written only from a real answer, once per answer (render-time update, guarded).
+  // The countdown's anchor (FR-21-W1) and the seen order (FR-23-W1): written only from a real answer, once per answer
+  // (render-time update, guarded).
   const [anchor, setAnchor] = useState<TimerAnchor | null>(null);
-  if (view && !pageQuery.isPlaceholderData && pageQuery.dataUpdatedAt !== anchor?.receivedAt) {
-    setAnchor({ expiresAt: view.expiresAt, serverNow: view.serverNow, receivedAt: pageQuery.dataUpdatedAt });
+  const [seen, setSeen] = useState<SeenOrder | null>(null);
+  if (loaded && !pageQuery.isPlaceholderData && pageQuery.dataUpdatedAt !== anchor?.receivedAt) {
+    setAnchor({
+      expiresAt: loaded.view.expiresAt,
+      serverNow: loaded.view.serverNow,
+      receivedAt: pageQuery.dataUpdatedAt,
+    });
+    setSeen({ view: loaded.view, tickets: loaded.tickets });
   }
 
   // Preload snap.js so the tap opens Snap at once; a failure changes nothing (snap.pay loads it again on the tap).
@@ -288,7 +338,7 @@ const PaymentController = ({
           setPhase({ kind: 'paid' });
           return;
         case 'inactive':
-          setPhase({ kind: 'inactive', refund: result.refund });
+          setPhase({ kind: 'inactive', outcome: result });
           return;
         case 'retryable':
           // Same key on the retry; snap null = start the attempt again, else reopen this one.
@@ -334,7 +384,7 @@ const PaymentController = ({
     setHandledAt(statusQuery.dataUpdatedAt);
     if (step.kind === 'paid') setPhase({ kind: 'paid' });
     else if (step.kind === 'failed') setPhase({ kind: 'failed', paymentStatus: step.paymentStatus });
-    else if (step.kind === 'inactive') setPhase({ kind: 'inactive', refund: step.refund });
+    else if (step.kind === 'inactive') setPhase({ kind: 'inactive', outcome: step });
     else if (step.reason !== verifying.reason) setPhase({ ...verifying, reason: step.reason });
   }
 
@@ -378,12 +428,15 @@ const PaymentController = ({
   }, [signInNeeded, router, signInHref]);
 
   const pageResult = pageQuery.data?.kind;
+  // The page answer first: it is the latest server read after the FR-21 refetch.
+  const ended: InactiveOutcome | null =
+    pageQuery.data?.kind === 'inactive' ? pageQuery.data : phase.kind === 'inactive' ? phase.outcome : null;
   let state: PaymentScreenState;
   if (!hasBookingId) state = 'not-found';
   else if (pageQuery.isPending || loadUnauthorized) state = 'loading';
   else if (pageQuery.isError) state = 'error';
   else if (pageResult === 'not-found' || phase.kind === 'not-found') state = 'not-found';
-  else if (pageResult === 'inactive' || phase.kind === 'inactive') state = 'inactive';
+  else if (ended) state = ended.reason === 'expired' ? 'expired' : 'inactive';
   else if (leaving) state = 'leaving';
   else if (paying) state = 'opening';
   else state = phase.kind as 'ready' | 'verifying' | 'failed' | 'busy';
@@ -428,8 +481,18 @@ const PaymentController = ({
     });
   }, [view, timeUp, paying, mutatePay, bookingId]);
 
-  const refund =
-    (pageQuery.data?.kind === 'inactive' && pageQuery.data.refund) || (phase.kind === 'inactive' && phase.refund);
+  const refund = ended?.refund ?? false;
+
+  // "Antre lagi" (FR-23-W1): forget this device's ended turn, then the back of the queue (A-10). Once per visit.
+  const rejoined = useRef(false);
+  const eventId = ended?.eventId ?? null;
+  const onQueueAgain = useCallback(() => {
+    if (!eventId || rejoined.current) return;
+    rejoined.current = true;
+    endOrderWindowUseCase.execute(eventId);
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.QUEUE_REJOIN, { eventId, from: 'payment' });
+    router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
+  }, [eventId, endOrderWindowUseCase, analyticsAdapter, router]);
 
   const steps: PaymentFlowStep[] = [
     { number: 1, label: t('order_step_choose'), current: false, done: true },
@@ -437,30 +500,31 @@ const PaymentController = ({
     { number: 3, label: t('order_step_ticket'), current: false, done: false },
   ];
 
-  const showsOrder = ['ready', 'opening', 'verifying', 'failed', 'busy', 'leaving'].includes(state);
+  const showsOrder = ['ready', 'opening', 'verifying', 'failed', 'busy', 'leaving', 'expired'].includes(state);
+  const order = state === 'expired' ? seen : loaded;
   const total = view ? formatRupiah(view.price.total.amount, locale) : '';
   const summary: PaymentSummaryView | null =
-    loaded && view && showsOrder
+    order && showsOrder
       ? {
           heading: t('payment_summary_heading'),
-          orderCode: view.orderCode,
+          orderCode: order.view.orderCode,
           eventLine: [
-            view.eventName?.toLocaleUpperCase(locale),
-            view.eventStartsAt ? formatEventDay(view.eventStartsAt, locale, view.timezone) : '',
-            view.venueShort,
+            order.view.eventName?.toLocaleUpperCase(locale),
+            order.view.eventStartsAt ? formatEventDay(order.view.eventStartsAt, locale, order.view.timezone) : '',
+            order.view.venueShort,
           ]
             .filter(Boolean)
             .join(' · '),
-          lines: loaded.tickets.map((ticket, index) => ({
+          lines: order.tickets.map((ticket, index) => ({
             key: String(index),
             category: ticket.categoryName,
             nik: t('payment_summary_nik', { nik: ticket.nikMasked }),
             amount: ticket.unitPrice === null ? '' : formatRupiah(ticket.unitPrice, locale),
           })),
           feeLabel: t('order_summary_fee'),
-          fee: formatRupiah(view.price.adminFee.amount, locale),
+          fee: formatRupiah(order.view.price.adminFee.amount, locale),
           totalLabel: t('order_summary_total'),
-          total,
+          total: formatRupiah(order.view.price.total.amount, locale),
           legal: t('payment_legal'),
         }
       : null;
@@ -550,6 +614,26 @@ const PaymentController = ({
     };
   }
 
+  const count = ended?.ticketCount || seen?.tickets.length || null;
+  const email = seen?.view.customerEmail?.trim() || null;
+  const expired: PaymentExpiredView | null =
+    state === 'expired' && ended
+      ? {
+          stamp: t('payment_expired_stamp'),
+          title: t('payment_expired_title'),
+          body: count ? t('payment_expired_body', { count }) : t('payment_expired_body_unknown'),
+          noteLead: ended.refund ? null : t('payment_expired_note_lead'),
+          note: ended.refund
+            ? t('payment_inactive_refund')
+            : email
+              ? t('payment_expired_note_email', { email })
+              : t('payment_expired_note_account'),
+          queueAgainLabel: t('payment_expired_queue_again'),
+          onQueueAgain: eventId ? onQueueAgain : null,
+          ...home,
+        }
+      : null;
+
   return {
     t,
     state,
@@ -570,6 +654,7 @@ const PaymentController = ({
     },
     timer,
     timeUp,
+    expired,
   };
 };
 
