@@ -1,5 +1,9 @@
 # Design Document
 
+> **Updated 13 Nov 2026 (spec 79):** the "Saya sendiri / Orang lain" choice is removed. The account holds no NIK (D17),
+> so every holder's name and NIK are typed in. The radiogroup, its styles and its translation keys no longer apply; see
+> `docs/specs/79-order-holders-without-choice`.
+
 ## Overview
 
 Three presentation changes on `/order`, all props-in / JSX-out:

@@ -44,11 +44,8 @@ export interface TicketSelection {
   limitBelowMax: boolean;
 }
 
-export type HolderType = 'self' | 'other';
-
 export interface HolderEntry {
   slotKey: string;
-  holderType: HolderType;
   fullName: string;
   /** Digits only; never logged. */
   nik: string;
@@ -60,10 +57,6 @@ export type ChangeQuantityResult =
       kind: 'unchanged';
       reason: 'LIMIT_REACHED' | 'NONE_TO_REMOVE' | 'UNKNOWN_CATEGORY' | 'SOLD_OUT' | 'STOCK_REACHED';
     };
-
-export type SetHolderTypeResult =
-  | { kind: 'changed'; holders: HolderEntry[] }
-  | { kind: 'unchanged'; reason: 'SELF_TAKEN' | 'NO_PROFILE_NAME' | 'SAME_TYPE' | 'UNKNOWN_SLOT' };
 
 export interface OrderTicketSelectionUseCaseInterface {
   orderLimit: (input: OrderLimitInput) => number;
@@ -84,13 +77,6 @@ export interface OrderTicketSelectionUseCaseInterface {
     categoryId: string,
   ) => ChangeQuantityResult;
   reconcileHolders: (holders: readonly HolderEntry[], slots: readonly TicketSlot[]) => HolderEntry[];
-  canChooseSelf: (holders: readonly HolderEntry[], slotKey: string) => boolean;
-  setHolderType: (
-    holders: readonly HolderEntry[],
-    slotKey: string,
-    holderType: HolderType,
-    profileName: string,
-  ) => SetHolderTypeResult;
 }
 
 /** A whole number ≥ 0; anything else from the server is ignored (the hold re-checks it). */
@@ -114,7 +100,7 @@ const capOf = (category: SelectableCategory): number => {
   return isValidCount(category.available) ? category.available : Number.POSITIVE_INFINITY;
 };
 
-const emptyEntry = (slotKey: string): HolderEntry => ({ slotKey, holderType: 'other', fullName: '', nik: '' });
+const emptyEntry = (slotKey: string): HolderEntry => ({ slotKey, fullName: '', nik: '' });
 
 /** No dependencies: pure order rules (FR-13, FR-14, ADR-0004, ADR-0007). */
 export const OrderTicketSelectionUseCase = (): OrderTicketSelectionUseCaseInterface => ({
@@ -173,30 +159,5 @@ export const OrderTicketSelectionUseCase = (): OrderTicketSelectionUseCaseInterf
       const kept = byKey.get(slot.key);
       return kept ? { ...kept } : emptyEntry(slot.key);
     });
-  },
-
-  canChooseSelf: (holders, slotKey) =>
-    !holders.some((holder) => holder.holderType === 'self' && holder.slotKey !== slotKey),
-
-  setHolderType: (holders, slotKey, holderType, profileName) => {
-    const target = holders.find((holder) => holder.slotKey === slotKey);
-    if (!target) return { kind: 'unchanged', reason: 'UNKNOWN_SLOT' };
-    if (target.holderType === holderType) return { kind: 'unchanged', reason: 'SAME_TYPE' };
-    const name = profileName.trim();
-    if (holderType === 'self') {
-      if (name === '') return { kind: 'unchanged', reason: 'NO_PROFILE_NAME' };
-      if (holders.some((holder) => holder.holderType === 'self' && holder.slotKey !== slotKey)) {
-        return { kind: 'unchanged', reason: 'SELF_TAKEN' };
-      }
-    }
-    return {
-      kind: 'changed',
-      holders: holders.map((holder) => {
-        if (holder.slotKey !== slotKey) return holder;
-        return holderType === 'self'
-          ? { ...holder, holderType: 'self', fullName: name }
-          : { ...holder, holderType: 'other', fullName: '' };
-      }),
-    };
   },
 });

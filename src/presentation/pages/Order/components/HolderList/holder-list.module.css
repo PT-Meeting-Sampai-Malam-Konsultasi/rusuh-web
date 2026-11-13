@@ -54,15 +54,6 @@
   @apply flex flex-col gap-3.5 border-b border-hair py-[22px];
 }
 
-/* Phone: title, choice and fields stack. From 720px: title left, choice right on one row. */
-.blockHead {
-  @apply flex flex-col gap-3;
-
-  @variant md {
-    @apply flex-row items-center justify-between gap-6;
-  }
-}
-
 .title {
   @apply font-display text-[19px] leading-[1.1] font-bold;
   font-stretch: 85%;
@@ -70,51 +61,6 @@
   @variant md {
     @apply text-[22px];
   }
-}
-
-/* Segmented control: two equal segments, full width on phones, 268px from 720px. */
-.choice {
-  @apply grid w-full grid-cols-2 border-[2.5px] border-ink;
-
-  @variant md {
-    @apply w-[268px] flex-none;
-  }
-}
-
-.option {
-  @apply relative flex min-h-[45px] cursor-pointer items-center justify-center bg-card px-2 text-center font-sans text-[15px] font-semibold text-ink;
-  transition: background-color 120ms;
-
-  & + & {
-    @apply border-l-[2.5px] border-ink;
-  }
-
-  &:hover {
-    @apply bg-paper-2;
-  }
-
-  &:has(:focus-visible) {
-    @apply z-10 outline-3 outline-offset-3 outline-blue;
-  }
-}
-
-/* Pink = you; ink = the other person. */
-.option[data-kind='self']:has(:checked) {
-  @apply bg-pink text-white;
-}
-
-.option[data-kind='other']:has(:checked) {
-  @apply bg-ink text-paper;
-}
-
-.option:has(:disabled) {
-  @apply cursor-not-allowed bg-paper-2 text-ink-3;
-}
-
-/* Visually hidden but focusable: the label is the segment. */
-.radio {
-  @apply absolute inset-0 m-0 opacity-0;
-  cursor: inherit;
 }
 
 .fields {

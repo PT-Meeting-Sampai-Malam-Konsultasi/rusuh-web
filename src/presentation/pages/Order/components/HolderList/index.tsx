@@ -7,17 +7,15 @@ import styles from './holder-list.module.css';
 
 interface HolderListProps {
   t: TFunction;
-  /** False when the profile has no name or could not be read: no radiogroup, plain fields. */
-  showChoice: boolean;
   holders: OrderHolderView[];
 }
 
 /**
- * Section 2: one block per ticket with the "Saya sendiri / Orang lain" choice (native radios, so arrow keys skip the
- * disabled "Saya sendiri"), the KTP name and the NIK with its check states (FR-15-W1: error, Dukcapil tick,
- * "checking" status and "Periksa lagi"). ADR-0007: no profile-NIK card, no "save NIK to profile".
+ * Section 2: one block per ticket with the KTP name and the NIK with its check states (FR-15-W1: error, Dukcapil tick,
+ * "checking" status and "Periksa lagi"). No "Saya sendiri / Orang lain" choice: the profile holds no NIK (D17), so
+ * every holder is typed in. ADR-0007: no profile-NIK card, no "save NIK to profile".
  */
-export default function HolderList({ t, showChoice, holders }: HolderListProps) {
+export default function HolderList({ t, holders }: HolderListProps) {
   return (
     <section className={styles.section} aria-labelledby="order-holders-heading">
       <div className={styles.head}>
@@ -32,43 +30,9 @@ export default function HolderList({ t, showChoice, holders }: HolderListProps) 
       <ul className={styles.list}>
         {holders.map((holder) => (
           <li key={holder.key} className={styles.block}>
-            <div className={styles.blockHead}>
-              <h3 className={styles.title} id={`order-holder-${holder.key}-title`}>
-                {holder.title}
-              </h3>
-              {showChoice && (
-                <div
-                  role="radiogroup"
-                  className={styles.choice}
-                  aria-label={t('order_holder_for_label')}
-                  aria-describedby={`order-holder-${holder.key}-title`}
-                >
-                  <label className={styles.option} data-kind="self">
-                    <input
-                      type="radio"
-                      className={styles.radio}
-                      name={holder.choiceName}
-                      value="self"
-                      checked={holder.holderType === 'self'}
-                      disabled={holder.selfDisabled}
-                      onChange={() => holder.choose('self')}
-                    />
-                    <span>{t('order_holder_self')}</span>
-                  </label>
-                  <label className={styles.option} data-kind="other">
-                    <input
-                      type="radio"
-                      className={styles.radio}
-                      name={holder.choiceName}
-                      value="other"
-                      checked={holder.holderType === 'other'}
-                      onChange={() => holder.choose('other')}
-                    />
-                    <span>{t('order_holder_other')}</span>
-                  </label>
-                </div>
-              )}
-            </div>
+            <h3 className={styles.title} id={`order-holder-${holder.key}-title`}>
+              {holder.title}
+            </h3>
             <div className={styles.fields}>
               <TextField
                 id={holder.name.id}
@@ -76,7 +40,6 @@ export default function HolderList({ t, showChoice, holders }: HolderListProps) 
                 placeholder={t('order_holder_name_placeholder')}
                 hint={holder.name.hint}
                 value={holder.name.value}
-                readOnly={holder.name.readOnly}
                 autoComplete="off"
                 onChange={(e) => holder.name.onChange(e.currentTarget.value)}
                 onBlur={holder.name.onBlur}

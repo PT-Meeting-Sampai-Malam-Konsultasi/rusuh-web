@@ -67,7 +67,8 @@ Tabular figures for anything that changes (numbers, timers, money). Smallest tex
 - **Stamp:** rotated −2°, caps, word first; one style per status (fill, outline, dashed, dark, grey).
 - **Input:** 54px, card fill, ink border, blue offset on focus; error = red border + "!" message; valid = "✓".
 - **Timer:** ink stamp; pink at 60 s (Detail) / 120 s (Payment).
-- **Holder block:** "Saya sendiri / Orang lain" segmented control; "Myself" in pink with a profile card.
+- **Holder block:** title, then "Nama sesuai KTP" and "NIK"; no "Saya sendiri / Orang lain" choice (the account holds
+  no NIK, D17).
 - **Code boxes:** 6 boxes; paste and autofill fill all six.
 - **Snap:** our page only; Snap's UI is Midtrans's (theme colour `--color-pink-ink`).
 

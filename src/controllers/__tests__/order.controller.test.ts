@@ -90,10 +90,8 @@ const NIK_REASONS: Record<string, string | undefined> = {
 describe('OrderController', () => {
   let eventOptions: Record<string, unknown>;
   let categoriesOptions: Record<string, unknown>;
-  let meOptions: Record<string, unknown>;
   let eventState: QueryState;
   let categoriesState: QueryState;
-  let meState: QueryState;
   let search: Record<string, string>;
   /** When the categories answer "arrived" by default: one number per test (a fresh one per render would re-anchor). */
   let answeredAt: number;
@@ -118,10 +116,6 @@ describe('OrderController', () => {
 
   const deps = () => ({
     catalogService: { listEvents: vi.fn(), getEvent: vi.fn().mockResolvedValue({ data: event, status: 200 }) },
-    accountService: {
-      getMe: vi.fn().mockResolvedValue({ data: { userId: 'usr_1', email: 'nadia@example.com' }, status: 200 }),
-      updateProfile: vi.fn(),
-    },
     getOrderCategoriesUseCase: { execute: vi.fn().mockResolvedValue(okResult) },
     orderTicketSelectionUseCase: OrderTicketSelectionUseCase(),
     validateAttendeeUseCase: { checkNik, execute: vi.fn() },
@@ -154,10 +148,6 @@ describe('OrderController', () => {
         eventOptions = options;
         return { data: undefined, isError: false, error: null, refetch: eventRefetch, ...eventState };
       }
-      if (options.queryKey[0] === 'me') {
-        meOptions = options;
-        return { data: undefined, isError: false, error: null, refetch: vi.fn(), ...meState };
-      }
       categoriesOptions = options;
       return {
         data: undefined,
@@ -181,7 +171,6 @@ describe('OrderController', () => {
     vi.clearAllMocks();
     eventState = {};
     categoriesState = {};
-    meState = {};
     search = { event: 'evt_samudra' };
     i18n.language = 'id';
     answeredAt = Date.now();
@@ -763,13 +752,9 @@ describe('OrderController', () => {
       ]);
       expect(result.current.holders[0]).toMatchObject({
         key: 'cat_festival-1',
-        holderType: 'other',
-        choiceName: 'order-holder-cat_festival-1-type',
-        selfDisabled: false,
         name: {
           id: 'order-holder-cat_festival-1-name',
           value: '',
-          readOnly: false,
           hint: 'order_holder_name_hint',
         },
         nik: { id: 'order-holder-cat_festival-1-nik', value: '' },
@@ -826,115 +811,35 @@ describe('OrderController', () => {
       const { result } = render(d);
       act(() => result.current.increment('cat_festival'));
       const holder = result.current.holders[0];
-      expect(holder).toMatchObject({ key: 'cat_festival-1', holderType: 'other', name: { value: '' } });
+      expect(holder).toMatchObject({ key: 'cat_festival-1', name: { value: '' } });
       act(() => {
-        holder.choose('self');
         holder.name.onChange('Budi');
         holder.nik.onChange('3174');
       });
-      expect(result.current.holders[0]).toMatchObject({ holderType: 'other', name: { value: '' }, nik: { value: '' } });
+      expect(result.current.holders[0]).toMatchObject({ name: { value: '' }, nik: { value: '' } });
     });
   });
 
-  describe('profile', () => {
-    const ready = () => {
+  describe('holders without a profile', () => {
+    it('never reads the profile: every holder name is typed in (the profile holds no NIK, D17)', () => {
       eventState = { data: event };
       categoriesState = { data: openResult };
-    };
-    const withName = (fullName?: string) => {
-      meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName } };
-    };
-
-    it('loads the profile once the page is ready, without retries or focus refetches', async () => {
+      const queried: unknown[] = [];
       const d = deps();
-      const { rerender } = render(d);
-      expect(meOptions).toMatchObject({ queryKey: ['me'], enabled: false, retry: false, refetchOnWindowFocus: false });
-      ready();
-      rerender();
-      expect(meOptions.enabled).toBe(true);
-      await expect((meOptions.queryFn as () => Promise<unknown>)()).resolves.toEqual({
-        userId: 'usr_1',
-        email: 'nadia@example.com',
+      const { result } = render({
+        ...d,
+        useQueryTanstack: (options: { queryKey: unknown[] } & Record<string, unknown>) => {
+          queried.push(options.queryKey[0]);
+          return d.useQueryTanstack(options);
+        },
       });
-      expect(d.accountService.getMe).toHaveBeenCalledTimes(1);
-    });
-
-    it('fills "Saya sendiri" from the profile name and blocks it on the other tickets', () => {
-      ready();
-      withName('  Nadia Saputri ');
-      const { result } = render();
-      expect(result.current.showHolderChoice).toBe(true);
+      expect(queried).not.toContain('me');
       act(() => result.current.increment('cat_festival'));
-      act(() => result.current.increment('cat_tribune'));
-      act(() => result.current.holders[0].choose('self'));
-      expect(result.current.holders[0]).toMatchObject({
-        holderType: 'self',
-        selfDisabled: false,
-        name: { value: 'Nadia Saputri', readOnly: true, hint: 'order_holder_name_hint_profile' },
-        nik: { value: '' },
-      });
-      expect(result.current.holders[1].selfDisabled).toBe(true);
-      act(() => result.current.holders[1].choose('self'));
-      expect(result.current.holders[1].holderType).toBe('other');
-      act(() => result.current.holders[0].name.onChange('Someone'));
-      expect(result.current.holders[0].name.value).toBe('Nadia Saputri');
-      act(() => result.current.holders[0].nik.onChange('3174'));
-      expect(result.current.holders[0].nik.value).toBe('3174');
-
-      act(() => result.current.holders[0].choose('other'));
-      expect(result.current.holders[0]).toMatchObject({
-        holderType: 'other',
-        name: { value: '', readOnly: false, hint: 'order_holder_name_hint' },
-        nik: { value: '3174' },
-      });
-      expect(result.current.holders[1].selfDisabled).toBe(false);
-    });
-
-    it('ignores choosing the same type again', () => {
-      ready();
-      withName('Nadia');
-      const { result } = render();
-      act(() => result.current.increment('cat_festival'));
-      act(() => result.current.holders[0].choose('other'));
-      expect(result.current.holders[0].holderType).toBe('other');
-    });
-
-    it('makes a self holder editable again if the profile disappears', () => {
-      ready();
-      withName('Nadia');
-      const { result, rerender } = render();
-      act(() => result.current.increment('cat_festival'));
-      act(() => result.current.holders[0].choose('self'));
-      meState = err(0, 'NETWORK_ERROR');
-      rerender();
-      expect(result.current.showHolderChoice).toBe(false);
-      expect(result.current.holders[0].name).toMatchObject({ readOnly: false, hint: 'order_holder_name_hint' });
-      act(() => result.current.holders[0].name.onChange('Nadia S'));
-      expect(result.current.holders[0].name.value).toBe('Nadia S');
-    });
-
-    it.each<[string, () => void]>([
-      ['401', () => (meState = err(401, 'UNAUTHORIZED'))],
-      ['offline', () => (meState = err(0, 'NETWORK_ERROR'))],
-      ['server error', () => (meState = err(500, 'INTERNAL_ERROR'))],
-      ['pending', () => (meState = {})],
-      ['no name', () => withName(undefined)],
-      ['a blank name', () => withName('  ')],
-    ])('hides the choice silently on %s', (_label, arrange) => {
-      ready();
-      arrange();
-      const d = deps();
-      const { result } = render(d);
-      expect(result.current.showHolderChoice).toBe(false);
-      expect(result.current.status).toBe('ready');
-      expect(result.current.errorMessage).toBe('');
-      expect(replace).not.toHaveBeenCalled();
-      expect(router.push).not.toHaveBeenCalled();
-      act(() => result.current.increment('cat_festival'));
-      act(() => result.current.holders[0].choose('self'));
-      expect(result.current.holders[0].holderType).toBe('other');
-      act(() => result.current.holders[0].name.onChange('Budi'));
-      expect(result.current.holders[0].name).toMatchObject({ value: 'Budi', readOnly: false });
+      act(() => result.current.holders[0].name.onChange('Nadia Saputri'));
+      expect(result.current.holders[0].name).toEqual(
+        expect.objectContaining({ value: 'Nadia Saputri', hint: 'order_holder_name_hint' }),
+      );
+      expect(result.current.holders[0]).not.toHaveProperty('choose');
     });
   });
 
@@ -942,7 +847,6 @@ describe('OrderController', () => {
     it('keeps digits only, shows them while focused and masks them otherwise', () => {
       eventState = { data: event };
       categoriesState = { data: okResult };
-      meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName: 'Nadia Saputri' } };
       const d = deps();
       const { result } = render(d);
       act(() => result.current.increment('cat_festival'));
@@ -955,7 +859,6 @@ describe('OrderController', () => {
       expect(result.current.holders[0].nik.value).toBe('3174055203960004');
       act(() => result.current.holders[0].nik.onBlur());
       expect(result.current.holders[0].nik.value).toBe('3174 •••• •••• 0004');
-      act(() => result.current.holders[1].choose('self'));
 
       const calls = JSON.stringify([
         d.analyticsAdapter.trackEvent.mock.calls,
@@ -964,9 +867,8 @@ describe('OrderController', () => {
         d.storage.set.mock.calls,
         eventOptions.queryKey,
         categoriesOptions.queryKey,
-        meOptions.queryKey,
       ]);
-      for (const secret of ['3174055203960004', '0396', 'Budi', 'Nadia']) expect(calls).not.toContain(secret);
+      for (const secret of ['3174055203960004', '0396', 'Budi']) expect(calls).not.toContain(secret);
       expect(sent(d)).toEqual(['view_item']);
       expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
       expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
@@ -982,10 +884,9 @@ describe('OrderController', () => {
     type Hook = { result: { current: ReturnType<typeof OrderController> } };
     type Vars = { slotKey: string; fieldIndex: number; fullName: string; nik: string };
 
-    const ready = (fullName?: string) => {
+    const ready = () => {
       eventState = { data: event };
       categoriesState = { data: openResult };
-      if (fullName) meState = { data: { userId: 'usr_1', email: 'nadia@example.com', fullName } };
     };
     const holder = (hook: Hook, i: number) => hook.result.current.holders[i];
     /** Types a name and a NIK, then leaves the NIK field (blur). */
@@ -1130,28 +1031,6 @@ describe('OrderController', () => {
       expect(mutate).toHaveBeenCalledWith({ slotKey: 'cat_festival-1', fieldIndex: 0, fullName: 'Budi', nik: NIK_A });
     });
 
-    it('checks when "Saya sendiri" fills the profile name, and drops the run on a type change', () => {
-      ready('Nadia Saputri');
-      const hook = render();
-      act(() => hook.result.current.increment('cat_festival'));
-      act(() => holder(hook, 0).choose('self'));
-      expect(mutate).not.toHaveBeenCalled();
-      act(() => holder(hook, 0).nik.onChange(NIK_A));
-      act(() => holder(hook, 0).choose('other'));
-      act(() => holder(hook, 0).choose('self'));
-      expect(mutate).toHaveBeenCalledTimes(1);
-      const v = lastVars();
-      expect(v).toEqual({ slotKey: 'cat_festival-1', fieldIndex: 0, fullName: 'Nadia Saputri', nik: NIK_A });
-      start(v);
-      settle(validResult, v);
-      expect(holder(hook, 0).nik.valid).toBe('order_nik_valid');
-      act(() => holder(hook, 0).choose('other'));
-      expect(holder(hook, 0).nik.valid).toBeUndefined();
-      act(() => holder(hook, 0).name.onChange('Nadia Saputri'));
-      expect(holder(hook, 0).nik.valid).toBeUndefined();
-      expect(holder(hook, 0).nik.checking).toBe(false);
-    });
-
     it('reads the admission token at call time and never puts it in the variables', async () => {
       const d = deps();
       d.admissionStore.get.mockReturnValue('adm-1');
@@ -1217,7 +1096,6 @@ describe('OrderController', () => {
         expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('holders_complete', {
           event_id: 'evt_samudra',
           ticket_count: 1,
-          myself_used: false,
         });
       }
       expect(replace).not.toHaveBeenCalled();
@@ -1883,14 +1761,12 @@ describe('OrderController', () => {
       advance(299_000);
       const before = [
         d.catalogService.getEvent.mock.calls.length,
-        d.accountService.getMe.mock.calls.length,
         d.getOrderCategoriesUseCase.execute.mock.calls.length,
       ];
       advance(1000);
       rerender();
       expect([
         d.catalogService.getEvent.mock.calls.length,
-        d.accountService.getMe.mock.calls.length,
         d.getOrderCategoriesUseCase.execute.mock.calls.length,
       ]).toEqual(before);
       expect(mutate).not.toHaveBeenCalled();

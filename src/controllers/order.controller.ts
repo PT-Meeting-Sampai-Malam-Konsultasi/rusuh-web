@@ -4,12 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod/mini';
 import type { TFunction } from 'i18next';
 
-import type { User } from '@core/entities/auth/auth.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { HttpError } from '@core/protocols/http.protocol';
 import type { OrderCategoriesResult } from '@core/use_case/booking/get-order-categories.use-case';
 import type { HoldBookingInput, HoldBookingResult, HoldTicket } from '@core/use_case/booking/hold-booking.use-case';
-import type { HolderType, TicketQuantities } from '@core/use_case/booking/order-ticket-selection.use-case';
+import type { TicketQuantities } from '@core/use_case/booking/order-ticket-selection.use-case';
 import type { ValidateAttendeeResult } from '@core/use_case/booking/validate-attendee.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 import { ANALYTICS_CURRENCY, ANALYTICS_EVENTS, categoryItem } from '@utils/analytics';
@@ -36,9 +35,6 @@ export interface FlowStep {
   current: boolean;
 }
 
-/** Re-exported so the presentation layer never imports from @core. */
-export type OrderHolderType = HolderType;
-
 /** A category row: the spec 44 view plus its stepper. */
 export interface OrderCategoryRow extends OrderCategoryView {
   quantity: number;
@@ -55,9 +51,7 @@ export interface OrderCategoryRow extends OrderCategoryView {
 export interface OrderHolderNameField {
   id: string;
   value: string;
-  /** True for "Saya sendiri" (name from the profile). */
-  readOnly: boolean;
-  /** "Dari profil Anda." when read-only, else "Dicetak di e-tiket.". */
+  /** "Dicetak di e-tiket.". */
   hint: string;
   onChange: (value: string) => void;
   /** Starts the Dukcapil check when the NIK is already locally ok. */
@@ -89,12 +83,6 @@ export interface OrderHolderView {
   key: string;
   /** "Tiket 1 · Festival B" / "Ticket 1 · Festival B". */
   title: string;
-  holderType: OrderHolderType;
-  /** Radio group name: `order-holder-${key}-type`. */
-  choiceName: string;
-  /** "Saya sendiri" is taken by another ticket (block, spec 47). */
-  selfDisabled: boolean;
-  choose: (holderType: OrderHolderType) => void;
   name: OrderHolderNameField;
   nik: OrderHolderNikField;
 }
@@ -198,8 +186,6 @@ export interface OrderControllerInterface {
   orderLimit: number;
   /** status === 'ready' && totalTickets >= 1. */
   showHolders: boolean;
-  /** The profile has a name: show "Saya sendiri" / "Orang lain". */
-  showHolderChoice: boolean;
   /** One per ticket, slot order; empty when totalTickets is 0. */
   holders: OrderHolderView[];
   /** Non-null only when status is 'ready' and the order limit is reached. */
@@ -247,7 +233,6 @@ const NIK_REJECTIONS: Partial<Record<ValidateAttendeeResult['kind'], string>> = 
 type OrderControllerDeps = Pick<
   AwilixRegistry,
   | 'catalogService'
-  | 'accountService'
   | 'getOrderCategoriesUseCase'
   | 'orderTicketSelectionUseCase'
   | 'validateAttendeeUseCase'
@@ -273,7 +258,6 @@ const holdersSchema = z.object({
   holders: z.array(
     z.object({
       slotKey: z.string(),
-      holderType: z.enum(['self', 'other']),
       fullName: z
         .string()
         .check(z.trim(), z.minLength(1, 'login_name_required'), z.maxLength(200, 'login_name_too_long')),
@@ -328,7 +312,6 @@ const IGNORE = () => {};
 
 const OrderController = ({
   catalogService,
-  accountService,
   getOrderCategoriesUseCase,
   orderTicketSelectionUseCase,
   validateAttendeeUseCase,
@@ -422,17 +405,6 @@ const OrderController = ({
     () => (eventData && !eventNotFound ? toOrderEventView(eventData, locale) : null),
     [eventData, eventNotFound, locale],
   );
-
-  // The profile only prefills "Saya sendiri": any failure (401 included) hides the choice, silently.
-  const meQuery = useQueryTanstack<User, HttpError>({
-    queryKey: [QUERY_KEYS.ME],
-    queryFn: async () => (await accountService.getMe()).data,
-    enabled: status === 'ready',
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-  const profileName = (!meQuery.isError && meQuery.data?.fullName?.trim()) || '';
-  const showHolderChoice = profileName !== '';
 
   const [quantities, setQuantities] = useState<TicketQuantities>({});
   const [focusedNik, setFocusedNik] = useState<string | null>(null);
@@ -569,8 +541,6 @@ const OrderController = ({
     const views = selection.slots.map((slot, position): OrderHolderView => {
       const index = holderValues.findIndex((holder) => holder.slotKey === slot.key);
       const entry = index >= 0 ? holderValues[index] : null;
-      const holderType: OrderHolderType = entry?.holderType ?? 'other';
-      const readOnly = holderType === 'self' && showHolderChoice;
       const digits = entry?.nik ?? '';
       const fullName = entry?.fullName ?? '';
       const earlier = selection.slots
@@ -640,37 +610,17 @@ const OrderController = ({
       return {
         key: slot.key,
         title: t('order_holder_title', { index: slot.index, category: slot.categoryName }),
-        holderType,
-        choiceName: `order-holder-${slot.key}-type`,
-        selfDisabled: !orderTicketSelectionUseCase.canChooseSelf(holderValues, slot.key),
-        choose: entry
-          ? (next) => {
-              const result = orderTicketSelectionUseCase.setHolderType(
-                formApi.getValues('holders'),
-                slot.key,
-                next,
-                profileName,
-              );
-              if (result.kind !== 'changed') return;
-              formApi.setValue('holders', result.holders);
-              dropRun(slot.key);
-              // The run was just dropped, so nothing covers the new values.
-              if (next === 'self') startCheck(slot.key, false, undefined);
-            }
-          : IGNORE,
         name: {
           id: `order-holder-${slot.key}-name`,
           value: fullName,
-          readOnly,
-          hint: t(readOnly ? 'order_holder_name_hint_profile' : 'order_holder_name_hint'),
-          onChange:
-            entry && !readOnly
-              ? (value) => {
-                  if (formApi.getValues(`holders.${index}.fullName`) === value) return;
-                  formApi.setValue(`holders.${index}.fullName`, value);
-                  dropRun(slot.key);
-                }
-              : IGNORE,
+          hint: t('order_holder_name_hint'),
+          onChange: entry
+            ? (value) => {
+                if (formApi.getValues(`holders.${index}.fullName`) === value) return;
+                formApi.setValue(`holders.${index}.fullName`, value);
+                dropRun(slot.key);
+              }
+            : IGNORE,
           onBlur: () => startCheck(slot.key, false, stored),
         },
         nik: {
@@ -703,7 +653,6 @@ const OrderController = ({
       allHoldersVerified: states.length > 0 && states.every((state) => state === 'valid'),
     };
   }, [
-    orderTicketSelectionUseCase,
     validateAttendeeUseCase,
     formApi,
     selection.slots,
@@ -711,8 +660,6 @@ const OrderController = ({
     focusedNik,
     touchedNik,
     checks,
-    profileName,
-    showHolderChoice,
     startCheck,
     dropRun,
     ERROR_CODE_MAP,
@@ -769,9 +716,8 @@ const OrderController = ({
     analyticsAdapter.trackEvent(ANALYTICS_EVENTS.HOLDERS_COMPLETE, {
       event_id: eventId,
       ticket_count: selection.total,
-      myself_used: showHolderChoice && holderValues.some((holder) => holder.holderType === 'self'),
     });
-  }, [allHoldersVerified, slotsKey, selection.total, showHolderChoice, holderValues, analyticsAdapter, eventId]);
+  }, [allHoldersVerified, slotsKey, selection.total, analyticsAdapter, eventId]);
 
   const limitNotice = useMemo<OrderLimitNotice | null>(
     () =>
@@ -1063,7 +1009,6 @@ const OrderController = ({
     totalTickets: selection.total,
     orderLimit: limit,
     showHolders: status === 'ready' && selection.total >= 1,
-    showHolderChoice,
     holders,
     limitNotice,
     categoryNote: ok ? t('order_category_note', { count: limit }) : '',
