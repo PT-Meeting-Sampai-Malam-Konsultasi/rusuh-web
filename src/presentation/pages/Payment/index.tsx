@@ -4,6 +4,7 @@ import type { PaymentControllerInterface } from '@controllers/payment.controller
 import container from '@infrastructure/di/container';
 import '@infrastructure/di/controllers/payment';
 import FlowHeader from '@presentation/components/FlowHeader';
+import Timer from '@presentation/components/Timer';
 
 import PaymentDock from './components/PaymentDock';
 import PaymentIntro from './components/PaymentIntro';
@@ -29,6 +30,7 @@ export default function PaymentScreen() {
     backHref,
     locale,
     setLocale,
+    timer,
   } = container.resolve<PaymentControllerInterface>('paymentController');
 
   return (
@@ -40,6 +42,7 @@ export default function PaymentScreen() {
         onLocaleChange={setLocale}
         backHref={backHref}
         title={title}
+        timer={timer && <Timer seconds={timer.seconds} label={timer.label} warnAt={120} compact />}
         labels={{
           home: t('logo_home_label'),
           steps: t('order_steps_label'),

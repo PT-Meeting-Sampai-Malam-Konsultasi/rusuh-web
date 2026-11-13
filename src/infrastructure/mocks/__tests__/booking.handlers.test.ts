@@ -7,7 +7,7 @@ import type { CreateBookingRequest, ValidateAttendeeRequest } from '@core/entiti
 import { BookingService } from '@core/services/booking.service';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 
-import { MOCK_ADMIN_FEE, MOCK_RETRY_AFTER_S } from '../handlers/booking.handlers';
+import { MOCK_ADMIN_FEE, MOCK_RETRY_AFTER_S, MOCK_SHORT_PAYMENT_WINDOW_MS } from '../handlers/booking.handlers';
 import { MOCK_SHORT_ORDER_WINDOW_MS } from '../handlers/mock-queue-state';
 import { createHandlers } from '../handlers/handlers';
 import type { MockScenario } from '../scenario';
@@ -562,6 +562,18 @@ describe('hold mock (FR-16-W1)', () => {
       expect(stored.attendees).toEqual(created.attendees);
       const { data: active } = await signedIn.getActiveBooking();
       expect(active.items.map((b) => b.status)).toEqual(['PAYMENT_PENDING']);
+    });
+
+    it('shortens the payment window to 150 seconds under short_payment, then answers 409 BOOKING_NOT_HELD', async () => {
+      const { data: created } = await create(['cat_festival_b']);
+      scenario = 'short_payment';
+      const { data, status } = await signedIn.enterPayment(created.bookingId, 'adm-1');
+      expect(status).toBe(200);
+      expect(MOCK_SHORT_PAYMENT_WINDOW_MS).toBe(150_000);
+      expect(Date.parse(data.paymentExpiresAt) - Date.parse(data.serverNow)).toBe(150_000);
+      later(150_000);
+      await rejection(signedIn.enterPayment(created.bookingId, 'adm-1'), { status: 409, code: 'BOOKING_NOT_HELD' });
+      await expect(signedIn.getBooking(created.bookingId)).resolves.toMatchObject({ data: { status: 'EXPIRED' } });
     });
 
     it('answers 409 BOOKING_NOT_HELD once the payment window has passed', async () => {

@@ -98,6 +98,7 @@ describe('translations', () => {
       payment_title: ['Pembayaran', 'Payment'],
       payment_back_label: ['Kembali ke beranda', 'Back to home'],
       payment_step_done: ['selesai', 'done'],
+      payment_timer_label: ['untuk membayar', 'left to pay'],
       payment_heading: ['Bayar dengan Midtrans', 'Pay with Midtrans'],
       payment_intro: [
         'Tekan Bayar, lalu pilih cara bayar di halaman Midtrans yang terbuka di atas halaman ini.',

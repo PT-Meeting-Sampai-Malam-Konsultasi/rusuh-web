@@ -37,6 +37,8 @@ export const MOCK_SCENARIOS = [
   'payment_pending',
   /** FR-20 / ADR-0009: the payment settles after expiry: EXPIRED, paid_after_expiry, refundRequired. */
   'payment_late',
+  /** FR-21: the payment window is 150 seconds, so the pink last two minutes, 0:00 and the inactive answer show quickly. */
+  'short_payment',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];

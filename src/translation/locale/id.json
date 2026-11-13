@@ -124,6 +124,7 @@
   "payment_title": "Pembayaran",
   "payment_back_label": "Kembali ke beranda",
   "payment_step_done": "selesai",
+  "payment_timer_label": "untuk membayar",
   "payment_heading": "Bayar dengan Midtrans",
   "payment_intro": "Tekan Bayar, lalu pilih cara bayar di halaman Midtrans yang terbuka di atas halaman ini.",
   "payment_intro_note": "Biarkan halaman ini terbuka sampai pembayaran selesai.",
