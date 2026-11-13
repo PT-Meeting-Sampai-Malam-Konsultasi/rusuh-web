@@ -11,6 +11,7 @@ import type { OrderCategoriesResult } from '@core/use_case/booking/get-order-cat
 import type { HolderType, TicketQuantities } from '@core/use_case/booking/order-ticket-selection.use-case';
 import type { ValidateAttendeeResult } from '@core/use_case/booking/validate-attendee.use-case';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
+import { ANALYTICS_CURRENCY, ANALYTICS_EVENTS, categoryItem } from '@utils/analytics';
 import type { FormatLocale } from '@utils/format/date';
 import { maskNik, toNikDigits } from '@utils/format/nik';
 import {
@@ -173,6 +174,17 @@ export interface OrderControllerInterface {
   /** Non-null exactly when timeUp. */
   timeUpSheet: OrderTimeUpView | null;
 }
+
+/** How long the ticket count must stay still before add_to_cart is sent. */
+const ADD_TO_CART_SETTLE_MS = 1000;
+
+/** NIK check answers that are `nik_rejected` reasons (tracking plan §3); the others are not rejections. */
+const NIK_REJECTIONS: Partial<Record<ValidateAttendeeResult['kind'], string>> = {
+  'nik-invalid': 'NIK_INVALID',
+  'seat-taken': 'NIK_SEAT_TAKEN',
+  duplicate: 'DUPLICATE_NIK',
+  unavailable: 'DUKCAPIL_UNAVAILABLE',
+};
 
 type OrderControllerDeps = Pick<
   AwilixRegistry,
@@ -400,7 +412,9 @@ const OrderController = ({
         router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
         return;
       }
-      analyticsAdapter.trackEvent('order_nik_checked', { outcome: result.kind });
+      // Tracking plan §3: a rejected NIK, by reason only (never the NIK).
+      const rejected = NIK_REJECTIONS[result.kind];
+      if (rejected) analyticsAdapter.trackEvent(ANALYTICS_EVENTS.NIK_REJECTED, { event_id: eventId, reason: rejected });
       setChecks((prev) => {
         const run = prev[slotKey];
         if (run?.phase !== 'checking' || run.nik !== nik || run.fullName !== fullName) return prev;
@@ -613,6 +627,60 @@ const OrderController = ({
     ERROR_CODE_MAP,
     t,
   ]);
+
+  // Tracking plan §2 steps 7–9 and §3 for this page.
+  const analyticsEvent = useMemo(() => (eventData ? { eventId, name: eventData.name } : null), [eventData, eventId]);
+  const viewTracked = useRef(false);
+  useEffect(() => {
+    if (!ok || !analyticsEvent || viewTracked.current) return;
+    viewTracked.current = true;
+    const prices = ok.categories.map((category) => category.price.amount);
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.VIEW_ITEM, {
+      event_id: eventId,
+      currency: ANALYTICS_CURRENCY,
+      value: prices.length > 0 ? Math.min(...prices) : 0,
+      items: ok.categories.map((category) => categoryItem(category, analyticsEvent)),
+    });
+    if (ok.categories.length > 0 && ok.categories.every((category) => category.availability === 'sold_out')) {
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.SOLD_OUT_SEEN, { event_id: eventId, where: 'order' });
+    }
+  }, [ok, analyticsEvent, analyticsAdapter, eventId]);
+
+  // add_to_cart once the count settles (1 s), not on every tap; only when something is picked.
+  const cartKey = selectable
+    .map((category) => `${category.categoryId}:${quantities[category.categoryId] ?? 0}`)
+    .join(',');
+  useEffect(() => {
+    if (!analyticsEvent || selection.total === 0) return;
+    const timer = window.setTimeout(() => {
+      const picked = selectable.filter((category) => (quantities[category.categoryId] ?? 0) > 0);
+      analyticsAdapter.trackEvent(ANALYTICS_EVENTS.ADD_TO_CART, {
+        event_id: eventId,
+        currency: ANALYTICS_CURRENCY,
+        value: picked.reduce(
+          (sum, category) => sum + category.price.amount * (quantities[category.categoryId] ?? 0),
+          0,
+        ),
+        items: picked.map((category) => categoryItem(category, analyticsEvent, quantities[category.categoryId])),
+      });
+    }, ADD_TO_CART_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+    // cartKey stands for the quantities: a new object each render, so it is not a dependency itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartKey, analyticsEvent]);
+
+  // holders_complete once per set of tickets, when every holder is verified.
+  const holdersTrackedFor = useRef<string | null>(null);
+  const slotsKey = selection.slots.map((slot) => slot.key).join(',');
+  useEffect(() => {
+    if (!allHoldersVerified || holdersTrackedFor.current === slotsKey) return;
+    holdersTrackedFor.current = slotsKey;
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.HOLDERS_COMPLETE, {
+      event_id: eventId,
+      ticket_count: selection.total,
+      myself_used: showHolderChoice && holderValues.some((holder) => holder.holderType === 'self'),
+    });
+  }, [allHoldersVerified, slotsKey, selection.total, showHolderChoice, holderValues, analyticsAdapter, eventId]);
 
   const limitNotice = useMemo<OrderLimitNotice | null>(
     () =>

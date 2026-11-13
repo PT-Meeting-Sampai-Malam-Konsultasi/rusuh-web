@@ -1,17 +1,28 @@
-import type { AnalyticsProtocol } from '@core/protocols/analytics.protocol';
+import type { AnalyticsParams, AnalyticsProtocol } from '@core/protocols/analytics.protocol';
 import type { HttpError } from '@core/protocols/http.protocol';
 
 export interface AnalyticsSink {
   page?(page: string): void;
-  event?(name: string, params?: Record<string, string | number | boolean>): void;
+  event?(name: string, params?: AnalyticsParams): void;
   error?(error: unknown, context?: Record<string, string>): void;
 }
 
+export interface AnalyticsAdapterOptions {
+  /** The UI language, added to every event as `language` (tracking plan §1). */
+  getLanguage?: () => string;
+}
+
 /** Analytics with a pluggable sink. Without a provider configured, calls are dropped. */
-export function createAnalyticsAdapter(sink: AnalyticsSink = {}): AnalyticsProtocol {
+export function createAnalyticsAdapter(
+  sink: AnalyticsSink = {},
+  options: AnalyticsAdapterOptions = {},
+): AnalyticsProtocol {
   return {
     trackPageView: (page) => sink.page?.(page),
-    trackEvent: (name, params) => sink.event?.(name, params),
+    trackEvent: (name, params) => {
+      const language = options.getLanguage?.();
+      sink.event?.(name, language ? { ...params, language } : params);
+    },
     reportError: (error, context) => sink.error?.(error, context),
   };
 }

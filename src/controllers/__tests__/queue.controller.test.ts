@@ -311,9 +311,9 @@ describe('QueueController', () => {
     expect(d.analyticsAdapter.trackPageView).toHaveBeenCalledWith('queue');
     expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledTimes(1);
     expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_join', {
-      eventId: 'evt_pelita',
+      event_id: 'evt_pelita',
       outcome: 'joined',
-      state: 'open',
+      position_bucket: '1001-10000',
     });
   });
 
@@ -532,7 +532,7 @@ describe('QueueController', () => {
       render(d);
       expect(router.replace).toHaveBeenCalledWith('/order?event=evt_pelita');
       expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_claim', {
-        eventId: 'evt_pelita',
+        event_id: 'evt_pelita',
         outcome: 'admitted',
       });
     });
@@ -556,10 +556,8 @@ describe('QueueController', () => {
         claiming: false,
         signInHref: '/login?next=%2Fqueue%3Fevent%3Devt_pelita',
       });
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_claim', {
-        eventId: 'evt_pelita',
-        outcome: 'sign-in',
-      });
+      // Sign-in comes before the claim: not a claim outcome.
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalledWith('queue_claim', expect.anything());
     });
 
     it('counts the 60 s down from server time, and misses the turn at 0', () => {
@@ -597,6 +595,20 @@ describe('QueueController', () => {
       expect(render().result.current.status).toBe('sold-out');
     });
 
+    it('reports a sold-out turn once as sold_out_seen and its claim outcome', () => {
+      atTurn();
+      claimState = { data: { kind: 'sold-out' } };
+      const d = deps();
+      const { rerender } = render(d);
+      rerender();
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_claim', {
+        event_id: 'evt_pelita',
+        outcome: 'sold_out',
+      });
+      const soldOut = d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === 'sold_out_seen');
+      expect(soldOut).toEqual([['sold_out_seen', { event_id: 'evt_pelita', where: 'queue' }]]);
+    });
+
     it('queues again at the back after a missed turn', () => {
       atTurn();
       claimState = { data: { kind: 'missed' } };
@@ -604,7 +616,14 @@ describe('QueueController', () => {
       const { result } = render(d);
       result.current.queueAgain();
       expect(refetch).toHaveBeenCalled();
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_rejoin', { eventId: 'evt_pelita' });
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_claim', {
+        event_id: 'evt_pelita',
+        outcome: 'missed',
+      });
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_rejoin', {
+        event_id: 'evt_pelita',
+        reason: 'missed',
+      });
     });
   });
 
@@ -657,9 +676,9 @@ describe('QueueController', () => {
       joinState = { data: { ...place(), resumed: true } };
       render(d);
       expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_join', {
-        eventId: 'evt_pelita',
+        event_id: 'evt_pelita',
         outcome: 'resumed',
-        state: 'open',
+        position_bucket: '1001-10000',
       });
     });
 
@@ -689,7 +708,13 @@ describe('QueueController', () => {
       expect(result.current.turn).toBeNull();
       expect(claimOptions.enabled).toBe(true);
       expect(windowOptions.enabled).toBe(false);
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_skip', { eventId: 'evt_pelita' });
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_join', {
+        event_id: 'evt_pelita',
+        outcome: 'no_queue',
+        position_bucket: '1-100',
+      });
+      // No queue, so no turn to report.
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalledWith('queue_turn', expect.anything());
     });
 
     it('moves on to the order page once admitted', () => {
@@ -713,7 +738,14 @@ describe('QueueController', () => {
       const { result } = render(d);
       expect(result.current.status).toBe('turn');
       expect(windowOptions.enabled).toBe(true);
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalledWith('queue_skip', expect.anything());
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith(
+        'queue_join',
+        expect.objectContaining({ outcome: 'joined' }),
+      );
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_turn', {
+        event_id: 'evt_pelita',
+        wait_bucket: '0-60',
+      });
     });
   });
 
@@ -794,7 +826,10 @@ describe('QueueController', () => {
       });
       expect(frontierOptions.enabled).toBe(false);
       expect(claimOptions.enabled).toBe(false);
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_leave', { eventId: 'evt_pelita' });
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_leave', {
+        event_id: 'evt_pelita',
+        position_bucket: '1001-10000',
+      });
       expect(toggleLoading).toHaveBeenCalledTimes(2);
       expect(result.current.event?.kicker).toBe('queue_kicker_open');
 

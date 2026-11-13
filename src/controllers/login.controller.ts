@@ -22,6 +22,7 @@ import {
   type FormatLocale,
 } from '@utils/format/date';
 import { posterToneFor, type PosterTone } from '@utils/format/event-card';
+import { ANALYTICS_EVENTS, signInFrom } from '@utils/analytics';
 import { eventIdFromPath, loginReturnOf, safeNextPath, secondsLeft } from '@utils/format/login';
 import { findHomeEvent, formatCountdown } from '@utils/format/queue';
 
@@ -228,7 +229,12 @@ const LoginController = ({
     onSuccess: (result) => {
       toggleLoading();
       if (result.kind === 'signed-in') {
-        analyticsAdapter.trackEvent('login_verified', { isNewAccount: result.isNewAccount });
+        // Tracking plan §2 step 6: a new account is a sign_up, any other a login.
+        analyticsAdapter.trackEvent(result.isNewAccount ? ANALYTICS_EVENTS.SIGN_UP : ANALYTICS_EVENTS.LOGIN, {
+          method: 'email_code',
+          from: signInFrom(next),
+          ...(eventId ? { event_id: eventId } : {}),
+        });
         if (result.isNewAccount) {
           setUser(result.user);
           profileFormApi.reset({ fullName: result.user.fullName ?? '' });

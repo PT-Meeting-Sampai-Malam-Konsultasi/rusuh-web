@@ -57,17 +57,18 @@ export function registerInfrastructure() {
       createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
     ).singleton(),
     // Sentry only with a DSN (off in local dev and tests); the SDK itself loads after the page is interactive.
-    analyticsAdapter: asFunction(({ config }: Pick<Deps, 'config'>) =>
+    analyticsAdapter: asFunction((d: Deps) =>
       createAnalyticsAdapter(
-        config.sentryDsn
+        d.config.sentryDsn
           ? createSentrySink({
-              dsn: config.sentryDsn,
-              environment: config.sentryEnvironment,
-              release: config.appVersion,
-              tracesSampleRate: config.sentryTracesSampleRate,
-              replayOnErrorRate: config.sentryReplayOnErrorRate,
+              dsn: d.config.sentryDsn,
+              environment: d.config.sentryEnvironment,
+              release: d.config.appVersion,
+              tracesSampleRate: d.config.sentryTracesSampleRate,
+              replayOnErrorRate: d.config.sentryReplayOnErrorRate,
             })
           : {},
+        { getLanguage: locale(d) },
       ),
     ).singleton(),
     // The session too: claiming a turn needs it (ADR-0025), and a join with it attaches the place to the account.

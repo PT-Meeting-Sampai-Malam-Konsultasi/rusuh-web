@@ -75,6 +75,14 @@ interface QueryState {
 
 const err = (status: number, code: string): QueryState => ({ isError: true, error: { status, code, message: 'raw' } });
 
+/** nik_rejected reasons per NIK check answer (tracking plan §3); the other answers are not rejections. */
+const NIK_REASONS: Record<string, string | undefined> = {
+  'nik-invalid': 'NIK_INVALID',
+  'seat-taken': 'NIK_SEAT_TAKEN',
+  duplicate: 'DUPLICATE_NIK',
+  unavailable: 'DUKCAPIL_UNAVAILABLE',
+};
+
 describe('OrderController', () => {
   let eventOptions: Record<string, unknown>;
   let categoriesOptions: Record<string, unknown>;
@@ -145,6 +153,10 @@ describe('OrderController', () => {
       };
     },
   });
+
+  /** The analytics event names sent so far, in order. */
+  const sent = (d: ReturnType<typeof deps>) =>
+    d.analyticsAdapter.trackEvent.mock.calls.map((call: unknown[]) => call[0] as string);
 
   const render = (d = deps()) => renderHook(() => OrderController(d as never));
 
@@ -611,7 +623,7 @@ describe('OrderController', () => {
       expect(result.current.categories).toBe(rows);
       expect(result.current.holders).toBe(holders);
       expect(result.current.limitNotice).toBeNull();
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(sent(d)).toEqual(['view_item']);
     });
 
     it('stops a row at its snapshot stock while the others stay open', () => {
@@ -651,7 +663,7 @@ describe('OrderController', () => {
       expect(result.current.limitNotice).toEqual({ count: '3/3', message: 'order_limit_reached:{"count":3}' });
       act(() => result.current.increment('cat_festival'));
       expect(result.current.totalTickets).toBe(3);
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(sent(d)).toEqual(['view_item']);
       expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
       act(() => result.current.decrement('cat_tribune'));
       expect(result.current.limitNotice).toBeNull();
@@ -936,7 +948,7 @@ describe('OrderController', () => {
         meOptions.queryKey,
       ]);
       for (const secret of ['3174055203960004', '0396', 'Budi', 'Nadia']) expect(calls).not.toContain(secret);
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(sent(d)).toEqual(['view_item']);
       expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
       expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
     });
@@ -1173,8 +1185,22 @@ describe('OrderController', () => {
       if (!expected.error) expect(holder(hook, 0).nik.error).toBeUndefined();
       if (!expected.valid) expect(holder(hook, 0).nik.valid).toBeUndefined();
       expect(hook.result.current.allHoldersVerified).toBe(answer.kind === 'valid');
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledTimes(1);
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('order_nik_checked', { outcome: answer.kind });
+      const reason = NIK_REASONS[answer.kind];
+      expect(sent(d)).toEqual([
+        'view_item',
+        ...(reason ? ['nik_rejected'] : []),
+        ...(answer.kind === 'valid' ? ['holders_complete'] : []),
+      ]);
+      if (reason) {
+        expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('nik_rejected', { event_id: 'evt_samudra', reason });
+      }
+      if (answer.kind === 'valid') {
+        expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('holders_complete', {
+          event_id: 'evt_samudra',
+          ticket_count: 1,
+          myself_used: false,
+        });
+      }
       expect(replace).not.toHaveBeenCalled();
     });
 
@@ -1192,7 +1218,7 @@ describe('OrderController', () => {
       fail(code, v);
       expect(holder(hook, 0).nik).toMatchObject({ error: key, canRecheck: true, checking: false });
       expect(holder(hook, 0).nik.error).not.toContain('raw');
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(sent(d)).toEqual(['view_item']);
       expect(d.analyticsAdapter.reportError).not.toHaveBeenCalled();
       expect(replace).not.toHaveBeenCalled();
       expect(router.push).not.toHaveBeenCalled();
@@ -1309,7 +1335,7 @@ describe('OrderController', () => {
       settle({ kind: 'admission-invalid' }, v);
       expect(replace).toHaveBeenCalledTimes(1);
       expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
-      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalled();
+      expect(sent(d)).toEqual(['view_item']);
       expect(holder(hook, 0).nik).toMatchObject({ error: undefined, valid: undefined });
     });
 
@@ -1374,7 +1400,84 @@ describe('OrderController', () => {
       for (const secret of [NIK_A, NIK_B, 'Budi', 'Sari', 'vt_secret', 'adm_token', '0004']) {
         expect(calls).not.toContain(secret);
       }
-      expect(d.analyticsAdapter.trackEvent.mock.calls).toEqual([['order_nik_checked', { outcome: 'valid' }]]);
+      expect(sent(d)).not.toContain('nik_rejected');
+    });
+  });
+
+  describe('analytics (tracking plan)', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('sends view_item once with every category, the lowest price and the event as item_category', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult };
+      const d = deps();
+      const { rerender } = render(d);
+      rerender();
+      expect(sent(d)).toEqual(['view_item']);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('view_item', {
+        event_id: 'evt_samudra',
+        currency: 'IDR',
+        value: 450000,
+        items: [
+          {
+            item_id: 'cat_festival',
+            item_name: 'Festival',
+            item_category: 'evt_samudra',
+            item_brand: 'Samudra',
+            price: 450000,
+          },
+          {
+            item_id: 'cat_tribune',
+            item_name: 'Tribun',
+            item_category: 'evt_samudra',
+            item_brand: 'Samudra',
+            price: 1250000,
+          },
+        ],
+      });
+    });
+
+    it('reports a page where every category is sold out as sold_out_seen', () => {
+      eventState = { data: event };
+      categoriesState = { data: { ...okResult, categories: [tribune] } };
+      const d = deps();
+      render(d);
+      expect(sent(d)).toEqual(['view_item', 'sold_out_seen']);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('sold_out_seen', {
+        event_id: 'evt_samudra',
+        where: 'order',
+      });
+    });
+
+    it('sends add_to_cart once the count has settled for a second, with the picked categories only', () => {
+      vi.useFakeTimers();
+      eventState = { data: event };
+      categoriesState = { data: openResult };
+      const d = deps();
+      const { result } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_festival'));
+      act(() => vi.advanceTimersByTime(500));
+      act(() => result.current.increment('cat_tribune'));
+      act(() => vi.advanceTimersByTime(999));
+      expect(sent(d)).toEqual(['view_item']);
+      act(() => vi.advanceTimersByTime(1));
+      expect(sent(d)).toEqual(['view_item', 'add_to_cart']);
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenLastCalledWith('add_to_cart', {
+        event_id: 'evt_samudra',
+        currency: 'IDR',
+        value: 2 * 450000 + 1250000,
+        items: [
+          expect.objectContaining({ item_id: 'cat_festival', quantity: 2 }),
+          expect.objectContaining({ item_id: 'cat_tribune', quantity: 1 }),
+        ],
+      });
+      // Back to nothing picked: no add_to_cart for an empty cart.
+      act(() => result.current.decrement('cat_tribune'));
+      act(() => result.current.decrement('cat_festival'));
+      act(() => result.current.decrement('cat_festival'));
+      act(() => vi.advanceTimersByTime(2000));
+      expect(sent(d)).toEqual(['view_item', 'add_to_cart']);
     });
   });
 
