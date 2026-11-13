@@ -55,7 +55,7 @@ describe('LoginController', () => {
     verifySignInCodeUseCase: { execute: vi.fn() },
     accountService: { getMe: vi.fn(), updateProfile: vi.fn().mockResolvedValue({ data: USER, status: 200 }) },
     getHomeEventsUseCase: { execute: vi.fn().mockResolvedValue(EVENTS) },
-    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
+    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
     ERROR_CODE_MAP: { NETWORK_ERROR: 'error_network_error', UNKNOWN_ERROR: 'error_unknown_error' },
     useTranslation: () => ({ t, i18n }),
@@ -203,6 +203,7 @@ describe('LoginController', () => {
     expect(d.verifySignInCodeUseCase.execute).toHaveBeenCalledWith({ challengeId: 'ch_1', code: '123456' });
     act(() => verify().onSuccess({ kind: 'signed-in', isNewAccount: false, user: USER }));
     expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+    expect(d.analyticsAdapter.setUser).toHaveBeenCalledWith(USER.userId);
     expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('login', {
       method: 'email_code',
       from: 'queue',

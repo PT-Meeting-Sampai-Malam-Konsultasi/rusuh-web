@@ -146,6 +146,7 @@ const AccountController = ({
       toggleLoading();
       queryClient.removeQueries({ queryKey: [QUERY_KEYS.ME] });
       analyticsAdapter.trackEvent('account_sign_out', { revoked });
+      analyticsAdapter.setUser(null);
       router.replace(ROUTES.HOME);
     },
     onError: (error) => {

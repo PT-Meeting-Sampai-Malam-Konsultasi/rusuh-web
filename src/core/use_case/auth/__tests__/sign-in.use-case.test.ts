@@ -136,20 +136,20 @@ describe('RefreshSessionUseCase', () => {
 
   it('keeps the new access token', async () => {
     const deps = setup();
-    await expect(RefreshSessionUseCase(deps).execute()).resolves.toBe(true);
+    await expect(RefreshSessionUseCase(deps).execute()).resolves.toEqual(USER);
     expect(deps.authService.refreshSession).toHaveBeenCalledWith('device');
     expect(deps.tokenStore.setAccessToken).toHaveBeenCalledWith('at2');
   });
 
   it('ends the session without a device token or when the refresh fails', async () => {
     const none = setup({ device: null });
-    await expect(RefreshSessionUseCase(none).execute()).resolves.toBe(false);
+    await expect(RefreshSessionUseCase(none).execute()).resolves.toBeNull();
     expect(none.authService.refreshSession).not.toHaveBeenCalled();
     expect(none.tokenStore.setAccessToken).toHaveBeenCalledWith(null);
 
     const failing = setup();
     failing.authService.refreshSession.mockRejectedValue(problem(401, 'UNAUTHORIZED'));
-    await expect(RefreshSessionUseCase(failing).execute()).resolves.toBe(false);
+    await expect(RefreshSessionUseCase(failing).execute()).resolves.toBeNull();
     expect(failing.tokenStore.setAccessToken).toHaveBeenCalledWith(null);
   });
 });

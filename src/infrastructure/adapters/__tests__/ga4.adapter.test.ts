@@ -102,6 +102,33 @@ describe('createGa4Sink', () => {
     expect(events()).toEqual([['event', 'page_view', expect.objectContaining({ page_title: 'home' })]]);
   });
 
+  it('keeps the user and properties until GA4 starts, then sets them before the first hit', () => {
+    const { sink } = setup('granted');
+    sink.user?.('usr_1');
+    sink.userProperties?.({ signed_in: 'true', app_language: 'id' });
+    expect(calls()).toEqual([]);
+    sink.page?.('home');
+    const all = calls();
+    const firstEvent = all.findIndex(([command]) => command === 'event');
+    expect(all.findIndex((c) => c[0] === 'set' && (c[1] as { user_id?: string }).user_id === 'usr_1')).toBeLessThan(
+      firstEvent,
+    );
+    expect(all.slice(0, firstEvent)).toContainEqual([
+      'set',
+      'user_properties',
+      { signed_in: 'true', app_language: 'id' },
+    ]);
+    sink.user?.(null);
+    expect(calls().at(-1)).toEqual(['set', { user_id: null }]);
+  });
+
+  it('sends nothing about the user before a yes', () => {
+    const { sink } = setup('denied');
+    sink.user?.('usr_1');
+    sink.userProperties?.({ signed_in: 'true' });
+    expect(calls()).toEqual([]);
+  });
+
   it('stops and clears its cookies on a later no, and starts again on a yes', () => {
     const { store, sink } = setup('granted');
     sink.page?.('home');

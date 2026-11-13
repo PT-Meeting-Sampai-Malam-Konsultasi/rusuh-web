@@ -128,7 +128,7 @@ describe('OrderController', () => {
     endOrderWindowUseCase: { execute: vi.fn(() => ({ kind: 'ended' })) },
     holdBookingUseCase: { ...HoldBookingUseCase({ bookingService: {} as never }), execute: vi.fn() },
     admissionStore: { get: vi.fn().mockReturnValue('adm_token'), set: vi.fn(), clear: vi.fn() },
-    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
+    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
     ERROR_CODE_MAP: {
       NETWORK_ERROR: 'error_network_error',

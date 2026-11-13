@@ -45,6 +45,13 @@ export function createGa4Sink({ measurementId, consent, scrubUrl }: Ga4SinkOptio
   const disableKey = `ga-disable-${measurementId}`;
   let gtag: Gtag | null = null;
   let stopped = false;
+  // Kept while GA4 is off, and applied when it starts.
+  let userId: string | null = null;
+  let properties: Record<string, string> | null = null;
+  const applyUser = (g: Gtag) => {
+    g('set', { user_id: userId });
+    if (properties) g('set', 'user_properties', properties);
+  };
   /** The screen in view, so a yes given on it still counts its page view. */
   let lastPage: string | null = null;
 
@@ -54,6 +61,7 @@ export function createGa4Sink({ measurementId, consent, scrubUrl }: Ga4SinkOptio
         stopped = false;
         win()[disableKey] = false;
         gtag('consent', 'update', { analytics_storage: 'granted' });
+        applyUser(gtag);
       }
       return gtag;
     }
@@ -71,6 +79,7 @@ export function createGa4Sink({ measurementId, consent, scrubUrl }: Ga4SinkOptio
       ad_personalization: 'denied',
     });
     gtag('js', new Date());
+    applyUser(gtag);
     gtag('config', measurementId, {
       send_page_view: false,
       allow_google_signals: false,
@@ -111,6 +120,14 @@ export function createGa4Sink({ measurementId, consent, scrubUrl }: Ga4SinkOptio
     },
     event: (name, params) => {
       if (!NOT_FOR_GA4.has(name)) send(name, params ?? {});
+    },
+    user: (next) => {
+      userId = next;
+      if (gtag && !stopped) gtag('set', { user_id: next });
+    },
+    userProperties: (next) => {
+      properties = next;
+      if (gtag && !stopped) gtag('set', 'user_properties', next);
     },
   };
 }
