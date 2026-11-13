@@ -315,6 +315,94 @@ describe('OrderScreen', () => {
     expect(queueAgain).toHaveBeenCalledTimes(1);
   });
 
+  describe('summary and continue (FR-16-W1)', () => {
+    const withCheckout = (over: Partial<NonNullable<OrderControllerInterface['checkout']>> = {}) => ({
+      ...base(),
+      totalTickets: 1,
+      showHolders: true,
+      holders: [holder],
+      summary: {
+        heading: 'order_summary_heading',
+        lines: [{ key: 'cat_fa', label: '1 × Festival A', amount: 'Rp 1.250.000' }],
+        feeLabel: 'order_summary_fee',
+        fee: 'Rp 10.000',
+        totalLabel: 'order_summary_total',
+        total: 'Rp 1.260.000',
+        note: 'order_summary_note',
+        ticketCount: '1 tiket',
+        dockLabel: 'order_summary_dock_label',
+      },
+      checkout: {
+        label: 'order_checkout_label',
+        shortLabel: 'order_checkout_short_label',
+        enabled: true,
+        busy: false,
+        hint: null,
+        onContinue: vi.fn(),
+        ...over,
+      },
+    });
+
+    it('renders neither the aside nor the dock without summary and checkout', () => {
+      render(<OrderScreen />);
+      expect(screen.queryByRole('complementary')).toBeNull();
+      expect(screen.queryByRole('region', { name: 'order_summary_dock_label' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'order_checkout_label' })).toBeNull();
+    });
+
+    it('places the aside in main after the flow column and the dock after main', () => {
+      controller = withCheckout();
+      render(<OrderScreen />);
+      const main = screen.getByRole('main');
+      const aside = screen.getByRole('complementary', { name: 'order_summary_heading' });
+      expect(main.children).toHaveLength(2);
+      expect(main.children[1]).toBe(aside);
+      const dock = screen.getByRole('region', { name: 'order_summary_dock_label' });
+      expect(main).not.toContainElement(dock);
+      expect(main.compareDocumentPosition(dock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(aside).getByText('Rp 1.260.000')).toBeInTheDocument();
+      expect(within(dock).getByText('1 tiket')).toBeInTheDocument();
+    });
+
+    it('wires both buttons to onContinue', async () => {
+      controller = withCheckout();
+      render(<OrderScreen />);
+      await userEvent.click(screen.getByRole('button', { name: 'order_checkout_label' }));
+      await userEvent.click(screen.getByRole('button', { name: 'order_checkout_short_label' }));
+      expect(controller.checkout?.onContinue).toHaveBeenCalledTimes(2);
+    });
+
+    it('passes the disabled state and the hint to both sections', () => {
+      controller = withCheckout({ enabled: false, hint: { text: 'order_hold_sold_out', error: true } });
+      render(<OrderScreen />);
+      expect(screen.getByRole('button', { name: 'order_checkout_label' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'order_checkout_short_label' })).toBeDisabled();
+      expect(screen.getAllByRole('alert').map((a) => a.textContent)).toEqual([
+        'order_hold_sold_out',
+        'order_hold_sold_out',
+      ]);
+    });
+
+    it("keeps the time's-up sheet last, after the dock", () => {
+      controller = {
+        ...withCheckout(),
+        timeUpSheet: {
+          stamp: 'order_time_up_stamp',
+          title: 'order_time_up_title',
+          body: 'order_time_up_body',
+          queueAgainLabel: 'order_time_up_queue_again',
+          homeLabel: 'action_back_home',
+          homeHref: '/',
+          queueAgain: vi.fn(),
+        },
+      };
+      render(<OrderScreen />);
+      const dock = screen.getByRole('region', { name: 'order_summary_dock_label' });
+      const dialog = screen.getByRole('dialog');
+      expect(dock.compareDocumentPosition(dialog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
   describe("time's-up sheet after a reload (FR-19-W1)", () => {
     const sheet = (): NonNullable<OrderControllerInterface['timeUpSheet']> => ({
       stamp: 'order_time_up_stamp',
