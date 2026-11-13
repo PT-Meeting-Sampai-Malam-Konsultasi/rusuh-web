@@ -1,6 +1,7 @@
 import { delay, HttpResponse } from 'msw';
 
 import type { MockScenario } from '../scenario';
+import type { MockBookingStore } from './mock-booking-store';
 import type { MockQueueState } from './mock-queue-state';
 
 export interface MockContext {
@@ -14,6 +15,8 @@ export interface MockContext {
 /** What each handler factory receives: the caller's context plus the state the queue and booking mocks share. */
 export interface MockHandlerContext extends MockContext {
   queueState: MockQueueState;
+  /** In-memory bookings of this createHandlers call; the payment handlers of FR-20-W1 read the same ones. */
+  bookingStore: MockBookingStore;
 }
 
 /** RFC 9457 problem, as the real API sends it. */

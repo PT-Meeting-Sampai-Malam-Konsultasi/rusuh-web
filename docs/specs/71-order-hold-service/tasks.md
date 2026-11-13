@@ -10,13 +10,13 @@ Writer: service-writer. Spec 72 consumes it; FR-20-W1 reads the same mock bookin
 
 ## Tasks
 
-- [ ] 1. In `src/core/entities/booking/booking.entity.ts`: widen `BookingStatus` (keep `HELD`), add `Attendee`, `CreateBookingTicket`, `CreateBookingRequest`, `EnterPaymentResponse`, `ActiveBookingsResponse`, and `attendees?`, `expiresAt?`, `refundRequired?` on `Booking`, with the design's TSDoc; types only [Requirement 1]
-- [ ] 2. Add `IDEMPOTENCY_KEY_HEADER`, `createBooking`, `enterPayment` and `getActiveBooking` to `src/core/services/booking.service.ts` per the design, and their cases (Properties 1–4) in `src/core/services/__tests__/booking.service.test.ts` [Requirement 2, Requirement 3, Requirement 6]
-- [ ] 3. Move `randomRequestId` to `src/utils/random-uuid.ts` as `randomUuid` (same body), import it in `src/infrastructure/adapters/http.adapter.ts` and keep `export const randomRequestId = randomUuid`; add `src/utils/__tests__/random-uuid.test.ts` (both branches) [Requirement 4]
-- [ ] 4. Add `src/infrastructure/mocks/handlers/mock-booking-store.ts` (`createMockBookingStore`, closure state), `bookingStore` on `MockHandlerContext` in `shared.ts`, and create it next to `queueState` in `handlers.ts`; add the three scenarios with comments to `src/infrastructure/mocks/scenario.ts` [Requirement 5]
-- [ ] 5. In `src/infrastructure/mocks/handlers/booking.handlers.ts`: export `MOCK_ADMIN_FEE` (used by categories too), remember attendees on a 200 validate, add `GET core/bookings/active` before `GET core/bookings/:bookingId`, make `getBooking` read the store first, and add `POST core/bookings` and `POST core/bookings/:bookingId/payment` in the design's row order [Requirement 5]
-- [ ] 6. Tests: every row of both handler tables, fee once per order for 1–3 tickets, idempotent replay, active-booking listing and expiry, PAYMENT_PENDING repeat, `payment_busy` first-then-ok, `getBooking` after entry, no full NIK in any body (`booking.handlers.test.ts`); the three scenarios in `scenario.test.ts` [Requirement 5, Requirement 6]
-- [ ] 7. Run the gate check [ALL]
+- [x] 1. In `src/core/entities/booking/booking.entity.ts`: widen `BookingStatus` (keep `HELD`), add `Attendee`, `CreateBookingTicket`, `CreateBookingRequest`, `EnterPaymentResponse`, `ActiveBookingsResponse`, and `attendees?`, `expiresAt?`, `refundRequired?` on `Booking`, with the design's TSDoc; types only [Requirement 1]
+- [x] 2. Add `IDEMPOTENCY_KEY_HEADER`, `createBooking`, `enterPayment` and `getActiveBooking` to `src/core/services/booking.service.ts` per the design, and their cases (Properties 1–4) in `src/core/services/__tests__/booking.service.test.ts` [Requirement 2, Requirement 3, Requirement 6]
+- [x] 3. Move `randomRequestId` to `src/utils/random-uuid.ts` as `randomUuid` (same body), import it in `src/infrastructure/adapters/http.adapter.ts` and keep `export const randomRequestId = randomUuid`; add `src/utils/__tests__/random-uuid.test.ts` (both branches) [Requirement 4]
+- [x] 4. Add `src/infrastructure/mocks/handlers/mock-booking-store.ts` (`createMockBookingStore`, closure state), `bookingStore` on `MockHandlerContext` in `shared.ts`, and create it next to `queueState` in `handlers.ts`; add the three scenarios with comments to `src/infrastructure/mocks/scenario.ts` [Requirement 5]
+- [x] 5. In `src/infrastructure/mocks/handlers/booking.handlers.ts`: export `MOCK_ADMIN_FEE` (used by categories too), remember attendees on a 200 validate, add `GET core/bookings/active` before `GET core/bookings/:bookingId`, make `getBooking` read the store first, and add `POST core/bookings` and `POST core/bookings/:bookingId/payment` in the design's row order [Requirement 5]
+- [x] 6. Tests: every row of both handler tables, fee once per order for 1–3 tickets, idempotent replay, active-booking listing and expiry, PAYMENT_PENDING repeat, `payment_busy` first-then-ok, `getBooking` after entry, no full NIK in any body (`booking.handlers.test.ts`); the three scenarios in `scenario.test.ts` [Requirement 5, Requirement 6]
+- [x] 7. Run the gate check [ALL]
 
 ## Task Dependency Graph
 

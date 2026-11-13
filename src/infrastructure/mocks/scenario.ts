@@ -21,6 +21,12 @@ export const MOCK_SCENARIOS = [
   'dukcapil_down',
   /** FR-17: the order window is 75 seconds, so the pink last minute and 0:00 show quickly. */
   'short_window',
+  /** FR-16: payment entry finds a holder's NIK already holds its seats: 409 NIK_SEAT_TAKEN with that nikMasked. */
+  'nik_seat_taken',
+  /** FR-16: the hold finds the first ticket's category sold out: 409 CATEGORY_SOLD_OUT with its categoryId. */
+  'category_sold_out',
+  /** FR-16: the first payment entry of each booking answers 503 PAYMENT_PROVIDER_BUSY; a retry succeeds. */
+  'payment_busy',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];
