@@ -455,8 +455,9 @@ describe('QueueController', () => {
       frontierState = { data: frontier({ served: 19700 }) };
     };
 
-    it('claims at the turn while the page is in front, and reads the 60 s window', async () => {
+    it('claims at the turn while the page is in front, and reads the 60 s window only after a claim that waits', async () => {
       atTurn();
+      claimState = { data: { kind: 'retry', afterMs: 1000 } };
       const d = deps();
       const { result } = render(d);
       expect(result.current.status).toBe('turn');
@@ -473,6 +474,34 @@ describe('QueueController', () => {
       await expect((claimOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('claimed');
       await expect((windowOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('window');
       expect(d.claimTurnUseCase.execute).toHaveBeenCalledWith('evt_pelita');
+    });
+
+    it('does not read the window alongside the claim, or after it admits (the place is used up: 410 EXPIRED)', () => {
+      atTurn();
+      render();
+      expect(claimOptions.enabled).toBe(true);
+      expect(windowOptions.enabled).toBe(false);
+
+      claimState = { data: { kind: 'admitted', admission: { admissionToken: 'adm' } } };
+      render();
+      expect(windowOptions.enabled).toBe(false);
+    });
+
+    it('stays on the turn once admitted, even if the window says the place ended', () => {
+      atTurn();
+      claimState = { data: { kind: 'admitted', admission: { admissionToken: 'adm' } } };
+      windowState = { data: { kind: 'missed' } };
+      const { result } = render();
+      expect(result.current.status).toBe('turn');
+      expect(router.replace).toHaveBeenCalledWith('/order?event=evt_pelita');
+    });
+
+    it('reads the window in a background tab, where the claim waits', () => {
+      atTurn();
+      visible = false;
+      render();
+      expect(claimOptions.enabled).toBe(false);
+      expect(windowOptions.enabled).toBe(true);
     });
 
     it('waits in a background tab, and claims nothing before the turn', () => {
@@ -699,6 +728,7 @@ describe('QueueController', () => {
     it('keeps the turn screen for a turn that came while waiting', () => {
       joinState = { data: place() };
       frontierState = { data: frontier({ served: 19700 }) };
+      claimState = { data: { kind: 'retry', afterMs: 1000 } };
       const d = deps();
       const { result } = render(d);
       expect(result.current.status).toBe('turn');
