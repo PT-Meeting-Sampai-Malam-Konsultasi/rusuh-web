@@ -61,7 +61,8 @@ export const ClaimTurnUseCase = ({
         return { kind: 'admitted', admission: data };
       } catch (error) {
         const code = errorCodeOf(error);
-        if (code === 'UNAUTHORIZED') return { kind: 'sign-in' };
+        // The backend answers LOGIN_REQUIRED (CLAIM_REQUIRES_LOGIN); UNAUTHORIZED is a bad or ended session.
+        if (code === 'LOGIN_REQUIRED' || code === 'UNAUTHORIZED') return { kind: 'sign-in' };
         if (code === 'NOT_YET') return { kind: 'retry', afterMs: 1000 };
         if (code === 'FULL') return { kind: 'retry', afterMs: Math.round(1000 + 1000 * jitter) };
         if (code === 'NO_STOCK') return { kind: 'paused' };

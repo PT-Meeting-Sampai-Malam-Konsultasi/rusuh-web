@@ -161,6 +161,7 @@
   "error_internal_error": "Terjadi kesalahan di sistem kami. Coba lagi sebentar lagi.",
   "error_verification_unavailable": "Pemeriksaan keamanan sedang tidak tersedia. Coba lagi sebentar lagi.",
   "error_unauthorized": "Sesi Anda berakhir. Silakan masuk lagi.",
+  "error_login_required": "Masuk dulu untuk melanjutkan. Giliran Anda tetap disimpan.",
   "error_admission_invalid": "Akses pemesanan Anda sudah tidak berlaku. Silakan antre lagi.",
   "error_admission_unavailable": "Pesanan Anda sedang disiapkan. Giliran Anda tetap aman, coba lagi sebentar lagi.",
   "error_not_found": "Data tidak ditemukan.",

@@ -161,6 +161,7 @@
   "error_internal_error": "Something went wrong on our side. Please try again shortly.",
   "error_verification_unavailable": "The security check is unavailable right now. Please try again shortly.",
   "error_unauthorized": "Your session has ended. Please sign in again.",
+  "error_login_required": "Sign in to continue. Your turn is kept.",
   "error_admission_invalid": "Your ordering access is no longer valid. Please queue again.",
   "error_admission_unavailable": "We're getting your order ready. Your turn is safe; please try again in a moment.",
   "error_not_found": "We couldn't find that.",

@@ -58,11 +58,13 @@ interface QueryState {
   isError?: boolean;
   error?: { status: number; code: string; message: string } | null;
   dataUpdatedAt?: number;
+  isSuccess?: boolean;
 }
 
 describe('QueueController', () => {
   let joinOptions: Record<string, unknown>;
   let eventsOptions: Record<string, unknown>;
+  let meOptions: Record<string, unknown>;
   let frontierOptions: Record<string, unknown>;
   let frontierState: QueryState;
   let claimOptions: Record<string, unknown>;
@@ -73,6 +75,8 @@ describe('QueueController', () => {
   const router = { replace: vi.fn(), push: vi.fn() };
   let joinState: QueryState;
   let eventsState: QueryState;
+  let meState: QueryState;
+  const meRefetch = vi.fn();
   let search: string;
   const refetch = vi.fn();
   let leaveMutation: Record<string, (...args: never[]) => unknown>;
@@ -86,6 +90,7 @@ describe('QueueController', () => {
     params ? `${key}:${JSON.stringify(params)}` : key,
   );
   const deps = () => ({
+    accountService: { getMe: vi.fn().mockResolvedValue({ data: { userId: 'usr_1' }, status: 200 }) },
     joinQueueUseCase: { execute: vi.fn().mockResolvedValue('joined') },
     followQueueUseCase: {
       poll: vi.fn().mockResolvedValue('frontier'),
@@ -116,11 +121,12 @@ describe('QueueController', () => {
         'queue-place': [(o) => (joinOptions = o), () => joinState],
         'queue-claim': [(o) => (claimOptions = o), () => claimState],
         'queue-turn': [(o) => (windowOptions = o), () => windowState],
+        me: [(o) => (meOptions = o), () => ({ refetch: meRefetch, ...meState })],
       };
       const [capture, read] = slots[key] ?? [(o) => (eventsOptions = o), () => eventsState];
       capture(options);
       const state = read();
-      return { data: undefined, isError: false, error: null, refetch, dataUpdatedAt: 0, ...state };
+      return { data: undefined, isError: false, isSuccess: false, error: null, refetch, dataUpdatedAt: 0, ...state };
     },
   });
 
@@ -136,6 +142,7 @@ describe('QueueController', () => {
     windowState = {};
     visible = true;
     eventsState = { data: EVENTS };
+    meState = { data: { userId: 'usr_1' }, isSuccess: true };
     i18n.language = 'id';
   });
 
@@ -156,6 +163,44 @@ describe('QueueController', () => {
     });
     await expect((joinOptions.queryFn as () => Promise<unknown>)()).resolves.toBe('joined');
     expect(d.joinQueueUseCase.execute).toHaveBeenCalledWith('evt_pelita', { rejoin: false });
+  });
+
+  describe('sign in before the queue', () => {
+    it('reads the profile as the session check, once, without retries', async () => {
+      const d = deps();
+      render(d);
+      expect(meOptions).toMatchObject({ queryKey: ['me'], enabled: true, retry: false, refetchOnWindowFocus: false });
+      await expect((meOptions.queryFn as () => Promise<unknown>)()).resolves.toEqual({ userId: 'usr_1' });
+      expect(d.accountService.getMe).toHaveBeenCalledOnce();
+    });
+
+    it('sends a guest to sign in and back, without joining', () => {
+      meState = { isError: true, error: { status: 401, code: 'UNAUTHORIZED', message: '' } };
+      const { result } = render();
+      expect(router.replace).toHaveBeenCalledWith('/login?next=%2Fqueue%3Fevent%3Devt_pelita');
+      expect(joinOptions.enabled).toBe(false);
+      expect(result.current.status).toBe('joining');
+      expect(result.current.errorMessage).toBe('');
+    });
+
+    it('waits for the session check before joining', () => {
+      meState = {};
+      const { result } = render();
+      expect(joinOptions.enabled).toBe(false);
+      expect(result.current.status).toBe('joining');
+      expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it('shows the error when the check fails for another reason, and retries the check', () => {
+      meState = { isError: true, error: { status: 0, code: 'NETWORK_ERROR', message: '' } };
+      const { result } = render();
+      expect(result.current.status).toBe('error');
+      expect(result.current.errorMessage).toBe('error_unknown_error');
+      expect(joinOptions.enabled).toBe(false);
+      result.current.retry();
+      expect(meRefetch).toHaveBeenCalledOnce();
+      expect(refetch).not.toHaveBeenCalled();
+    });
   });
 
   it('reads the event from the Home list query, sharing its cache', async () => {
