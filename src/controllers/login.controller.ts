@@ -229,6 +229,7 @@ const LoginController = ({
     onSuccess: (result) => {
       toggleLoading();
       if (result.kind === 'signed-in') {
+        analyticsAdapter.setUser(result.user.userId);
         // Tracking plan §2 step 6: a new account is a sign_up, any other a login.
         analyticsAdapter.trackEvent(result.isNewAccount ? ANALYTICS_EVENTS.SIGN_UP : ANALYTICS_EVENTS.LOGIN, {
           method: 'email_code',

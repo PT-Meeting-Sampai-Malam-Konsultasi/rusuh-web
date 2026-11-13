@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { apiErrorReporter, combineSinks, createAnalyticsAdapter } from '../analytics.adapter';
 
 describe('apiErrorReporter', () => {
-  const analytics = { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() };
+  const analytics = { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() };
   const report = apiErrorReporter(() => analytics);
 
   it('leaves a breadcrumb with the request ID for every failed call, and reports server errors', () => {
@@ -55,17 +55,45 @@ describe('createAnalyticsAdapter', () => {
   });
 });
 
+describe('createAnalyticsAdapter user (tracking plan §1)', () => {
+  it('passes the account and keeps signed_in and app_language up to date, sending them only on a change', () => {
+    const sink = { page: vi.fn(), event: vi.fn(), user: vi.fn(), userProperties: vi.fn() };
+    let language = 'id';
+    const analytics = createAnalyticsAdapter(sink, { getLanguage: () => language });
+    analytics.trackPageView('home');
+    analytics.trackEvent('view_item_list');
+    expect(sink.userProperties.mock.calls).toEqual([[{ signed_in: 'false', app_language: 'id' }]]);
+
+    analytics.setUser('usr_1');
+    expect(sink.user).toHaveBeenLastCalledWith('usr_1');
+    expect(sink.userProperties).toHaveBeenLastCalledWith({ signed_in: 'true', app_language: 'id' });
+
+    language = 'en';
+    analytics.trackEvent('login');
+    expect(sink.userProperties).toHaveBeenLastCalledWith({ signed_in: 'true', app_language: 'en' });
+
+    analytics.setUser(null);
+    expect(sink.user).toHaveBeenLastCalledWith(null);
+    expect(sink.userProperties).toHaveBeenLastCalledWith({ signed_in: 'false', app_language: 'en' });
+    expect(sink.userProperties).toHaveBeenCalledTimes(4);
+  });
+});
+
 describe('combineSinks', () => {
   it('passes every call to each sink that handles it', () => {
-    const a = { page: vi.fn(), event: vi.fn(), error: vi.fn() };
+    const a = { page: vi.fn(), event: vi.fn(), error: vi.fn(), user: vi.fn(), userProperties: vi.fn() };
     const b = { event: vi.fn() };
     const sink = combineSinks(a, b, {});
     sink.page?.('home');
     sink.event?.('queue_join', { event_id: 'evt_1' });
     sink.error?.('boom', { code: 'X' });
+    sink.user?.('usr_1');
+    sink.userProperties?.({ signed_in: 'true' });
     expect(a.page).toHaveBeenCalledWith('home');
     expect(a.event).toHaveBeenCalledWith('queue_join', { event_id: 'evt_1' });
     expect(b.event).toHaveBeenCalledWith('queue_join', { event_id: 'evt_1' });
     expect(a.error).toHaveBeenCalledWith('boom', { code: 'X' });
+    expect(a.user).toHaveBeenCalledWith('usr_1');
+    expect(a.userProperties).toHaveBeenCalledWith({ signed_in: 'true' });
   });
 });

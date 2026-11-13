@@ -32,7 +32,7 @@ describe('AccountController', () => {
       updateProfile: vi.fn().mockResolvedValue({ data: { ...NADIA, fullName: 'Nadia S.' }, status: 200 }),
     },
     signOutUseCase: { execute: vi.fn().mockResolvedValue({ revoked: true }) },
-    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
+    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
     ERROR_CODE_MAP: { INTERNAL_ERROR: 'error_internal', UNKNOWN_ERROR: 'error_unknown_error' },
     useTranslation: () => ({ t, i18n }),
@@ -165,6 +165,7 @@ describe('AccountController', () => {
     run('signOut', 'onSuccess', { revoked: true });
     expect(queryClient.removeQueries).toHaveBeenCalledWith({ queryKey: ['me'] });
     expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('account_sign_out', { revoked: true });
+    expect(d.analyticsAdapter.setUser).toHaveBeenCalledWith(null);
     expect(router.replace).toHaveBeenCalledWith('/');
     run('signOut', 'onError', { status: 0, code: 'SOMETHING', message: 'x' });
     expect(openPopupError).toHaveBeenCalledWith({ message: 'error_unknown_error' });

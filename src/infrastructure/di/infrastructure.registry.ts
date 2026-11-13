@@ -40,7 +40,12 @@ export function registerInfrastructure() {
 
   // Resolved when a 401 arrives, not now: the use case is registered after the infrastructure. Concurrent 401s share
   // one refresh, because each refresh rotates the cookie and a second one with the old cookie revokes the session.
-  const refreshSession = singleFlight(() => container.resolve('refreshSessionUseCase').execute());
+  // A page load starts without an access token, so the first refresh also tells analytics who is signed in.
+  const refreshSession = singleFlight(async () => {
+    const user = await container.resolve('refreshSessionUseCase').execute();
+    container.resolve('analyticsAdapter').setUser(user?.userId ?? null);
+    return user !== null;
+  });
 
   const onError = apiErrorReporter(() => container.resolve('analyticsAdapter'));
 

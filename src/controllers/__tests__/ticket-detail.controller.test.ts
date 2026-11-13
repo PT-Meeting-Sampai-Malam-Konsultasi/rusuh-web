@@ -62,7 +62,7 @@ describe('TicketDetailController', () => {
     qrEncoder: { encode: vi.fn(() => [[true]]) },
     fileSaver: { save: vi.fn() },
     printer: { print: vi.fn() },
-    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
+    analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
     ERROR_CODE_MAP: { INTERNAL_ERROR: 'error_internal', UNKNOWN_ERROR: 'error_unknown_error' },
     useTranslation: () => ({ t, i18n }),

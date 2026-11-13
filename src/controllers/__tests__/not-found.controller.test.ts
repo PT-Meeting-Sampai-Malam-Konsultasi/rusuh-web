@@ -5,7 +5,7 @@ import NotFoundController from '../not-found.controller';
 
 describe('NotFoundController', () => {
   it('returns t and the home link, and tracks the page view once', () => {
-    const analyticsAdapter = { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() };
+    const analyticsAdapter = { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn(), setUser: vi.fn() };
     const t = vi.fn((k: string) => k);
     const { result, rerender } = renderHook(() =>
       NotFoundController({ analyticsAdapter, useTranslation: (() => ({ t })) as never }),

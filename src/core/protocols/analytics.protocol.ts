@@ -10,4 +10,6 @@ export interface AnalyticsProtocol {
   trackPageView(page: string): void;
   trackEvent(name: string, params?: AnalyticsParams): void;
   reportError(error: unknown, context?: Record<string, string>): void;
+  /** The signed-in account (`usr_…`, never the e-mail), or null after sign-out (tracking plan §1). */
+  setUser(userId: string | null): void;
 }

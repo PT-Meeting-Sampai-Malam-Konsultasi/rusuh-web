@@ -1,8 +1,9 @@
+import type { User } from '@core/entities/auth/auth.entity';
 import type { AwilixRegistry } from '@infrastructure/di/registry.types';
 
 export interface RefreshSessionUseCaseInterface {
-  /** True when a new access token is in the token store; false when the buyer has to sign in again. */
-  execute: () => Promise<boolean>;
+  /** The account when a new access token is in the token store; null when the buyer has to sign in again. */
+  execute: () => Promise<User | null>;
 }
 
 type Deps = Pick<AwilixRegistry, 'authService' | 'deviceTokenStore' | 'tokenStore'>;
@@ -21,16 +22,16 @@ export const RefreshSessionUseCase = ({
     const deviceToken = deviceTokenStore.get();
     if (!deviceToken) {
       tokenStore.setAccessToken(null);
-      return false;
+      return null;
     }
     try {
       const { data } = await authService.refreshSession(deviceToken);
       tokenStore.setAccessToken(data.accessToken);
-      return true;
+      return data.user;
     } catch {
       // Refreshing is best effort: whatever went wrong, the buyer signs in again.
       tokenStore.setAccessToken(null);
-      return false;
+      return null;
     }
   },
 });
