@@ -9,7 +9,7 @@ interface PaymentMessageProps {
   message: PaymentMessageView;
 }
 
-/** No longer active / not found / load error, with home (FR-23-W1 builds the full expired screen). */
+/** No longer active / not found / load error, with home. */
 export default function PaymentMessage({ message }: PaymentMessageProps) {
   const canRetry = !!message.actionLabel && !!message.onAction;
   return (

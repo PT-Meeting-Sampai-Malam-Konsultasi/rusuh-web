@@ -7,6 +7,7 @@ import FlowHeader from '@presentation/components/FlowHeader';
 import Timer from '@presentation/components/Timer';
 
 import PaymentDock from './components/PaymentDock';
+import PaymentExpired from './components/PaymentExpired';
 import PaymentIntro from './components/PaymentIntro';
 import PaymentMessage from './components/PaymentMessage';
 import PaymentProgress from './components/PaymentProgress';
@@ -31,6 +32,7 @@ export default function PaymentScreen() {
     locale,
     setLocale,
     timer,
+    expired,
   } = container.resolve<PaymentControllerInterface>('paymentController');
 
   return (
@@ -57,6 +59,7 @@ export default function PaymentScreen() {
           {intro && <PaymentIntro intro={intro} />}
           {progress && <PaymentProgress progress={progress} />}
           {message && <PaymentMessage message={message} />}
+          {expired && <PaymentExpired expired={expired} />}
         </div>
         {summary && <PaymentSummary summary={summary} pay={pay} notice={notice} />}
       </main>

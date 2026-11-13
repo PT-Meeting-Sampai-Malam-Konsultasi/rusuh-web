@@ -149,6 +149,30 @@ describe('translations', () => {
         'Saldo terpotong? Pembayaran Anda masuk setelah waktu habis. Dana akan kami kembalikan; rinciannya kami kirim ke email akun Anda.',
         "Money already taken? Your payment arrived after the time ran out. We'll refund it and email the details to your account address.",
       ],
+      payment_expired_stamp: ['Waktu habis', "Time's up"],
+      payment_expired_title: ['Pesanan dibatalkan.', 'Order cancelled.'],
+      payment_expired_body_one: [
+        'Waktu 10 menit untuk membayar sudah lewat. {{count}} tiket yang ditahan kami lepaskan untuk pembeli lain.',
+        "The 10 minutes to pay ran out. We've released the held ticket to other buyers.",
+      ],
+      payment_expired_body_other: [
+        'Waktu 10 menit untuk membayar sudah lewat. {{count}} tiket yang ditahan kami lepaskan untuk pembeli lain.',
+        "The 10 minutes to pay ran out. We've released the {{count}} held tickets to other buyers.",
+      ],
+      payment_expired_body_unknown: [
+        'Waktu 10 menit untuk membayar sudah lewat. Tiket yang ditahan kami lepaskan untuk pembeli lain.',
+        "The 10 minutes to pay ran out. We've released the held tickets to other buyers.",
+      ],
+      payment_expired_note_lead: ['Saldo terpotong?', 'Money already taken?'],
+      payment_expired_note_email: [
+        'Jika pembayaran Anda masuk setelah waktu habis, dana akan kami kembalikan. Rinciannya kami kirim ke {{email}}.',
+        "If your payment arrived after the time ran out, we'll refund it and email the details to {{email}}.",
+      ],
+      payment_expired_note_account: [
+        'Jika pembayaran Anda masuk setelah waktu habis, dana akan kami kembalikan. Rinciannya kami kirim ke email akun Anda.',
+        "If your payment arrived after the time ran out, we'll refund it and email the details to your account address.",
+      ],
+      payment_expired_queue_again: ['Antre lagi', 'Queue again'],
       payment_not_found_title: ['Pesanan tidak ditemukan.', 'Order not found.'],
       payment_not_found_body: [
         'Tautan pembayaran ini salah, atau pesanannya milik akun lain.',
@@ -166,6 +190,13 @@ describe('translations', () => {
     }
     // H-4: the refund is promised, not "otomatis".
     expect(id.payment_inactive_refund).not.toMatch(/otomatis/);
+    // H-4 again for the expired note (FR-23-W1): no "otomatis" / "automatic", no e-mail literal.
+    for (const [key, [idValue, enValue]] of Object.entries(copy)) {
+      expect(idValue, key).not.toMatch(/otomatis|automatic/i);
+      expect(enValue, key).not.toMatch(/otomatis|automatic/i);
+      expect(idValue, key).not.toMatch(/@/);
+      expect(enValue, key).not.toMatch(/@/);
+    }
     // Same order in both files.
     const order = (strings: Record<string, string>) => Object.keys(strings).filter((k) => k.startsWith('payment_'));
     expect(order(id)).toEqual(order(en));
@@ -213,6 +244,23 @@ describe('i18n instance', () => {
     );
     expect(i18n.t('order_limit_reached_reserved', { count: 2 })).toBe(
       'Your turn holds 2 tickets. Remove one to switch category.',
+    );
+    await i18n.changeLanguage('id');
+  });
+
+  it('picks the singular and plural of the payment expired body (FR-23-W1)', async () => {
+    expect(i18n.t('payment_expired_body', { count: 3 })).toBe(
+      'Waktu 10 menit untuk membayar sudah lewat. 3 tiket yang ditahan kami lepaskan untuk pembeli lain.',
+    );
+    expect(i18n.t('payment_expired_note_email', { email: 'rina@example.com' })).toBe(
+      'Jika pembayaran Anda masuk setelah waktu habis, dana akan kami kembalikan. Rinciannya kami kirim ke rina@example.com.',
+    );
+    await i18n.changeLanguage('en');
+    expect(i18n.t('payment_expired_body', { count: 1 })).toBe(
+      "The 10 minutes to pay ran out. We've released the held ticket to other buyers.",
+    );
+    expect(i18n.t('payment_expired_body', { count: 3 })).toBe(
+      "The 10 minutes to pay ran out. We've released the 3 held tickets to other buyers.",
     );
     await i18n.changeLanguage('id');
   });

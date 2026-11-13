@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 
 import type {
   PaymentActionView,
+  PaymentExpiredView,
   PaymentIntroView,
   PaymentMessageView,
   PaymentProgressView,
@@ -64,5 +65,18 @@ export const messageView = (over: Partial<PaymentMessageView> = {}): PaymentMess
 export const timerView = (over: Partial<PaymentTimerView> = {}): PaymentTimerView => ({
   seconds: 552,
   label: 'payment_timer_label',
+  ...over,
+});
+
+export const expiredView = (over: Partial<PaymentExpiredView> = {}): PaymentExpiredView => ({
+  stamp: 'payment_expired_stamp',
+  title: 'payment_expired_title',
+  body: 'payment_expired_body',
+  noteLead: 'payment_expired_note_lead',
+  note: 'payment_expired_note_email',
+  queueAgainLabel: 'payment_expired_queue_again',
+  onQueueAgain: vi.fn(),
+  homeHref: '/',
+  homeLabel: 'action_back_home',
   ...over,
 });
