@@ -182,7 +182,7 @@ describe('queue mock', () => {
       const { queueToken } = (await queue.joinQueue('evt_pelita', device, 'ts')).data;
       await expect(claim(device, queueToken)).rejects.toMatchObject({ status: 409, code: 'NOT_YET' });
       now = TURN_AT;
-      await expect(claim(device, queueToken, false)).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
+      await expect(claim(device, queueToken, false)).rejects.toMatchObject({ status: 401, code: 'LOGIN_REQUIRED' });
       const { data } = await claim(device, queueToken);
       expect(data).toMatchObject({
         admissionToken: 'mock-admission.evt_pelita.19700',

@@ -44,6 +44,7 @@ describe('ClaimTurnUseCase.execute', () => {
 
   it.each([
     [problem(401, 'UNAUTHORIZED'), { kind: 'sign-in' }],
+    [problem(401, 'LOGIN_REQUIRED'), { kind: 'sign-in' }],
     [problem(409, 'NOT_YET'), { kind: 'retry', afterMs: 1000 }],
     [problem(409, 'FULL'), { kind: 'retry', afterMs: 1500 }],
     [problem(409, 'NO_STOCK'), { kind: 'paused' }],

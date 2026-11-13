@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 
+import type { User } from '@core/entities/auth/auth.entity';
 import type { HttpError } from '@core/protocols/http.protocol';
 import type { HomeEvents } from '@core/use_case/catalog/get-home-events.use-case';
 import { applyFrontier, pollDelayMs, type FrontierResult } from '@core/use_case/queue/follow-queue.use-case';
@@ -143,6 +144,7 @@ const CLAIM_OUTCOMES: Partial<Record<ClaimTurnResult['kind'], string>> = {
 type QueueControllerDeps = Pick<
   AwilixRegistry,
   | 'joinQueueUseCase'
+  | 'accountService'
   | 'followQueueUseCase'
   | 'claimTurnUseCase'
   | 'leaveQueueUseCase'
@@ -165,6 +167,7 @@ const EVENTS_STALE_MS = 5_000;
 
 const QueueController = ({
   joinQueueUseCase,
+  accountService,
   followQueueUseCase,
   claimTurnUseCase,
   leaveQueueUseCase,
@@ -197,6 +200,23 @@ const QueueController = ({
     staleTime: EVENTS_STALE_MS,
   });
 
+  // Sign in before the queue (13 Nov 2026, as on mobile): the turn gives only 60 s, too short to sign in then. The
+  // profile read is the session check; a stored refresh cookie renews it on the way. No session → sign in, then back.
+  const router = useRouterNext();
+  const signInHref = `${ROUTES.LOGIN}?next=${encodeURIComponent(`${ROUTES.QUEUE}?event=${eventId}`)}`;
+  const meQuery = useQueryTanstack<User, HttpError>({
+    queryKey: [QUERY_KEYS.ME],
+    queryFn: async () => (await accountService.getMe()).data,
+    enabled: hasEventId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const signedOut = meQuery.error?.status === 401;
+  const signedIn = meQuery.isSuccess;
+  useEffect(() => {
+    if (signedOut) router.replace(signInHref);
+  }, [signedOut, router, signInHref]);
+
   // One join per visit. A refresh or a new tab resumes the stored place (FR-10); "Antre lagi" marks the next one as a
   // real rejoin at the back.
   const rejoinNext = useRef(false);
@@ -207,7 +227,7 @@ const QueueController = ({
       rejoinNext.current = false;
       return joinQueueUseCase.execute(eventId, { rejoin });
     },
-    enabled: hasEventId,
+    enabled: hasEventId && signedIn,
     staleTime: Infinity,
     gcTime: 0,
     retry: false,
@@ -255,18 +275,16 @@ const QueueController = ({
   const baseStatus = queueStatusFor(
     hasEventId,
     place && result?.kind === 'joined' ? { ...result, place } : result,
-    joinQuery.isError,
+    joinQuery.isError || (meQuery.isError && !signedOut),
   );
 
   // FR-08: at the turn, claim while the page is in front (a background tab waits; the buyer has 60 s to come back).
   // Both queries are keyed by the number, so "Antre lagi" starts clean with the new one.
-  const router = useRouterNext();
   const visible = usePageVisible();
   const atTurn = !!place?.turnReached && place.state === 'open' && !left;
   // FR-05: the join answer itself is at the turn, so there is no queue: straight on, no turn screen or 60 s timer.
   const skipping =
     joined?.state === 'open' && joined.seq !== null && joined.served !== null && joined.served >= joined.seq;
-  const signInHref = `${ROUTES.LOGIN}?next=${encodeURIComponent(`${ROUTES.QUEUE}?event=${eventId}`)}`;
   const windowQuery = useQueryTanstack<TurnWindowResult, HttpError>({
     queryKey: [QUERY_KEYS.QUEUE_TURN, eventId, place?.seq],
     queryFn: () => claimTurnUseCase.turnWindow(eventId),
@@ -508,7 +526,7 @@ const QueueController = ({
       }
     : null;
 
-  const errorCode = joinQuery.error?.code;
+  const errorCode = joinQuery.error?.code ?? (signedOut ? undefined : meQuery.error?.code);
   const errorMessage =
     status === 'error' && errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
 
@@ -553,7 +571,8 @@ const QueueController = ({
     },
     errorMessage,
     retry: () => {
-      void joinQuery.refetch();
+      if (meQuery.isError) void meQuery.refetch();
+      else void joinQuery.refetch();
     },
     locale,
     setLocale: (next) => {

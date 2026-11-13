@@ -283,7 +283,8 @@ export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: Moc
       const failed = await failure(getScenario());
       if (failed) return failed;
       // A JWT session is required (ADR-0025): a guest signs in first.
-      if (!request.headers.get('Authorization')) return problem(401, 'UNAUTHORIZED', 'Silakan masuk dulu');
+      if (!request.headers.get('Authorization'))
+        return problem(401, 'LOGIN_REQUIRED', 'Masuk dulu untuk mengambil giliran');
       const eventId = String(params.eventId);
       const found = placeFor(request, eventId);
       if (found.error) return found.error;
