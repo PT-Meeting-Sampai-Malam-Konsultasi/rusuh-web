@@ -2123,8 +2123,13 @@ describe('OrderController', () => {
       act(() => void holdOptions.onSuccess(result as never, input as never));
     const failWith = (error: Record<string, unknown>, input: HoldInput = lastInput()) =>
       act(() => void holdOptions.onError({ message: 'raw', ...error } as never, input as never));
+    /** Tracking plan §3 `nik_rejected` calls; the plan has no web-only hold events. */
     const failed = (d: ReturnType<typeof holdDeps>) =>
-      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === 'order_hold_failed').map(([, p]) => p);
+      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === 'nik_rejected').map(([, p]) => p);
+    const webOnly = (d: ReturnType<typeof holdDeps>) =>
+      d.analyticsAdapter.trackEvent.mock.calls.filter(
+        ([name]) => String(name).startsWith('order_hold') || name === 'order_continue_tapped',
+      );
 
     afterEach(() => {
       vi.useRealTimers();
@@ -2251,10 +2256,7 @@ describe('OrderController', () => {
         bookingId: null,
       });
       expect(d.admissionStore.get).toHaveBeenLastCalledWith('evt_samudra');
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('order_continue_tapped', {
-        eventId: 'evt_samudra',
-        tickets: 2,
-      });
+      expect(d.analyticsAdapter.trackEvent).not.toHaveBeenCalledWith('order_continue_tapped', expect.anything());
     });
 
     it('runs the use case with the loading overlay in all three paths', async () => {
@@ -2318,11 +2320,15 @@ describe('OrderController', () => {
       tap(hook);
       succeed({ kind: 'held', bookingId: 'bk1', resumed: false });
       expect(router.push).toHaveBeenCalledWith('/payment?booking=bk1');
-      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('order_hold_created', {
-        eventId: 'evt_samudra',
-        tickets: 2,
-        resumed: false,
+      // Tracking plan §2 step 10: 2 × Rp 850.000 + the Rp 10.000 fee once per order.
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('begin_checkout', {
+        event_id: 'evt_samudra',
+        booking_id: 'bk1',
+        currency: 'IDR',
+        value: 1_710_000,
+        items: [expect.objectContaining({ item_id: 'cat_b', item_name: 'Festival B', price: 850000, quantity: 2 })],
       });
+      expect(webOnly(d)).toEqual([]);
       expect(hook.result.current.checkout).toMatchObject({ enabled: false, busy: true, hint: null });
       tap(hook);
       expect(holdMutate).toHaveBeenCalledTimes(1);
@@ -2404,11 +2410,12 @@ describe('OrderController', () => {
             expect.objectContaining({ message: ERROR_CODE_MAP.UNKNOWN_ERROR, reference: 'req-9' }),
           ),
       ],
-    ])('handles %s', (_name, result, params, expectEffect) => {
+    ])('handles %s', (_name, result, _params, expectEffect) => {
       const { hook, d } = arrange();
       tap(hook);
       succeed(result);
-      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', ...params }]);
+      expect(failed(d)).toEqual([]);
+      expect(webOnly(d)).toEqual([]);
       expect(categoriesRefetch).not.toHaveBeenCalled();
       expectEffect();
       // Every outcome but held lets the buyer tap again.
@@ -2449,7 +2456,7 @@ describe('OrderController', () => {
       expect(holder(hook, 1).nik.error).toBe('error_nik_seat_taken order_nik_use_another');
       expect(hook.result.current.allHoldersVerified).toBe(false);
       expect(hook.result.current.checkout?.hint).toEqual({ text: 'order_checkout_hint_holders', error: false });
-      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: 'nik-conflict', code: 'NIK_SEAT_TAKEN' }]);
+      expect(failed(d)).toEqual([{ event_id: 'evt_samudra', reason: 'NIK_SEAT_TAKEN' }]);
       expect(openPopupError).not.toHaveBeenCalled();
     });
 
@@ -2483,7 +2490,9 @@ describe('OrderController', () => {
         enabled: false,
         hint: { text: ERROR_CODE_MAP[code], error: true },
       });
-      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: (result as { kind: string }).kind, code }]);
+      expect(failed(d)).toEqual(
+        (result as { kind: string }).kind === 'nik-conflict' ? [{ event_id: 'evt_samudra', reason: code }] : [],
+      );
       mutate.mockClear();
       act(() => holder(hook, 0).nik.recheck());
       expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ slotKey: 'cat_b-1', nik: NIK_A }));
@@ -2499,7 +2508,7 @@ describe('OrderController', () => {
         enabled: false,
         hint: { text: 'order_hold_sold_out:{"category":"Festival B"}', error: true },
       });
-      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: 'sold-out', code: 'CATEGORY_SOLD_OUT' }]);
+      expect(failed(d)).toEqual([]);
       act(() => hook.result.current.decrement('cat_b'));
       expect(hook.result.current.checkout).toMatchObject({ enabled: true, hint: null });
     });
@@ -2523,9 +2532,7 @@ describe('OrderController', () => {
         enabled: false,
         hint: { text: 'order_hold_over_reservation', error: true },
       });
-      expect(failed(d)).toEqual([
-        { eventId: 'evt_samudra', outcome: 'over-reservation', code: 'QUANTITY_OVER_RESERVATION' },
-      ]);
+      expect(failed(d)).toEqual([]);
       act(() => hook.result.current.decrement('cat_t'));
       expect(hook.result.current.checkout).toMatchObject({ enabled: true, hint: null });
     });
@@ -2536,7 +2543,7 @@ describe('OrderController', () => {
       failWith({ status: 401, code: 'UNAUTHORIZED' });
       expect(router.push).toHaveBeenCalledWith(SIGN_IN);
       expect(openPopupError).not.toHaveBeenCalled();
-      expect(failed(d)).toEqual([{ eventId: 'evt_samudra', outcome: 'error', code: 'UNAUTHORIZED' }]);
+      expect(webOnly(d)).toEqual([]);
     });
 
     it.each([
@@ -2593,7 +2600,8 @@ describe('OrderController', () => {
       });
     });
 
-    it('never passes a name, NIK, last 4 digits, token or booking id to analytics', () => {
+    // The booking id is not personal data: the tracking plan sends it on begin_checkout (§2 step 10).
+    it('never passes a name, NIK, last 4 digits or token to analytics', () => {
       const { hook, d } = arrange();
       tap(hook);
       succeed({ kind: 'retryable', code: 'INTERNAL_ERROR', bookingId: 'bk_secret' });
@@ -2619,7 +2627,6 @@ describe('OrderController', () => {
         'adm_token',
         '0004',
         '0001',
-        'bk_secret',
       ]) {
         expect(calls).not.toContain(secret);
       }

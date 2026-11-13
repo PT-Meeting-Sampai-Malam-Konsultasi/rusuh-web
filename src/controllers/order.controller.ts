@@ -797,28 +797,39 @@ const OrderController = ({
       toggleLoading();
       return holdBookingUseCase.execute(input);
     },
-    onSuccess: (result, input) => {
+    onSuccess: (result) => {
       toggleLoading();
       if (result.kind === 'held') {
         setLeaving(true);
         redirected.current = true;
-        analyticsAdapter.trackEvent('order_hold_created', {
-          eventId,
-          tickets: input.tickets.length,
-          resumed: result.resumed,
-        });
+        // Tracking plan §2 step 10: the tickets are held and the 10-minute payment window starts.
+        if (ok) {
+          const held = holdBookingUseCase.quote(ok.categories, quantities, ok.adminFee.amount);
+          const picked = ok.categories.filter((category) => (quantities[category.categoryId] ?? 0) > 0);
+          analyticsAdapter.trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
+            event_id: eventId,
+            booking_id: result.bookingId,
+            currency: ANALYTICS_CURRENCY,
+            value: held.total,
+            items: analyticsEvent
+              ? picked.map((category) => categoryItem(category, analyticsEvent, quantities[category.categoryId]))
+              : [],
+          });
+        }
         router.push(withQuery(ROUTES.PAYMENT, { booking: result.bookingId }));
         return;
       }
       holdGuard.current = false;
       switch (result.kind) {
         case 'not-verified':
-          analyticsAdapter.trackEvent('order_hold_failed', { eventId, outcome: result.kind });
           return;
         case 'nik-conflict':
         case 'attendees-stale': {
           const code = result.kind === 'nik-conflict' ? result.code : 'ATTENDEE_NOT_VALIDATED';
-          analyticsAdapter.trackEvent('order_hold_failed', { eventId, outcome: result.kind, code });
+          // Tracking plan §3: a NIK the hold refused, by reason only (never the NIK).
+          if (result.kind === 'nik-conflict') {
+            analyticsAdapter.trackEvent(ANALYTICS_EVENTS.NIK_REJECTED, { event_id: eventId, reason: result.code });
+          }
           const values = formApi.getValues('holders');
           const marked = result.kind === 'nik-conflict' ? result.slotIndexes : [];
           // Slot known: that field shows the existing seat-taken / duplicate error. Otherwise every holder rechecks.
@@ -848,29 +859,14 @@ const OrderController = ({
           return;
         }
         case 'sold-out':
-          analyticsAdapter.trackEvent('order_hold_failed', {
-            eventId,
-            outcome: result.kind,
-            code: 'CATEGORY_SOLD_OUT',
-          });
           setHoldFlag({ kind: 'sold-out', categoryId: result.categoryId });
           void categoriesQuery.refetch();
           return;
         case 'over-reservation':
-          analyticsAdapter.trackEvent('order_hold_failed', {
-            eventId,
-            outcome: result.kind,
-            code: 'QUANTITY_OVER_RESERVATION',
-          });
           setHoldFlag({ kind: 'over-reservation' });
           void categoriesQuery.refetch();
           return;
         case 'active-booking': {
-          analyticsAdapter.trackEvent('order_hold_failed', {
-            eventId,
-            outcome: result.kind,
-            code: 'ACCOUNT_HAS_ACTIVE_BOOKING',
-          });
           const { bookingId } = result;
           openPopupError(
             result.status === 'PAYMENT_PENDING' && bookingId
@@ -888,26 +884,18 @@ const OrderController = ({
           return;
         }
         case 'not-held':
-          analyticsAdapter.trackEvent('order_hold_failed', {
-            eventId,
-            outcome: result.kind,
-            code: 'BOOKING_NOT_HELD',
-          });
           attemptRef.current = null;
           openPopupError({ message: t('error_booking_not_held') });
           return;
         case 'admission-invalid':
-          analyticsAdapter.trackEvent('order_hold_failed', { eventId, outcome: result.kind });
           if (redirected.current) return;
           redirected.current = true;
           router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
           return;
         case 'unauthorized':
-          analyticsAdapter.trackEvent('order_hold_failed', { eventId, outcome: result.kind });
           router.push(signInHref);
           return;
         case 'retryable':
-          analyticsAdapter.trackEvent('order_hold_failed', { eventId, outcome: result.kind, code: result.code });
           if (attemptRef.current) attemptRef.current = { ...attemptRef.current, bookingId: result.bookingId };
           openPopupError({
             message: t(ERROR_CODE_MAP[result.code] ?? ERROR_CODE_MAP.UNKNOWN_ERROR),
@@ -922,7 +910,6 @@ const OrderController = ({
     onError: (error) => {
       toggleLoading();
       holdGuard.current = false;
-      analyticsAdapter.trackEvent('order_hold_failed', { eventId, outcome: 'error', code: error.code });
       if (error.status === 401 || error.code === 'UNAUTHORIZED') {
         router.push(signInHref);
         return;
@@ -1004,9 +991,8 @@ const OrderController = ({
     }
     const { idempotencyKey, bookingId } = attemptRef.current;
     setHoldFlag(null);
-    analyticsAdapter.trackEvent('order_continue_tapped', { eventId, tickets: tickets.length });
     mutateHold({ eventId, admissionToken: admissionStore.get(eventId), idempotencyKey, tickets, bookingId });
-  }, [enabled, formApi, selection.slots, checks, analyticsAdapter, eventId, admissionStore, mutateHold]);
+  }, [enabled, formApi, selection.slots, checks, eventId, admissionStore, mutateHold]);
 
   useEffect(() => {
     continueRef.current = onContinue;
