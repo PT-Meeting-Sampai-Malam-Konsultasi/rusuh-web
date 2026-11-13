@@ -10,4 +10,6 @@
 - [x] 5. Account "3 Privasi" section; controller `privacy`; tests [Requirement 4]
 - [x] 6. Checked in a static build at 390 and 1440: Home, waiting room (compact), settings from "Info" and from
       `#cookie-settings`, "Terima" saves and the footer link shows
-- [ ] 7. GA4 sink after a yes (part 3, needs the Firebase web stream measurement ID)
+- [x] 7. GA4 sink after a yes (part 3): `NEXT_PUBLIC_GA_MEASUREMENT_ID`, gtag.js loaded on the first event after a yes,
+      stopped with its cookies cleared on a later no; CSP; tests. Checked in a static build: no request before "Terima",
+      `gtag/js` + `g/collect` after, `_ga*` cookies gone after switching it off [Requirement 5]

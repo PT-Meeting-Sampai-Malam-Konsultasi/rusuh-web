@@ -21,6 +21,7 @@ export function createConsentStore({
   storage: StorageProtocol;
   now?: () => number;
 }): ConsentStoreProtocol {
+  const listeners = new Set<(choice: AnalyticsConsent) => void>();
   return {
     get: () => {
       const raw = storage.get(STORAGE_KEYS.CONSENT);
@@ -37,6 +38,11 @@ export function createConsentStore({
     set: (choice) => {
       const value: StoredConsent = { analytics: choice, at: new Date(now()).toISOString() };
       storage.set(STORAGE_KEYS.CONSENT, JSON.stringify(value));
+      listeners.forEach((listener) => listener(choice));
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
 }

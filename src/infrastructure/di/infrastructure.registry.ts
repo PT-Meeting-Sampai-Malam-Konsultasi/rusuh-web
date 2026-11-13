@@ -11,8 +11,9 @@ import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
 import { createConsentStore } from '@infrastructure/adapters/consent-store.adapter';
 import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
-import { apiErrorReporter, createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
-import { createSentrySink } from '@infrastructure/adapters/sentry.adapter';
+import { apiErrorReporter, combineSinks, createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
+import { createGa4Sink } from '@infrastructure/adapters/ga4.adapter';
+import { createSentrySink, scrubUrl } from '@infrastructure/adapters/sentry.adapter';
 import { createDeviceTokenStore } from '@infrastructure/adapters/device-token-store.adapter';
 import { createFileSaver } from '@infrastructure/adapters/file-saver.adapter';
 import { createPrinter } from '@infrastructure/adapters/printer.adapter';
@@ -29,7 +30,7 @@ import { TURNSTILE_SLOT_ID } from '@utils/constants/turnstile';
 import container from './container';
 import type { AwilixRegistry } from './registry.types';
 
-type Deps = Pick<AwilixRegistry, 'config' | 'storage' | 'tokenStore'>;
+type Deps = Pick<AwilixRegistry, 'config' | 'storage' | 'tokenStore' | 'consentStore'>;
 
 export function registerInfrastructure() {
   const locale =
@@ -60,20 +61,25 @@ export function registerInfrastructure() {
       createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
     ).singleton(),
     // Sentry only with a DSN (off in local dev and tests); the SDK itself loads after the page is interactive.
-    analyticsAdapter: asFunction((d: Deps) =>
-      createAnalyticsAdapter(
-        d.config.sentryDsn
+    // GA4 only with the analytics flag and a measurement ID, and then only after a yes to the cookie.
+    analyticsAdapter: asFunction((d: Deps) => {
+      const { config } = d;
+      const sinks = [
+        config.sentryDsn
           ? createSentrySink({
-              dsn: d.config.sentryDsn,
-              environment: d.config.sentryEnvironment,
-              release: d.config.appVersion,
-              tracesSampleRate: d.config.sentryTracesSampleRate,
-              replayOnErrorRate: d.config.sentryReplayOnErrorRate,
+              dsn: config.sentryDsn,
+              environment: config.sentryEnvironment,
+              release: config.appVersion,
+              tracesSampleRate: config.sentryTracesSampleRate,
+              replayOnErrorRate: config.sentryReplayOnErrorRate,
             })
           : {},
-        { getLanguage: locale(d) },
-      ),
-    ).singleton(),
+        config.analyticsEnabled && config.gaMeasurementId
+          ? createGa4Sink({ measurementId: config.gaMeasurementId, consent: d.consentStore, scrubUrl })
+          : {},
+      ];
+      return createAnalyticsAdapter(combineSinks(...sinks), { getLanguage: locale(d) });
+    }).singleton(),
     // The session too: claiming a turn needs it (ADR-0025), and a join with it attaches the place to the account.
     queueHttp: asFunction((d: Deps) =>
       createHttpAdapter({

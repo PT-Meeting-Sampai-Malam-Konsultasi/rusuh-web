@@ -37,3 +37,11 @@ the GA4 web stream exists (part 3).
 - Opened from the banner's "Info" and from the desktop footer link "Pengaturan cookie" (`#cookie-settings`, any page)
 - Account section "3 Privasi" (the phone's way in): the same switch, saved on change
 - Copy in ID and EN; the switch writes "Aktif" / "Nonaktif" beside it
+
+### Requirement 5: GA4 (part 3)
+
+- GA4 SHALL run only with `NEXT_PUBLIC_ANALYTICS_ENABLED=true`, `NEXT_PUBLIC_GA_MEASUREMENT_ID` set (deploy variable
+  `GA_MEASUREMENT_ID`) and the analytics choice `granted`; before that no script loads and nothing is sent
+- It SHALL get the tracking plan events from the analytics adapter (not `api_error`, which stays in Sentry), page views
+  from the screens only, and URLs scrubbed like Sentry's; Google signals and ad storage off
+- A yes given on a screen SHALL count that screen's page view; a later no SHALL stop GA4 and delete its `_ga*` cookies

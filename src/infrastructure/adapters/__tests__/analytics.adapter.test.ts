@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { apiErrorReporter, createAnalyticsAdapter } from '../analytics.adapter';
+import { apiErrorReporter, combineSinks, createAnalyticsAdapter } from '../analytics.adapter';
 
 describe('apiErrorReporter', () => {
   const analytics = { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() };
@@ -52,5 +52,20 @@ describe('createAnalyticsAdapter', () => {
     createAnalyticsAdapter(sink).trackEvent('login', { method: 'email_code' });
     expect(sink.event).toHaveBeenCalledWith('login', { method: 'email_code' });
     expect(() => createAnalyticsAdapter().trackEvent('login')).not.toThrow();
+  });
+});
+
+describe('combineSinks', () => {
+  it('passes every call to each sink that handles it', () => {
+    const a = { page: vi.fn(), event: vi.fn(), error: vi.fn() };
+    const b = { event: vi.fn() };
+    const sink = combineSinks(a, b, {});
+    sink.page?.('home');
+    sink.event?.('queue_join', { event_id: 'evt_1' });
+    sink.error?.('boom', { code: 'X' });
+    expect(a.page).toHaveBeenCalledWith('home');
+    expect(a.event).toHaveBeenCalledWith('queue_join', { event_id: 'evt_1' });
+    expect(b.event).toHaveBeenCalledWith('queue_join', { event_id: 'evt_1' });
+    expect(a.error).toHaveBeenCalledWith('boom', { code: 'X' });
   });
 });
