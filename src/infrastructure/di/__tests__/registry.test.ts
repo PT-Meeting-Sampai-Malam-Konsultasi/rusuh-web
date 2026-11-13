@@ -69,6 +69,7 @@ const KEYS = {
   loginController: true,
   notFoundController: true,
   orderController: true,
+  paymentController: true,
   queueController: true,
   ticketDetailController: true,
   ticketsController: true,

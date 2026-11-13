@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDayMonth, formatEventDate, formatPosterDate, formatShortDateTime, formatTime, zoneAbbr } from '../date';
+import {
+  formatDayMonth,
+  formatEventDate,
+  formatEventDay,
+  formatPosterDate,
+  formatShortDateTime,
+  formatTime,
+  zoneAbbr,
+} from '../date';
 
 const SHOW = '2026-12-12T12:00:00Z'; // 19.00 in Jakarta
 
@@ -33,5 +41,11 @@ describe('date formatters', () => {
     expect(zoneAbbr('Asia/Makassar')).toBe('WITA');
     expect(zoneAbbr('Asia/Jayapura')).toBe('WIT');
     expect(zoneAbbr('UTC')).toBe('UTC');
+  });
+
+  it('writes the event day without the time, in the venue zone', () => {
+    expect(formatEventDay(SHOW, 'id')).toBe('Sab, 12 Des 2026');
+    expect(formatEventDay(SHOW, 'en')).toBe('Sat, 12 Dec 2026');
+    expect(formatEventDay('2026-12-12T17:30:00Z', 'id', 'Asia/Jayapura')).toBe('Min, 13 Des 2026');
   });
 });

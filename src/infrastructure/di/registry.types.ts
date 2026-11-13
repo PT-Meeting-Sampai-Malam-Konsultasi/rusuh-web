@@ -45,6 +45,7 @@ import type { HomeControllerInterface } from '@controllers/home.controller';
 import type { LoginControllerInterface } from '@controllers/login.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { OrderControllerInterface } from '@controllers/order.controller';
+import type { PaymentControllerInterface } from '@controllers/payment.controller';
 import type { QueueControllerInterface } from '@controllers/queue.controller';
 import type { TicketDetailControllerInterface } from '@controllers/ticket-detail.controller';
 import type { TicketsControllerInterface } from '@controllers/tickets.controller';
@@ -164,6 +165,7 @@ export interface AwilixRegistry {
   loginController: LoginControllerInterface;
   notFoundController: NotFoundControllerInterface;
   orderController: OrderControllerInterface;
+  paymentController: PaymentControllerInterface;
   queueController: QueueControllerInterface;
   ticketDetailController: TicketDetailControllerInterface;
   ticketsController: TicketsControllerInterface;

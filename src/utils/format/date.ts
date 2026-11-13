@@ -37,10 +37,15 @@ export function formatTime(iso: string, locale: FormatLocale, timeZone = DEFAULT
     .toLowerCase();
 }
 
+/** `Sab, 12 Des 2026` (ID) / `Sat, 12 Dec 2026` (EN), in the venue's zone. */
+export function formatEventDay(iso: string, locale: FormatLocale, timeZone = DEFAULT_TIME_ZONE): string {
+  const day = parts(iso, locale, timeZone, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  return day.replace(/^(\w+)\s/, '$1, ');
+}
+
 /** `Sab, 12 Des 2026 · 19.00 WIB` */
 export function formatEventDate(iso: string, locale: FormatLocale, timeZone = DEFAULT_TIME_ZONE): string {
-  const day = parts(iso, locale, timeZone, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-  return `${day.replace(/^(\w+)\s/, '$1, ')} · ${formatTime(iso, locale, timeZone)} ${zoneAbbr(timeZone)}`;
+  return `${formatEventDay(iso, locale, timeZone)} · ${formatTime(iso, locale, timeZone)} ${zoneAbbr(timeZone)}`;
 }
 
 /** `Jum, 30 Okt · 10.00 WIB` (no year: used for openings in the next weeks). */

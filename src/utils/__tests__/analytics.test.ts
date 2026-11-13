@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 import type { Category } from '@core/entities/booking/booking.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 
-import { ANALYTICS_EVENTS, categoryItem, eventItem, positionBucket, signInFrom, waitBucket } from '../analytics';
+import {
+  ANALYTICS_EVENTS,
+  categoryItem,
+  eventItem,
+  positionBucket,
+  priceItems,
+  signInFrom,
+  waitBucket,
+} from '../analytics';
 
 describe('analytics helpers (tracking plan)', () => {
   it('names the events as the plan does: snake_case, at most 40 characters, no duplicates', () => {
@@ -71,5 +79,35 @@ describe('analytics helpers (tracking plan)', () => {
     expect(signInFrom('/tickets')).toBe('tickets');
     expect(signInFrom('/tickets/detail?booking=bk_1')).toBe('tickets');
     expect(signInFrom('/')).toBe('other');
+  });
+
+  it('builds one item per price line with the unit price and quantity', () => {
+    const money = (amount: number) => ({ amount, currency: 'IDR' as const });
+    expect(
+      priceItems({
+        lines: [
+          {
+            categoryId: 'cat_fb',
+            name: 'Festival B',
+            quantity: 2,
+            unitPrice: money(850000),
+            lineTotal: money(1700000),
+          },
+          {
+            categoryId: 'cat_ta',
+            name: 'Tribun Atas',
+            quantity: 1,
+            unitPrice: money(450000),
+            lineTotal: money(450000),
+          },
+        ],
+        ticketSubtotal: money(2150000),
+        adminFee: money(10000),
+        total: money(2160000),
+      }),
+    ).toEqual([
+      { item_id: 'cat_fb', item_name: 'Festival B', price: 850000, quantity: 2 },
+      { item_id: 'cat_ta', item_name: 'Tribun Atas', price: 450000, quantity: 1 },
+    ]);
   });
 });
