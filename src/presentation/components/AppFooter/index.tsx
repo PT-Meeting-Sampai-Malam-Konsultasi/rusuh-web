@@ -21,6 +21,10 @@ export default function AppFooter({ t }: AppFooterProps) {
               {t(key)}
             </a>
           ))}
+          {/* Opens the privacy settings (NFR-09-W2); shown only while analytics is on (`html[data-consent]`). */}
+          <a className={`${styles.link} ${styles.cookies}`} href="#cookie-settings">
+            {t('footer_cookies')}
+          </a>
         </nav>
       </div>
     </footer>

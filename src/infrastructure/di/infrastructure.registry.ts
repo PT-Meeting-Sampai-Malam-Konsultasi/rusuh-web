@@ -3,11 +3,13 @@ import { asFunction, asValue } from 'awilix';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
+import { useConsent } from '@contexts/consent.context';
 import { useLoading } from '@contexts/loading.context';
 import { useNetworkStatus } from '@contexts/network-status.context';
 import { usePageVisible } from '@contexts/page-visibility';
 import { usePopupError } from '@contexts/popup-error.context';
 import { createConfig } from '@infrastructure/config';
+import { createConsentStore } from '@infrastructure/adapters/consent-store.adapter';
 import { createAdmissionStore, MOCK_ADMISSION_TOKEN } from '@infrastructure/adapters/admission-store.adapter';
 import { apiErrorReporter, createAnalyticsAdapter } from '@infrastructure/adapters/analytics.adapter';
 import { createSentrySink } from '@infrastructure/adapters/sentry.adapter';
@@ -53,6 +55,7 @@ export function registerInfrastructure() {
       createDeviceTokenStore({ storage }),
     ).singleton(),
     queuePlaceStore: asFunction(({ storage }: Pick<Deps, 'storage'>) => createQueuePlaceStore({ storage })).singleton(),
+    consentStore: asFunction(({ storage }: Pick<Deps, 'storage'>) => createConsentStore({ storage })).singleton(),
     turnstile: asFunction((d: Deps) =>
       createTurnstileAdapter({ siteKey: d.config.turnstileSiteKey, getLocale: locale(d), slotId: TURNSTILE_SLOT_ID }),
     ).singleton(),
@@ -111,5 +114,6 @@ export function registerInfrastructure() {
     usePopupError: asValue(usePopupError),
     useNetworkStatus: asValue(useNetworkStatus),
     usePageVisible: asValue(usePageVisible),
+    useConsent: asValue(useConsent),
   });
 }

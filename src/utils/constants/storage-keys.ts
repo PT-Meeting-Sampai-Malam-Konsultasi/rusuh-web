@@ -8,4 +8,6 @@ export const STORAGE_KEYS = {
   DEVICE_TOKEN: 'rusuh.device',
   /** Followed by the event id. */
   QUEUE_PLACE_PREFIX: 'rusuh.queue.',
+  /** The analytics cookie choice and when it was made (NFR-09-W2). */
+  CONSENT: 'rusuh.consent',
 } as const;

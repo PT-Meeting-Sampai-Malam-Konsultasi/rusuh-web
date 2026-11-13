@@ -28,6 +28,15 @@
   }
 }
 
+/* The consent provider marks <html data-consent> when analytics is switched on. */
+.cookies {
+  @apply hidden;
+
+  html[data-consent] & {
+    @apply inline;
+  }
+}
+
 /* Paper gets the content only (the e-ticket prints to PDF). */
 @media print {
   .footer {

@@ -11,6 +11,15 @@
   }
 }
 
+/* While the cookie question shows at the bottom (NFR-09-W2), under the header instead of over its buttons. */
+body:has([data-consent-banner]) .badge {
+  @apply top-[72px] bottom-auto;
+
+  @variant md {
+    @apply top-24;
+  }
+}
+
 /* Paper gets the content only (the e-ticket prints to PDF). */
 @media print {
   .badge {

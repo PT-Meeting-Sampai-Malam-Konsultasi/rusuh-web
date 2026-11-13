@@ -25,6 +25,8 @@ export interface AppConfig {
    * call whose preflight does not list it.
    */
   requestIdHeader: boolean;
+  /** Product analytics (NFR-09-W2): the consent banner and settings, and later GA4. Off unless set to true. */
+  analyticsEnabled: boolean;
 }
 
 export type RawEnv = Record<keyof AppConfig, string | undefined>;
@@ -44,6 +46,7 @@ export const readEnv = (): RawEnv => ({
   sentryTracesSampleRate: process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   sentryReplayOnErrorRate: process.env.NEXT_PUBLIC_SENTRY_REPLAY_ON_ERROR_RATE,
   requestIdHeader: process.env.NEXT_PUBLIC_REQUEST_ID_HEADER,
+  analyticsEnabled: process.env.NEXT_PUBLIC_ANALYTICS_ENABLED,
 });
 
 export function requireEnv(value: string | undefined, name: string): string {
@@ -84,5 +87,6 @@ export function createConfig(env: RawEnv = readEnv()): AppConfig {
     sentryTracesSampleRate: rateEnv(env.sentryTracesSampleRate, 0.05),
     sentryReplayOnErrorRate: rateEnv(env.sentryReplayOnErrorRate, 0.1),
     requestIdHeader: boolEnv(env.requestIdHeader),
+    analyticsEnabled: boolEnv(env.analyticsEnabled),
   };
 }

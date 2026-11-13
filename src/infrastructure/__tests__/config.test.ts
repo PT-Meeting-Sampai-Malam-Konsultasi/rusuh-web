@@ -17,6 +17,7 @@ const env: RawEnv = {
   sentryTracesSampleRate: undefined,
   sentryReplayOnErrorRate: undefined,
   requestIdHeader: undefined,
+  analyticsEnabled: undefined,
 };
 
 describe('config', () => {
@@ -58,6 +59,12 @@ describe('config', () => {
   it('sends no request ID header unless switched on', () => {
     expect(createConfig(env).requestIdHeader).toBe(false);
     expect(createConfig({ ...env, requestIdHeader: 'true' }).requestIdHeader).toBe(true);
+  });
+
+  it('keeps product analytics off unless switched on', () => {
+    expect(createConfig(env).analyticsEnabled).toBe(false);
+    expect(createConfig({ ...env, analyticsEnabled: 'true' }).analyticsEnabled).toBe(true);
+    expect(createConfig({ ...env, analyticsEnabled: 'false' }).analyticsEnabled).toBe(false);
   });
 
   it('accepts sample rates between 0 and 1 only', () => {

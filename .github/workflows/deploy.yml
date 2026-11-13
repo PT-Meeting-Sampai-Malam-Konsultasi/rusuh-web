@@ -67,6 +67,8 @@ jobs:
           # X-Request-ID on API calls; off unless the variable is "true" (needs the API's CORS to allow it).
           NEXT_PUBLIC_REQUEST_ID_HEADER: ${{ vars.REQUEST_ID_HEADER }}
           SOURCE_MAPS: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+          # Product analytics and its consent banner; off unless the variable is "true".
+          NEXT_PUBLIC_ANALYTICS_ENABLED: ${{ vars.ANALYTICS_ENABLED }}
 
       # Readable stack traces in Sentry: tie each chunk to its map (debug IDs), upload the maps under the release,
       # then delete them so the site never serves them.
