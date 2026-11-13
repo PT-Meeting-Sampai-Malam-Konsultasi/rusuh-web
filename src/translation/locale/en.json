@@ -308,7 +308,7 @@
   "login_send_new_code": "Send a new code",
   "login_resend_in": "Resend code in",
   "login_resend": "Resend code",
-  "login_spam_note": "Not in your inbox? Check Spam or Promotions. Sender: no-reply@rusuh.id. Code valid for {{time}}.",
+  "login_spam_note": "Not in your inbox? Check Spam or Promotions. Sender: no-reply@rusuh-tiket.web.id. Code valid for {{time}}.",
   "login_stamp_new": "Account created",
   "login_title_profile": "One more step.",
   "login_verified_prefix": "Email",
