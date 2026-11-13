@@ -119,14 +119,17 @@ const retryable = (error: unknown, bookingId: string | null): HoldBookingResult 
 const countOf = (value: unknown): number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : 0;
 
+/** One order for both sides of a comparison; the order itself does not matter. */
+const byText = (a: string, b: string): number => a.localeCompare(b);
+
 /** Sorted "categoryId:last4" per ticket; from attendees, else "categoryId" × quantity from price.lines. */
 const signatureOf = (booking: Booking, withNik: boolean): string[] => {
   if (withNik) {
-    return (booking.attendees ?? []).map((a) => `${a.categoryId}:${lastFourOf(a.nikMasked) ?? ''}`).sort();
+    return (booking.attendees ?? []).map((a) => `${a.categoryId}:${lastFourOf(a.nikMasked) ?? ''}`).sort(byText);
   }
   return (booking.price?.lines ?? [])
     .flatMap((line) => Array.from({ length: countOf(line.quantity) }, () => line.categoryId))
-    .sort();
+    .sort(byText);
 };
 
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
@@ -187,9 +190,9 @@ export const HoldBookingUseCase = ({
 
     const sameOrder = (booking: Booking): boolean => {
       if ((booking.attendees?.length ?? 0) > 0) {
-        return sameList(signatureOf(booking, true), tickets.map((t) => `${t.categoryId}:${t.nikLast4}`).sort());
+        return sameList(signatureOf(booking, true), tickets.map((t) => `${t.categoryId}:${t.nikLast4}`).sort(byText));
       }
-      return sameList(signatureOf(booking, false), tickets.map((t) => t.categoryId).sort());
+      return sameList(signatureOf(booking, false), tickets.map((t) => t.categoryId).sort(byText));
     };
 
     const recover = async (): Promise<HoldBookingResult> => {
