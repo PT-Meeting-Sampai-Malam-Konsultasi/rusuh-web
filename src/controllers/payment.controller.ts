@@ -19,7 +19,6 @@ import { ROUTES, withQuery } from '@utils/constants/routes';
 import { STORAGE_KEYS } from '@utils/constants/storage-keys';
 import { formatEventDay, type FormatLocale } from '@utils/format/date';
 import { formatRupiah } from '@utils/format/number';
-import { randomUuid } from '@utils/random-uuid';
 
 export type PaymentScreenState =
   | 'loading'
@@ -202,9 +201,8 @@ type Phase =
   | { kind: 'not-found' }
   | { kind: 'paid' };
 
-/** The idempotency key and the transaction "Bayar" reopens; `reusable: undefined` = take the view's currentSnap. */
+/** The transaction "Bayar" reopens; `reusable: undefined` = take the view's currentSnap. */
 interface Attempt {
-  key: string | null;
   reusable: SnapTransaction | null | undefined;
 }
 
@@ -292,9 +290,10 @@ const PaymentController = ({
   });
 
   const [phase, setPhase] = useState<Phase>({ kind: 'ready' });
-  const attemptRef = useRef<Attempt>({ key: null, reusable: undefined });
+  const attemptRef = useRef<Attempt>({ reusable: undefined });
   const payGuard = useRef(false);
-  const trackedAttempts = useRef<Set<number>>(new Set());
+  /** Snap tokens already tracked: in memory only, never sent anywhere. */
+  const trackedAttempts = useRef<Set<string>>(new Set());
   const roundRef = useRef(0);
 
   const verifying = phase.kind === 'verifying' ? phase : null;
@@ -310,8 +309,8 @@ const PaymentController = ({
         case 'snap': {
           attemptRef.current = { ...attemptRef.current, reusable: result.snap };
           // Tracking plan §2 step 11: Snap opened for this attempt (once per attempt, never the token).
-          if (view && !trackedAttempts.current.has(result.snap.attemptId)) {
-            trackedAttempts.current.add(result.snap.attemptId);
+          if (view && !trackedAttempts.current.has(result.snap.snapToken)) {
+            trackedAttempts.current.add(result.snap.snapToken);
             analyticsAdapter.trackEvent(ANALYTICS_EVENTS.ADD_PAYMENT_INFO, {
               booking_id: bookingId,
               currency: ANALYTICS_CURRENCY,
@@ -341,7 +340,7 @@ const PaymentController = ({
           setPhase({ kind: 'inactive', outcome: result });
           return;
         case 'retryable':
-          // Same key on the retry; snap null = start the attempt again, else reopen this one.
+          // snap null = ask enterPayment again on the retry, else reopen this one.
           attemptRef.current = { ...attemptRef.current, reusable: result.snap };
           setPhase({ kind: 'busy', code: result.code });
           return;
@@ -369,7 +368,7 @@ const PaymentController = ({
 
   const statusQuery = useQueryTanstack<PaymentStep, HttpError>({
     queryKey: [QUERY_KEYS.PAYMENT_STATUS, bookingId, verifying?.hint ?? null, verifying?.round ?? 0],
-    queryFn: () => payBookingUseCase.checkStatus(bookingId, verifying?.hint ?? 'success'),
+    queryFn: () => payBookingUseCase.checkStatus(bookingId, view?.eventId ?? '', verifying?.hint ?? 'success'),
     enabled: verifying !== null,
     refetchInterval: POLL_MS,
     refetchOnWindowFocus: true,
@@ -388,10 +387,10 @@ const PaymentController = ({
     else if (step.reason !== verifying.reason) setPhase({ ...verifying, reason: step.reason });
   }
 
-  // A failed attempt: the next "Bayar" starts a new one (new key, nothing to reopen). Once per failure.
+  // A failed attempt: the next "Bayar" asks enterPayment for the live attempt (nothing to reopen). Once per failure.
   useEffect(() => {
     if (phase.kind !== 'failed') return;
-    attemptRef.current = { key: null, reusable: null };
+    attemptRef.current = { reusable: null };
     analyticsAdapter.trackEvent(ANALYTICS_EVENTS.PAYMENT_FAILED, {
       booking_id: bookingId,
       reason: phase.paymentStatus,
@@ -472,11 +471,10 @@ const PaymentController = ({
   const onPay = useCallback(() => {
     if (!view || timeUp || payGuard.current || paying) return;
     payGuard.current = true;
-    attemptRef.current.key ??= randomUuid();
-    const { key, reusable } = attemptRef.current;
+    const { reusable } = attemptRef.current;
     mutatePay({
       bookingId,
-      idempotencyKey: key,
+      eventId: view.eventId,
       reusable: reusable === undefined ? (view.currentSnap ?? null) : reusable,
     });
   }, [view, timeUp, paying, mutatePay, bookingId]);

@@ -13,22 +13,18 @@ import { formatRupiah } from '@utils/format/number';
 
 import PaymentController, { type PaymentControllerInterface } from '../payment.controller';
 
-let uuidCount = 0;
-vi.mock('@utils/random-uuid', () => ({ randomUuid: () => `uuid-${++uuidCount}` }));
-
 const money = (amount: number) => ({ amount, currency: 'IDR' as const });
 
 const S1: SnapTransaction = {
-  attemptId: 1,
-  orderId: 'bk1-1',
   snapToken: 'tok-secret-1',
   redirectUrl: 'https://snap.test/1',
   gatewayExpiresAt: '2026-11-13T03:10:00Z',
 };
-const S2: SnapTransaction = { ...S1, attemptId: 2, orderId: 'bk1-2', snapToken: 'tok-secret-2' };
+const S2: SnapTransaction = { ...S1, snapToken: 'tok-secret-2' };
 
 const view: PaymentView = {
   bookingId: 'bk1',
+  eventId: 'evt_samudra',
   orderCode: 'RSH-26-900001',
   eventName: 'Samudra',
   eventStartsAt: '2026-12-12T12:00:00Z',
@@ -52,8 +48,6 @@ const view: PaymentView = {
   currentSnap: null,
   expiresAt: '2026-11-13T03:10:00Z',
   serverNow: '2026-11-13T03:00:00Z',
-  csrfToken: 'csrf',
-  snapClientKey: 'SB-test',
 };
 
 const ready = (v: PaymentView = view): PaymentPageResult => ({
@@ -169,7 +163,6 @@ describe('PaymentController', () => {
     payPending = false;
     search = { booking: 'bk1' };
     i18n.language = 'id';
-    uuidCount = 0;
     answeredAt = Date.now();
   });
 
@@ -315,36 +308,36 @@ describe('PaymentController', () => {
     it('runs one mutation around the use case without retry or overlay', async () => {
       const { d } = render();
       expect(mutationOptions).toMatchObject({ mutationKey: ['payment-pay'], retry: false });
-      const input = { bookingId: 'bk1', idempotencyKey: 'k', reusable: null };
+      const input = { bookingId: 'bk1', eventId: 'evt_samudra', reusable: null };
       await mutationOptions.mutationFn(input);
       expect(d.payBookingUseCase.pay).toHaveBeenCalledWith(input);
       expect(d).not.toHaveProperty('useLoading');
     });
 
-    it('Property 3: first tap reopens the current snap with a new key; closed keeps it', () => {
+    it('Property 3: first tap reopens the current snap; closed keeps it', () => {
       pageState = { data: ready({ ...view, currentSnap: S1 }) };
       const { result, rerender } = render();
       tap(result.current);
-      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', idempotencyKey: 'uuid-1', reusable: S1 });
+      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', eventId: 'evt_samudra', reusable: S1 });
       succeed(rerender, { kind: 'snap', outcome: 'closed', snap: S1 });
       expect(result.current.state).toBe('ready');
       tap(result.current);
-      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', idempotencyKey: 'uuid-1', reusable: S1 });
+      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', eventId: 'evt_samudra', reusable: S1 });
     });
 
-    it('Property 3: retryable without a snap keeps the key and starts again', () => {
+    it('Property 3: retryable without a snap asks enterPayment again', () => {
       const { result, rerender } = render();
       tap(result.current);
-      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', idempotencyKey: 'uuid-1', reusable: null });
+      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', eventId: 'evt_samudra', reusable: null });
       succeed(rerender, { kind: 'retryable', code: 'PAYMENT_PROVIDER_BUSY', snap: null });
       tap(result.current);
-      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', idempotencyKey: 'uuid-1', reusable: null });
+      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', eventId: 'evt_samudra', reusable: null });
       succeed(rerender, { kind: 'retryable', code: 'SNAP_UNAVAILABLE', snap: S2 });
       tap(result.current);
-      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', idempotencyKey: 'uuid-1', reusable: S2 });
+      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', eventId: 'evt_samudra', reusable: S2 });
     });
 
-    it('Property 3: a failed step renews the attempt (new key, nothing to reopen)', () => {
+    it('Property 3: a failed step renews the attempt (nothing to reopen)', () => {
       const { result, rerender } = render();
       tap(result.current);
       succeed(rerender, { kind: 'snap', outcome: 'error', snap: S1 });
@@ -353,7 +346,7 @@ describe('PaymentController', () => {
       rerender();
       expect(result.current.state).toBe('failed');
       tap(result.current);
-      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', idempotencyKey: 'uuid-2', reusable: null });
+      expect(mutate).toHaveBeenLastCalledWith({ bookingId: 'bk1', eventId: 'evt_samudra', reusable: null });
     });
 
     it('Property 3: two taps before a render call mutate once; the guard lifts on settle', () => {
@@ -499,7 +492,7 @@ describe('PaymentController', () => {
       });
       expect(statusOptions.queryKey.slice(0, 3)).toEqual(['payment-status', 'bk1', 'pending']);
       await (statusOptions.queryFn as () => Promise<unknown>)();
-      expect(d.payBookingUseCase.checkStatus).toHaveBeenCalledWith('bk1', 'pending');
+      expect(d.payBookingUseCase.checkStatus).toHaveBeenCalledWith('bk1', 'evt_samudra', 'pending');
     });
 
     it('gives every verifying stretch a fresh query key', () => {
@@ -806,7 +799,6 @@ describe('PaymentController', () => {
       expect(vi.getTimerCount()).toBe(0);
       tap(result.current);
       expect(mutate).not.toHaveBeenCalled();
-      expect(uuidCount).toBe(0);
       tick(10000);
       expect(result.current.timer?.seconds).toBe(0);
       expect(result.current.timeUp).toBe(true);

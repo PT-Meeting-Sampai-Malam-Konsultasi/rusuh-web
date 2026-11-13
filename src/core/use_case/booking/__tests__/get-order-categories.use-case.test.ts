@@ -54,6 +54,7 @@ const setup = () => {
     validateAttendee: vi.fn(),
     createBooking: vi.fn(),
     enterPayment: vi.fn(),
+    checkPaymentStatus: vi.fn(),
     getActiveBooking: vi.fn(),
   };
   const claimTurnUseCase = { execute: vi.fn(), turnWindow: vi.fn() };

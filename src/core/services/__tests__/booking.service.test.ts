@@ -137,6 +137,17 @@ describe('BookingService', () => {
     });
   });
 
+  describe('checkPaymentStatus', () => {
+    it('posts no body to check-status with the admission token, the id encoded', async () => {
+      const response = { data: { bookingId: 'bk 1', status: 'PAID' }, status: 200 };
+      coreHttp.post.mockResolvedValue(response);
+      await expect(service.checkPaymentStatus('bk 1', 'adm-1')).resolves.toBe(response);
+      expect(coreHttp.post).toHaveBeenCalledWith('core/bookings/bk%201/check-status', undefined, {
+        headers: { 'X-Admission-Token': 'adm-1' },
+      });
+    });
+  });
+
   describe('enterPayment', () => {
     it('posts no body to the payment path with only the admission token', async () => {
       const response = {

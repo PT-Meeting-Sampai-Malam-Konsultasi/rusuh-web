@@ -5,7 +5,6 @@ import { AuthService } from '@core/services/auth.service';
 import { BookingService } from '@core/services/booking.service';
 import { CatalogService } from '@core/services/catalog.service';
 import { DeviceService } from '@core/services/device.service';
-import { PaymentService } from '@core/services/payment.service';
 import { QueueService } from '@core/services/queue.service';
 import { SignOutUseCase } from '@core/use_case/auth/sign-out.use-case';
 import { RefreshSessionUseCase } from '@core/use_case/auth/refresh-session.use-case';
@@ -36,7 +35,6 @@ export function registerServices() {
     bookingService: asFunction(BookingService).singleton(),
     deviceService: asFunction(DeviceService).singleton(),
     queueService: asFunction(QueueService).singleton(),
-    paymentService: asFunction(PaymentService).singleton(),
     getHomeEventsUseCase: asFunction(GetHomeEventsUseCase).singleton(),
     getOrderCategoriesUseCase: asFunction(GetOrderCategoriesUseCase).singleton(),
     orderTicketSelectionUseCase: asFunction(OrderTicketSelectionUseCase).singleton(),

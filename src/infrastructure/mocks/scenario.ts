@@ -26,7 +26,7 @@ export const MOCK_SCENARIOS = [
   'category_sold_out',
   /** FR-16: the first payment entry of each booking answers 503 PAYMENT_PROVIDER_BUSY; a retry succeeds. */
   'payment_busy',
-  /** FR-20: the view has no live Snap attempt and the first Snap start answers 503 PAYMENT_PROVIDER_BUSY; a retry works. */
+  /** FR-20: the first "Bayar" (enterPayment from the payment page) answers 503 PAYMENT_PROVIDER_BUSY; a retry works. */
   'snap_busy',
   /** FR-20: the customer closes the Snap popup without paying. */
   'snap_closed',

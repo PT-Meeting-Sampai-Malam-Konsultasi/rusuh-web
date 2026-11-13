@@ -1,4 +1,5 @@
 import type { Booking, BookingStatus } from '@core/entities/booking/booking.entity';
+import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type {
   PaymentStatus,
   PaymentStatusResponse,
@@ -39,9 +40,9 @@ export interface InactiveOutcome {
 
 export type PaymentPageResult =
   | { kind: 'ready'; view: PaymentView; tickets: PaymentTicketLine[] }
-  /** 409 and the status says PAID: go to the e-ticket. */
+  /** The booking is PAID: go to the e-ticket. */
   | { kind: 'paid' }
-  /** 409 and expired / cancelled. */
+  /** Expired, cancelled, not yet held (SELECTION) or past its deadline. */
   | InactiveOutcome
   /** Empty id, 404 (unknown or someone else's booking). */
   | { kind: 'not-found' }
@@ -49,9 +50,9 @@ export type PaymentPageResult =
 
 export interface PayInput {
   bookingId: string;
-  /** The controller's attempt key (a UUID); a new one only after a failed attempt. */
-  idempotencyKey: string;
-  /** A transaction to reopen (the view's currentSnap or the one opened last); null to start one. */
+  /** The admission token is kept per event; enterPayment needs it. */
+  eventId: string;
+  /** A transaction to reopen (the one opened last); null to ask enterPayment for the live one. */
   reusable: SnapTransaction | null;
 }
 
@@ -62,7 +63,8 @@ export type PayResult =
   | InactiveOutcome
   | { kind: 'not-found' }
   | { kind: 'unauthorized' }
-  /** Busy / transport / Snap would not open. snap: reopen it on the retry (null: start again, same key). */
+  /** Busy / transport / Snap would not open, or ADMISSION_INVALID (no live admission: Snap can't be asked for again).
+   * snap: reopen it on the retry (null: ask enterPayment again). */
   | { kind: 'retryable'; code: string; requestId?: string; snap: SnapTransaction | null };
 
 export type PaymentStep =
@@ -74,12 +76,12 @@ export type PaymentStep =
   | InactiveOutcome;
 
 export interface PayBookingUseCaseInterface {
-  /** ready: 1 call. 409: + getPaymentStatus; dead: + getBooking (3 at most). */
+  /** getBooking, + getEvent for the header when the booking can still be paid (its failure only drops the header). */
   load: (bookingId: string) => Promise<PaymentPageResult>;
-  /** At most: startSnap, snap.pay; or on 409 startSnap, getPaymentStatus, getBooking (dead only). Never retried here. */
+  /** At most: enterPayment, snap.pay; or on 409 enterPayment, getBooking. Never retried here. */
   pay: (input: PayInput) => Promise<PayResult>;
-  /** 1 call; + getBooking only when the step is inactive. A 401 from either call is thrown. */
-  checkStatus: (bookingId: string, hint: SnapHint) => Promise<PaymentStep>;
+  /** checkPaymentStatus with the admission token, else (none, or 403) getBooking. A 401 is thrown. */
+  checkStatus: (bookingId: string, eventId: string, hint: SnapHint) => Promise<PaymentStep>;
 }
 
 const TRANSIENT_CODES = new Set([
@@ -100,6 +102,8 @@ const isTransient = (error: unknown): boolean =>
 const isUnauthorized = (error: unknown): boolean => errorCodeOf(error) === 'UNAUTHORIZED' || statusOf(error) === 401;
 const isNotFound = (error: unknown): boolean => errorCodeOf(error) === 'NOT_FOUND' || statusOf(error) === 404;
 const isNotHeld = (error: unknown): boolean => errorCodeOf(error) === 'BOOKING_NOT_HELD';
+const isAdmissionInvalid = (error: unknown): boolean =>
+  errorCodeOf(error) === 'ADMISSION_INVALID' || statusOf(error) === 403;
 const requestIdOf = (error: unknown): string | undefined => {
   const requestId = (error as HttpError | null)?.requestId;
   return typeof requestId === 'string' ? requestId : undefined;
@@ -119,6 +123,29 @@ const stepOf = (status: PaymentStatusResponse, hint: SnapHint): LiveStep => {
   if (paymentStatus !== 'pending' && hint === 'error') return { kind: 'failed', paymentStatus: 'none' };
   return { kind: 'verifying', reason: hint === 'pending' ? 'waiting' : 'confirming' };
 };
+
+/** The booking as the payment steps read it: only a late payment (refundRequired) is known beyond the status. */
+const statusOfBooking = (booking: Booking): PaymentStatusResponse => ({
+  bookingStatus: booking.status,
+  ...(booking.refundRequired ? { paymentStatus: 'paid_after_expiry' as const } : {}),
+  serverNow: booking.serverNow,
+});
+
+/** The payment page view: the booking, with the event header when getEvent worked. */
+const toView = (booking: Booking, event: EventSummary | null): PaymentView => ({
+  bookingId: booking.bookingId,
+  eventId: booking.eventId,
+  orderCode: booking.orderCode ?? '',
+  ...(event
+    ? { eventName: event.name, eventStartsAt: event.startsAt, venueShort: event.venueShort, timezone: event.timezone }
+    : {}),
+  attendees: booking.attendees ?? [],
+  price: booking.price,
+  currentSnap: null,
+  // A PAYMENT_PENDING booking has its deadline; without one the countdown reads 0.
+  expiresAt: booking.expiresAt ?? booking.serverNow,
+  serverNow: booking.serverNow,
+});
 
 /** Attendees in order with the unit price of their category's line. fullName is not copied. */
 const ticketLines = (view: PaymentView): PaymentTicketLine[] =>
@@ -160,36 +187,44 @@ const classify = (status: PaymentStatusResponse, booking: Booking | null): Inact
   };
 };
 
-/** FR-20-W1: load the payment page, open Snap (reuse or start an attempt), map status polls to the next step. */
+/**
+ * FR-20-W1: the payment page on core.booking (Apidog): getBooking for the page and the status, enterPayment (idempotent)
+ * for the Snap token, checkPaymentStatus to re-check Midtrans. Maps every answer to the next step.
+ */
 export const PayBookingUseCase = ({
-  paymentService,
   bookingService,
+  catalogService,
+  admissionStore,
   snap,
-}: Pick<AwilixRegistry, 'paymentService' | 'bookingService' | 'snap'>): PayBookingUseCaseInterface => {
-  /**
-   * The single exit of every inactive path: one getBooking, never retried. The read only enriches an outcome already
-   * decided from the Status, so any failure but 401 degrades to nulls (spec 81, recorded rule tension).
-   */
-  const endedOutcome = async (bookingId: string, status: PaymentStatusResponse): Promise<InactiveOutcome> => {
-    let booking: Booking | null;
-    try {
-      booking = (await bookingService.getBooking(bookingId)).data;
-    } catch (error) {
-      if (isUnauthorized(error)) throw error;
-      booking = null;
-    }
-    return classify(status, booking);
+}: Pick<
+  AwilixRegistry,
+  'bookingService' | 'catalogService' | 'admissionStore' | 'snap'
+>): PayBookingUseCaseInterface => {
+  /** Paid, dead, or still payable: one booking decides. */
+  const outcomeOf = (booking: Booking): { kind: 'paid' } | InactiveOutcome | null => {
+    const status = statusOfBooking(booking);
+    if (booking.status === 'PAID') return { kind: 'paid' };
+    if (booking.refundRequired || DEAD.has(booking.status) || pastDeadline(booking)) return classify(status, booking);
+    return null;
   };
 
-  /** After a 409 BOOKING_NOT_HELD: one status call tells paid from a dead order. */
+  /** After a 409 BOOKING_NOT_HELD: one getBooking tells paid from a dead order. */
   const settle = async (bookingId: string): Promise<{ kind: 'paid' } | InactiveOutcome | { kind: 'unauthorized' }> => {
     try {
-      const { data } = await paymentService.getPaymentStatus(bookingId);
-      if (data.bookingStatus === 'PAID') return { kind: 'paid' };
-      return await endedOutcome(bookingId, data);
+      const booking = (await bookingService.getBooking(bookingId)).data;
+      return outcomeOf(booking) ?? classify(statusOfBooking(booking), booking);
     } catch (error) {
       if (isUnauthorized(error)) return { kind: 'unauthorized' };
       throw error;
+    }
+  };
+
+  const eventOf = async (eventId: string): Promise<EventSummary | null> => {
+    try {
+      return (await catalogService.getEvent(eventId)).data;
+    } catch (error) {
+      if (isUnauthorized(error)) throw error;
+      return null;
     }
   };
 
@@ -197,28 +232,39 @@ export const PayBookingUseCase = ({
     load: async (bookingId) => {
       if (!bookingId) return { kind: 'not-found' };
       try {
-        const { data } = await paymentService.getPaymentPage(bookingId);
-        return { kind: 'ready', view: data, tickets: ticketLines(data) };
+        const booking = (await bookingService.getBooking(bookingId)).data;
+        const ended = outcomeOf(booking);
+        if (ended) return ended;
+        const view = toView(booking, await eventOf(booking.eventId));
+        return { kind: 'ready', view, tickets: ticketLines(view) };
       } catch (error) {
-        if (isNotHeld(error)) return settle(bookingId);
         if (isNotFound(error)) return { kind: 'not-found' };
         if (isUnauthorized(error)) return { kind: 'unauthorized' };
         throw error;
       }
     },
 
-    pay: async ({ bookingId, idempotencyKey, reusable }) => {
+    pay: async ({ bookingId, eventId, reusable }) => {
       if (!bookingId) return { kind: 'not-found' };
       let tx: SnapTransaction;
       if (reusable) {
         tx = reusable;
       } else {
+        const admissionToken = admissionStore.get(eventId);
+        // Kept in memory only: a reload loses it, and enterPayment can't be called without one.
+        if (!admissionToken) return { kind: 'retryable', code: 'ADMISSION_INVALID', snap: null };
         try {
-          tx = (await paymentService.startSnap(bookingId, idempotencyKey)).data;
+          const { data } = await bookingService.enterPayment(bookingId, admissionToken);
+          tx = {
+            snapToken: data.snapToken,
+            redirectUrl: data.redirectUrl ?? null,
+            gatewayExpiresAt: data.paymentExpiresAt,
+          };
         } catch (error) {
           if (isNotHeld(error)) return settle(bookingId);
           if (isNotFound(error)) return { kind: 'not-found' };
           if (isUnauthorized(error)) return { kind: 'unauthorized' };
+          if (isAdmissionInvalid(error)) return { kind: 'retryable', code: 'ADMISSION_INVALID', snap: null };
           if (isTransient(error)) {
             const code = errorCodeOf(error) ?? 'UNKNOWN_ERROR';
             const requestId = requestIdOf(error);
@@ -238,10 +284,21 @@ export const PayBookingUseCase = ({
       }
     },
 
-    checkStatus: async (bookingId, hint) => {
-      const { data } = await paymentService.getPaymentStatus(bookingId);
-      const step = stepOf(data, hint);
-      return step.kind === 'ended' ? endedOutcome(bookingId, data) : step;
+    checkStatus: async (bookingId, eventId, hint) => {
+      const admissionToken = admissionStore.get(eventId);
+      let booking: Booking | null = null;
+      if (admissionToken) {
+        try {
+          booking = (await bookingService.checkPaymentStatus(bookingId, admissionToken)).data;
+        } catch (error) {
+          // No live admission: the booking still says where the payment stands (the webhook updates it).
+          if (!isAdmissionInvalid(error)) throw error;
+        }
+      }
+      booking ??= (await bookingService.getBooking(bookingId)).data;
+      const status = statusOfBooking(booking);
+      const step = stepOf(status, hint);
+      return step.kind === 'ended' ? classify(status, booking) : step;
     },
   };
 };

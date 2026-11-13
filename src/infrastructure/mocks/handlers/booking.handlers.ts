@@ -18,6 +18,7 @@ import { categoriesFixture } from '../fixtures/categories.fixture';
 import { eventsFixture } from '../fixtures/events.fixture';
 import { expireIfDue, type StoredBooking } from './mock-booking-store';
 import { ADMISSION_MS, orderWindowMs } from './mock-queue-state';
+import { FINAL_STATUSES } from './payment.handlers';
 import { failure, problem, problemWith, type MockHandlerContext } from './shared';
 
 const admissionInvalid = () => problem(403, 'ADMISSION_INVALID', 'Giliran tidak berlaku');
@@ -343,8 +344,21 @@ export function bookingHandlers({
         redirectUrl: null,
         serverNow: today.toISOString(),
       });
-      // Idempotent while PAYMENT_PENDING: the live token and deadline again.
-      if (booking.status === 'PAYMENT_PENDING') return HttpResponse.json<EnterPaymentResponse>(answer());
+      if (booking.status === 'PAYMENT_PENDING') {
+        // FR-20-W1: "Bayar" on the payment page calls this again; snap_busy fails that first call.
+        if (scenario === 'snap_busy' && entry.paymentEntries === 2) {
+          return problem(503, 'PAYMENT_PROVIDER_BUSY', 'Layanan pembayaran sedang sibuk');
+        }
+        // Idempotent: the live token and deadline again; after a failed attempt (denied …), the next attempt's.
+        const last = entry.attempts.at(-1);
+        if (last && FINAL_STATUSES.has(last.status)) {
+          const attemptId = last.attemptId + 1;
+          entry.snapToken = `mock-snap-${booking.bookingId}-${attemptId}`;
+          entry.attempts.push({ attemptId, snapToken: entry.snapToken, status: 'none', firstPolledAt: null });
+          bookingStore.save(entry);
+        }
+        return HttpResponse.json<EnterPaymentResponse>(answer());
+      }
       if (booking.status !== 'SELECTION') return problem(409, 'BOOKING_NOT_HELD', 'Pesanan tidak lagi aktif');
       if (scenario === 'payment_busy' && entry.paymentEntries === 1) {
         return problem(503, 'PAYMENT_PROVIDER_BUSY', 'Layanan pembayaran sedang sibuk');
@@ -356,15 +370,9 @@ export function bookingHandlers({
         });
       }
       entry.snapToken = `mock-snap-${booking.bookingId}-1`;
-      // FR-20-W1: the payment entry's token is Snap attempt 1 (the payment page's currentSnap).
+      // FR-20-W1: the payment entry's token is Snap attempt 1, the one "Bayar" opens.
       if (entry.attempts.length === 0) {
-        entry.attempts.push({
-          attemptId: 1,
-          idempotencyKey: null,
-          snapToken: entry.snapToken,
-          status: 'none',
-          firstPolledAt: null,
-        });
+        entry.attempts.push({ attemptId: 1, snapToken: entry.snapToken, status: 'none', firstPolledAt: null });
       }
       entry.booking = {
         ...booking,

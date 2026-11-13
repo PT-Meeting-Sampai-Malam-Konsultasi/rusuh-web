@@ -57,6 +57,11 @@ export interface BookingServiceInterface {
    * NIK_SEAT_TAKEN (+ nikMasked); 503 retryable.
    */
   enterPayment: (bookingId: string, admissionToken: string) => Promise<HttpResponse<EnterPaymentResponse>>;
+  /**
+   * `POST /core/bookings/{bookingId}/check-status`: re-checks the live attempt with Midtrans Get Status; settlement →
+   * PAID, expire → EXPIRED, a Get Status 404 leaves it unchanged. Returns the booking. 403; 404.
+   */
+  checkPaymentStatus: (bookingId: string, admissionToken: string) => Promise<HttpResponse<Booking>>;
   /** `GET /core/bookings/active`: this account's SELECTION / PAYMENT_PENDING bookings, at most one per event. */
   getActiveBooking: () => Promise<HttpResponse<ActiveBookingsResponse>>;
 }
@@ -85,6 +90,10 @@ export const BookingService = ({ coreHttp }: Pick<AwilixRegistry, 'coreHttp'>): 
     }),
   enterPayment: (bookingId, admissionToken) =>
     coreHttp.post<EnterPaymentResponse>(`core/bookings/${encodeURIComponent(bookingId)}/payment`, undefined, {
+      headers: { [ADMISSION_TOKEN_HEADER]: admissionToken },
+    }),
+  checkPaymentStatus: (bookingId, admissionToken) =>
+    coreHttp.post<Booking>(`core/bookings/${encodeURIComponent(bookingId)}/check-status`, undefined, {
       headers: { [ADMISSION_TOKEN_HEADER]: admissionToken },
     }),
   getActiveBooking: () => coreHttp.get<ActiveBookingsResponse>('core/bookings/active'),
