@@ -9,6 +9,8 @@ export interface FlowHeaderStep {
   number: 1 | 2 | 3;
   label: string;
   current: boolean;
+  /** Finished step: "✓" instead of the number, plus labels.done for screen readers. */
+  done?: boolean;
 }
 
 interface FlowHeaderProps {
@@ -19,7 +21,7 @@ interface FlowHeaderProps {
   backHref: string;
   /** Phone app bar title ("Pilih tiket"). */
   title: string;
-  labels: { home: string; steps: string; language: string; back: string };
+  labels: { home: string; steps: string; language: string; back: string; done?: string };
   /** Countdown (FR-17-W1). Rendered in both bars when present; nothing otherwise. */
   timer?: ReactNode;
 }
@@ -43,9 +45,16 @@ export default function FlowHeader({
         </Link>
         <ol className={styles.steps} aria-label={labels.steps}>
           {steps.map((step) => (
-            <li key={step.number} className={styles.step} aria-current={step.current ? 'step' : undefined}>
-              <b className={styles.stepNumber}>{step.number}</b>
+            <li
+              key={step.number}
+              className={step.done ? styles.stepDone : styles.step}
+              aria-current={step.current ? 'step' : undefined}
+            >
+              <b className={styles.stepNumber} aria-hidden={step.done || undefined}>
+                {step.done ? '✓' : step.number}
+              </b>
               {step.label}
+              {step.done && labels.done && <span className={styles.srOnly}> ({labels.done})</span>}
             </li>
           ))}
         </ol>

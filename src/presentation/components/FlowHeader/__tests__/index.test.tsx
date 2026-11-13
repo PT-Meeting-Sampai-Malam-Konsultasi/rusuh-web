@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -56,6 +56,31 @@ describe('FlowHeader', () => {
   it('renders no timer without one', () => {
     renderHeader();
     expect(screen.queryByRole('timer')).toBeNull();
+  });
+
+  it('draws a done step with a hidden check mark and a visually hidden "done" label', () => {
+    renderHeader({
+      steps: [
+        { number: 1, label: 'Pilih tiket', current: false, done: true },
+        { number: 2, label: 'Bayar', current: true, done: false },
+        { number: 3, label: 'E-tiket', current: false, done: false },
+      ],
+      labels: { ...labels, done: 'selesai' },
+    });
+    const items = screen.getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('✓Pilih tiket (selesai)');
+    expect(items[0]).not.toHaveTextContent('1');
+    expect(screen.getByText('✓')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('(selesai)', { exact: false })).toBeInTheDocument();
+    expect(items[1]).toHaveAttribute('aria-current', 'step');
+    expect(items[1]).toHaveTextContent('2Bayar');
+    expect(within(items[1]).getByText('2')).not.toHaveAttribute('aria-hidden');
+  });
+
+  it('keeps steps without done unchanged (no check mark, no hidden label)', () => {
+    renderHeader({ labels: { ...labels, done: 'selesai' } });
+    expect(screen.queryByText('✓')).toBeNull();
+    expect(screen.queryByText('(selesai)', { exact: false })).toBeNull();
   });
 
   it('renders the timer in both bars when given', () => {

@@ -1,0 +1,60 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .mid.left (flow.css 133–135, 165): left-aligned. */
+.message {
+  @apply flex max-w-[640px] flex-col items-start gap-[18px] pt-6;
+
+  @variant md {
+    @apply pt-5;
+  }
+}
+
+/* Display L: 34px on phones, clamp(40px, 5vw, 64px) from 720px. */
+.title {
+  @apply font-display text-[34px] leading-[0.92] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+
+  @variant md {
+    font-size: clamp(40px, 5vw, 64px);
+  }
+}
+
+/* HiFi .mid-p */
+.body {
+  @apply text-base leading-[1.55];
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+/* HiFi .note (flow.css 138): quiet box, the refund promise (H-4). */
+.note {
+  @apply max-w-[600px] border-[2.5px] border-ink bg-card px-[18px] py-4 text-sm leading-normal;
+
+  @variant md {
+    @apply text-[15px];
+  }
+}
+
+.actions {
+  @apply mt-2 flex flex-wrap items-center gap-5;
+}
+
+.link {
+  @apply inline-flex min-h-11 items-center font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}
