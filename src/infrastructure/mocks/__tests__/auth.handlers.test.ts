@@ -119,6 +119,12 @@ describe('auth mock', () => {
     });
   });
 
+  it('accepts an empty Turnstile token, as the web sends with Turnstile off', async () => {
+    await expect(
+      auth.requestOtp({ email: 'off@example.com', locale: 'id' }, 'device', { turnstileToken: '' }),
+    ).resolves.toMatchObject({ status: 202 });
+  });
+
   it('refreshes the last session until logout, and guards the profile', async () => {
     const { data } = await request(MOCK_KNOWN_EMAIL);
     await auth.verifyOtp({ challengeId: data.challengeId, code: MOCK_OTP_CODE }, 'device');

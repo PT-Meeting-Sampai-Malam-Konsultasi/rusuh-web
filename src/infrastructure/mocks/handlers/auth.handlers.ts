@@ -60,7 +60,7 @@ export function authHandlers({ coreApiUrl, getScenario, now }: MockContext): Htt
       const failed = await failure(getScenario());
       if (failed) return failed;
       if (!request.headers.get('X-Device-Token')) return problem(401, 'UNAUTHORIZED', 'Perangkat belum terdaftar');
-      if (!request.headers.get('X-Turnstile-Token') && !request.headers.get('X-Queue-Token')) {
+      if (!request.headers.has('X-Turnstile-Token') && !request.headers.get('X-Queue-Token')) {
         return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
       }
       const { email } = (await request.json()) as { email?: string };

@@ -159,7 +159,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: Moc
     http.post(`${queueApiUrl}/queue/devices`, async ({ request }) => {
       const failed = await failure(getScenario());
       if (failed) return failed;
-      if (!request.headers.get('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
+      if (!request.headers.has('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
       queueState.devices += 1;
       const devices = queueState.devices;
       persist();
@@ -181,7 +181,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: Moc
       if (failed) return failed;
       const device = request.headers.get('X-Device-Token');
       if (!device) return problem(401, 'UNAUTHORIZED', 'Perangkat belum terdaftar');
-      if (!request.headers.get('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
+      if (!request.headers.has('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
 
       const eventId = String(params.eventId);
       const event = findEvent(eventId);

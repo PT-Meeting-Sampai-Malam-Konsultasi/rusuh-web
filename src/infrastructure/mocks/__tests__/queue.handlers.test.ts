@@ -95,10 +95,15 @@ describe('queue mock', () => {
     await expect(queue.joinQueue('evt_pelita', device, 'ts')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('rejects a join without a device token, and calls without a Turnstile token', async () => {
+  it('rejects a join without a device token, and calls without a Turnstile header', async () => {
     await expect(queue.joinQueue('evt_pelita', '', 'ts')).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
-    await expect(queue.joinQueue('evt_pelita', 'd', '')).rejects.toMatchObject({ status: 400 });
-    await expect(devices.registerDevice('')).rejects.toMatchObject({ status: 400 });
+    const noHeader = await fetch(`${QUEUE}/queue/devices`, { method: 'POST', body: '{"platform":"web"}' });
+    expect(noHeader.status).toBe(400);
+  });
+
+  it('accepts an empty Turnstile token, as the web sends with Turnstile off', async () => {
+    const device = (await devices.registerDevice('')).data.deviceToken;
+    await expect(queue.joinQueue('evt_pelita', device, '')).resolves.toMatchObject({ data: { eventId: 'evt_pelita' } });
   });
 
   it('shares the failure scenarios', async () => {
