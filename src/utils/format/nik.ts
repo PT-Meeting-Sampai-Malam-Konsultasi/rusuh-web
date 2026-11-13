@@ -3,9 +3,15 @@ const NIK_VISIBLE_EDGE = 4;
 const NIK_GROUP = 4;
 const NIK_MASK_CHAR = '•';
 
-/** Keeps digits only: what the NIK field stores. No length or structure rule (FR-15-W1). */
+/** A KTP NIK has 16 digits: the field never holds more (validateAttendeeUseCase NIK_LENGTH, openapi `^[0-9]{16}$`). */
+export const NIK_MAX_DIGITS = 16;
+
+/**
+ * Keeps digits only, at most 16: what the NIK field stores. Digits are counted after spaces and dashes are dropped, so
+ * a pasted "3174 0552 0396 0004" keeps all 16. No structure rule (FR-15-W1).
+ */
 export function toNikDigits(value: string): string {
-  return value.replace(/\D/g, '');
+  return value.replace(/\D/g, '').slice(0, NIK_MAX_DIGITS);
 }
 
 /**

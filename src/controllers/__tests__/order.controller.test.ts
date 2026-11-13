@@ -852,7 +852,7 @@ describe('OrderController', () => {
       act(() => result.current.increment('cat_festival'));
       act(() => result.current.increment('cat_festival'));
       act(() => result.current.holders[0].nik.onFocus());
-      act(() => result.current.holders[0].nik.onChange('3174 0552-0396 0004'));
+      act(() => result.current.holders[0].nik.onChange('3174 0552-0396 0004 99'));
       act(() => result.current.holders[0].name.onChange('Budi Santoso'));
       expect(result.current.holders[0].nik.value).toBe('3174055203960004');
       act(() => result.current.holders[1].nik.onBlur());
