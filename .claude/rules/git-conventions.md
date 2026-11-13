@@ -136,8 +136,8 @@ docs(steering): add git conventions
 ```
 feat(order): [FR-13-W1][FR-15-W1] add holder name and nik per ticket
 
-Each ticket asks "Saya sendiri / Orang lain"; only one ticket can use the
-profile NIK, since one NIK holds one seat per event.
+Each ticket takes the name and NIK as on the KTP; every NIK in the order
+must be different, since one NIK holds one seat per event.
 ```
 
 ## Tooling

@@ -57,7 +57,6 @@ const base = (): OrderControllerInterface => ({
   totalTickets: 0,
   orderLimit: 3,
   showHolders: false,
-  showHolderChoice: false,
   holders: [],
   limitNotice: null,
   categoryNote: 'Maks. 3 tiket per transaksi.',
@@ -83,15 +82,10 @@ const base = (): OrderControllerInterface => ({
 const holder: OrderControllerInterface['holders'][number] = {
   key: 'cat_fa-1',
   title: 'Tiket 1 · Festival A',
-  holderType: 'self',
-  choiceName: 'order-holder-1-type',
-  selfDisabled: false,
-  choose: vi.fn(),
   name: {
     id: 'order-holder-1-name',
     value: 'Nadia Saputri',
-    readOnly: true,
-    hint: 'Dari profil Anda.',
+    hint: 'Dicetak di e-tiket.',
     onChange: vi.fn(),
     onBlur: vi.fn(),
   },
@@ -178,21 +172,14 @@ describe('OrderScreen', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
-  it('shows the holders section with the choice when ready and showHolders', () => {
-    controller = { ...base(), totalTickets: 1, showHolders: true, showHolderChoice: true, holders: [holder] };
+  it('shows the holders section when ready and showHolders, without a "Saya sendiri" choice', () => {
+    controller = { ...base(), totalTickets: 1, showHolders: true, holders: [holder] };
     render(<OrderScreen />);
     const section = screen.getByRole('region', { name: 'order_holders_heading' });
     expect(section).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: 'Tiket 1 · Festival A' })).toBeInTheDocument();
-    expect(screen.getByRole('radiogroup', { name: 'order_holder_for_label' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'order_holder_name_label' })).toHaveValue('Nadia Saputri');
-  });
-
-  it('passes showHolderChoice through: no radios without it', () => {
-    controller = { ...base(), totalTickets: 1, showHolders: true, showHolderChoice: false, holders: [holder] };
-    render(<OrderScreen />);
-    expect(screen.getByRole('region', { name: 'order_holders_heading' })).toBeInTheDocument();
     expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'order_holder_name_label' })).toHaveValue('Nadia Saputri');
   });
 
   it('never shows the holders section outside the ready state', () => {

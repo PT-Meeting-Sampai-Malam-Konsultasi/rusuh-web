@@ -1,5 +1,9 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026 (spec 79):** the "Saya sendiri / Orang lain" choice is removed. The account holds no NIK (D17),
+> so every holder's name and NIK are typed in. The radiogroup, its styles and its translation keys no longer apply; see
+> `docs/specs/79-order-holders-without-choice`.
+
 ## Introduction
 
 The Detail Ticket screen for FR-13-W1 (rusuh-web#13, "Web: Order: 1–3 tickets, a holder (name + NIK) per ticket,

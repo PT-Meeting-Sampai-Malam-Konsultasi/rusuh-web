@@ -1,5 +1,9 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026 (spec 79):** the "Saya sendiri / Orang lain" choice is removed. The account holds no NIK (D17),
+> so every holder's name and NIK are typed in. The "choosing Saya sendiri" check trigger no longer applies; see
+> `docs/specs/79-order-holders-without-choice`.
+
 ## Introduction
 
 Page logic for FR-15-W1 (rusuh-web#15, "Web: Order: NIK field checks and Dukcapil states"; parent FR-15 "Sistem

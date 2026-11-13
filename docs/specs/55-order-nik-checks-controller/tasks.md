@@ -1,5 +1,9 @@
 # Implementation Plan: Order NIK checks (controller)
 
+> **Updated 13 Nov 2026 (spec 79):** the "Saya sendiri / Orang lain" choice is removed. The account holds no NIK (D17),
+> so every holder's name and NIK are typed in. The "choosing Saya sendiri" check trigger no longer applies; see
+> `docs/specs/79-order-holders-without-choice`.
+
 ## Overview
 
 Extend `OrderController` with per-slot NIK check state: local errors from `validateAttendeeUseCase.checkNik` (duplicate at

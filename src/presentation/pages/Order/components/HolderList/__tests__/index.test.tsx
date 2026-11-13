@@ -33,14 +33,9 @@ const interpolate = (text: string, values: Record<string, unknown> = {}) =>
 const holder = (index: number, overrides: Partial<OrderHolderView> = {}): OrderHolderView => ({
   key: `cat_fb-${index}`,
   title: `Tiket ${index} · Festival B`,
-  holderType: 'other',
-  choiceName: `order-holder-${index}-type`,
-  selfDisabled: false,
-  choose: vi.fn(),
   name: {
     id: `order-holder-${index}-name`,
     value: '',
-    readOnly: false,
     hint: 'Dicetak di e-tiket.',
     onChange: vi.fn(),
     onBlur: vi.fn(),
@@ -59,31 +54,21 @@ const holder = (index: number, overrides: Partial<OrderHolderView> = {}): OrderH
 });
 
 const holders = (): OrderHolderView[] => [
-  holder(1, {
-    holderType: 'self',
-    name: {
-      id: 'order-holder-1-name',
-      value: 'Nadia Saputri',
-      readOnly: true,
-      hint: 'Dari profil Anda.',
-      onChange: vi.fn(),
-      onBlur: vi.fn(),
-    },
-  }),
-  holder(2, { selfDisabled: true, title: 'Tiket 2 · Festival B' }),
-  holder(3, { selfDisabled: true, title: 'Tiket 3 · Tribun Atas' }),
+  holder(1),
+  holder(2, { title: 'Tiket 2 · Festival B' }),
+  holder(3, { title: 'Tiket 3 · Tribun Atas' }),
 ];
 
 describe('HolderList', () => {
   it('is a section labelled by its heading, with the note', () => {
-    render(<HolderList t={t} showChoice holders={holders()} />);
+    render(<HolderList t={t} holders={holders()} />);
     expect(screen.getByRole('region', { name: 'order_holders_heading' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'order_holders_heading' })).toBeInTheDocument();
     expect(screen.getByText('order_holders_note')).toBeInTheDocument();
   });
 
   it('renders one block per holder with its title as h3, in order', () => {
-    render(<HolderList t={t} showChoice holders={holders()} />);
+    render(<HolderList t={t} holders={holders()} />);
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'Tiket 1 · Festival B',
@@ -92,66 +77,24 @@ describe('HolderList', () => {
     ]);
   });
 
-  it('gives each block a radiogroup with self checked / disabled from the view', () => {
-    render(<HolderList t={t} showChoice holders={holders()} />);
-    const groups = screen.getAllByRole('radiogroup', { name: 'order_holder_for_label' });
-    expect(groups).toHaveLength(3);
-    expect(groups[0]).toHaveAccessibleDescription('Tiket 1 · Festival B');
-
-    const self1 = within(groups[0]).getByRole('radio', { name: 'order_holder_self' });
-    const other1 = within(groups[0]).getByRole('radio', { name: 'order_holder_other' });
-    expect(self1).toBeChecked();
-    expect(self1).toBeEnabled();
-    expect(other1).not.toBeChecked();
-
-    const self2 = within(groups[1]).getByRole('radio', { name: 'order_holder_self' });
-    expect(self2).toBeDisabled();
-    expect(self2).not.toBeChecked();
-    expect(within(groups[1]).getByRole('radio', { name: 'order_holder_other' })).toBeChecked();
-  });
-
-  it('calls choose with the picked value', async () => {
-    const list = holders();
-    render(<HolderList t={t} showChoice holders={list} />);
-    const group = screen.getAllByRole('radiogroup')[0];
-    await userEvent.click(within(group).getByRole('radio', { name: 'order_holder_other' }));
-    expect(list[0].choose).toHaveBeenCalledWith('other');
-  });
-
-  it('calls choose("self") on an enabled "Saya sendiri" and never on a disabled one', async () => {
-    const list = holders();
-    list[0] = holder(1);
-    render(<HolderList t={t} showChoice holders={list} />);
-    const selfs = screen.getAllByRole('radio', { name: 'order_holder_self' });
-    await userEvent.click(selfs[0]);
-    expect(list[0].choose).toHaveBeenCalledWith('self');
-    await userEvent.click(selfs[1]);
-    expect(list[1].choose).not.toHaveBeenCalled();
-  });
-
-  it('renders plain fields without a radiogroup when there is no choice', () => {
-    render(<HolderList t={t} showChoice={false} holders={[holder(1)]} />);
+  it('has no "Saya sendiri / Orang lain" choice: plain, editable name and NIK fields (D17)', () => {
+    render(<HolderList t={t} holders={holders()} />);
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.queryByRole('radio')).toBeNull();
-    expect(screen.getByRole('textbox', { name: 'order_holder_name_label' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'order_holder_nik_label' })).toBeInTheDocument();
-  });
-
-  it('shows the profile name read only with its hint', () => {
-    render(<HolderList t={t} showChoice holders={holders()} />);
     const names = screen.getAllByRole('textbox', { name: 'order_holder_name_label' });
-    expect(names[0]).toHaveValue('Nadia Saputri');
-    expect(names[0]).toHaveAttribute('readonly');
-    expect(names[0]).toHaveAccessibleDescription('Dari profil Anda.');
-    expect(names[0]).toHaveAttribute('autocomplete', 'off');
-    expect(names[1]).not.toHaveAttribute('readonly');
-    expect(names[1]).toHaveAccessibleDescription('Dicetak di e-tiket.');
-    expect(names[1]).toHaveAttribute('placeholder', 'order_holder_name_placeholder');
+    expect(names).toHaveLength(3);
+    for (const name of names) {
+      expect(name).not.toHaveAttribute('readonly');
+      expect(name).toHaveAccessibleDescription('Dicetak di e-tiket.');
+      expect(name).toHaveAttribute('autocomplete', 'off');
+      expect(name).toHaveAttribute('placeholder', 'order_holder_name_placeholder');
+    }
+    expect(screen.getAllByRole('textbox', { name: 'order_holder_nik_label' })).toHaveLength(3);
   });
 
   it('passes name typing to the controller', async () => {
     const one = holder(1);
-    render(<HolderList t={t} showChoice={false} holders={[one]} />);
+    render(<HolderList t={t} holders={[one]} />);
     await userEvent.type(screen.getByRole('textbox', { name: 'order_holder_name_label' }), 'R');
     expect(one.name.onChange).toHaveBeenCalledWith('R');
   });
@@ -169,7 +112,7 @@ describe('HolderList', () => {
         recheck: vi.fn(),
       },
     });
-    render(<HolderList t={t} showChoice={false} holders={[one]} />);
+    render(<HolderList t={t} holders={[one]} />);
     const nik = screen.getByRole('textbox', { name: 'order_holder_nik_label' });
     expect(nik).toHaveValue('3174 •••• •••• 0004');
     expect(nik).toHaveAttribute('inputmode', 'numeric');
@@ -187,7 +130,7 @@ describe('HolderList', () => {
   });
 
   it('has no profile-NIK card, save-to-profile checkbox or NIK messages (ADR-0007, FR-15-W1)', () => {
-    render(<HolderList t={tFrom(id)} showChoice holders={holders()} />);
+    render(<HolderList t={tFrom(id)} holders={holders()} />);
     const section = screen.getByRole('region');
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
@@ -196,12 +139,11 @@ describe('HolderList', () => {
   });
 
   it('renders the Indonesian strings', () => {
-    render(<HolderList t={tFrom(id)} showChoice holders={holders()} />);
+    render(<HolderList t={tFrom(id)} holders={holders()} />);
     expect(screen.getByRole('heading', { level: 2, name: 'Pemegang tiket' })).toBeInTheDocument();
     expect(screen.getByText(/1 NIK = 1 tiket per event/)).toBeInTheDocument();
-    expect(screen.getAllByRole('radiogroup', { name: 'Untuk siapa tiket ini' })).toHaveLength(3);
-    expect(screen.getAllByRole('radio', { name: 'Saya sendiri' })).toHaveLength(3);
-    expect(screen.getAllByRole('radio', { name: 'Orang lain' })).toHaveLength(3);
+    expect(screen.queryByText('Saya sendiri')).toBeNull();
+    expect(screen.queryByText('Orang lain')).toBeNull();
     expect(screen.getAllByRole('textbox', { name: 'Nama sesuai KTP' })[2]).toHaveAttribute(
       'placeholder',
       'Nama lengkap',
@@ -215,15 +157,13 @@ describe('HolderList', () => {
     const list = holders().map((h, index) => ({
       ...h,
       title: `Ticket ${index + 1} · Festival B`,
-      name: { ...h.name, hint: index === 0 ? en.order_holder_name_hint_profile : en.order_holder_name_hint },
+      name: { ...h.name, hint: en.order_holder_name_hint },
     }));
-    render(<HolderList t={tFrom(en)} showChoice holders={list} />);
+    render(<HolderList t={tFrom(en)} holders={list} />);
     expect(screen.getByRole('heading', { level: 2, name: 'Ticket holders' })).toBeInTheDocument();
-    expect(screen.getAllByRole('radiogroup', { name: 'Who is this ticket for' })).toHaveLength(3);
-    expect(screen.getAllByRole('radio', { name: 'Myself' })).toHaveLength(3);
-    expect(screen.getAllByRole('radio', { name: 'Someone else' })).toHaveLength(3);
+    expect(screen.queryByText('Myself')).toBeNull();
     const names = screen.getAllByRole('textbox', { name: 'Name as on the KTP' });
-    expect(names[0]).toHaveAccessibleDescription('From your profile.');
+    expect(names[0]).toHaveAccessibleDescription('Printed on the e-ticket.');
     expect(names[1]).toHaveAttribute('placeholder', 'Full name');
     expect(screen.getAllByRole('textbox', { name: 'NIK' })[0]).toHaveAccessibleDescription(
       'Example: 3201 1252 0396 0001',
@@ -235,7 +175,7 @@ describe('HolderList', () => {
     const one = (nik: Partial<OrderHolderView['nik']> = {}) => holder(1, { nik: nikField(1, nik) });
 
     it('idle: example hint, no alert, no aria-busy, empty status, no recheck', () => {
-      render(<HolderList t={t} showChoice={false} holders={[one()]} />);
+      render(<HolderList t={t} holders={[one()]} />);
       expect(nikInput()).toHaveAccessibleDescription('order_holder_nik_hint');
       expect(nikInput()).not.toHaveAttribute('aria-busy');
       expect(nikInput()).not.toHaveAttribute('aria-invalid');
@@ -246,7 +186,7 @@ describe('HolderList', () => {
 
     it('checking: aria-busy, editable, described by the checking line, status announces it', async () => {
       const view = one({ checking: true });
-      render(<HolderList t={t} showChoice={false} holders={[view]} />);
+      render(<HolderList t={t} holders={[view]} />);
       const input = nikInput();
       expect(input).toHaveAttribute('aria-busy', 'true');
       expect(input).toBeEnabled();
@@ -260,7 +200,7 @@ describe('HolderList', () => {
     });
 
     it('valid: tick line and status text, no alert', () => {
-      render(<HolderList t={t} showChoice={false} holders={[one({ valid: 'order_nik_valid' })]} />);
+      render(<HolderList t={t} holders={[one({ valid: 'order_nik_valid' })]} />);
       const input = nikInput();
       expect(input).toHaveAccessibleDescription('order_nik_valid');
       expect(input).not.toHaveAttribute('aria-invalid');
@@ -277,7 +217,7 @@ describe('HolderList', () => {
       ['seat taken', 'error_nik_seat_taken order_nik_use_another'],
       ['server duplicate', 'error_duplicate_nik'],
     ])('error (%s): red alert line, aria-invalid, no recheck, status quiet', (_, message) => {
-      render(<HolderList t={t} showChoice={false} holders={[one({ error: message })]} />);
+      render(<HolderList t={t} holders={[one({ error: message })]} />);
       expect(screen.getByRole('alert')).toHaveTextContent(`!${message}`);
       expect(nikInput()).toHaveAttribute('aria-invalid', 'true');
       expect(nikInput()).toHaveAccessibleDescription(message);
@@ -289,7 +229,7 @@ describe('HolderList', () => {
       'retryable error (%s): recheck button described by the message calls recheck once',
       async (message) => {
         const view = one({ error: message, canRecheck: true });
-        render(<HolderList t={t} showChoice={false} holders={[view]} />);
+        render(<HolderList t={t} holders={[view]} />);
         expect(screen.getByRole('alert')).toHaveTextContent(message);
         const button = screen.getByRole('button', { name: 'order_nik_recheck' });
         expect(button).toHaveAttribute('type', 'button');
@@ -301,18 +241,18 @@ describe('HolderList', () => {
     );
 
     it('keeps one status node per holder across idle → checking → valid', () => {
-      const { rerender } = render(<HolderList t={t} showChoice={false} holders={[one()]} />);
+      const { rerender } = render(<HolderList t={t} holders={[one()]} />);
       const status = screen.getByRole('status');
-      rerender(<HolderList t={t} showChoice={false} holders={[one({ checking: true })]} />);
+      rerender(<HolderList t={t} holders={[one({ checking: true })]} />);
       expect(screen.getByRole('status')).toBe(status);
       expect(status).toHaveTextContent('order_nik_checking');
-      rerender(<HolderList t={t} showChoice={false} holders={[one({ valid: 'order_nik_valid' })]} />);
+      rerender(<HolderList t={t} holders={[one({ valid: 'order_nik_valid' })]} />);
       expect(screen.getByRole('status')).toBe(status);
       expect(status).toHaveTextContent('order_nik_valid');
     });
 
     it('renders exactly one status region per holder block', () => {
-      render(<HolderList t={t} showChoice holders={holders()} />);
+      render(<HolderList t={t} holders={holders()} />);
       for (const item of screen.getAllByRole('listitem')) {
         expect(within(item).getAllByRole('status')).toHaveLength(1);
       }
@@ -320,7 +260,7 @@ describe('HolderList', () => {
 
     it('forwards name blur and NIK blur', () => {
       const view = one();
-      render(<HolderList t={t} showChoice={false} holders={[view]} />);
+      render(<HolderList t={t} holders={[view]} />);
       fireEvent.blur(screen.getByRole('textbox', { name: 'order_holder_name_label' }));
       expect(view.name.onBlur).toHaveBeenCalledTimes(1);
       fireEvent.blur(nikInput());
@@ -329,7 +269,7 @@ describe('HolderList', () => {
 
     it('leaving the name field by keyboard calls name.onBlur', async () => {
       const view = one();
-      render(<HolderList t={t} showChoice={false} holders={[view]} />);
+      render(<HolderList t={t} holders={[view]} />);
       await userEvent.click(screen.getByRole('textbox', { name: 'order_holder_name_label' }));
       await userEvent.tab();
       expect(view.name.onBlur).toHaveBeenCalledTimes(1);
@@ -347,7 +287,7 @@ describe('HolderList', () => {
         }),
         holder(3, { nik: nikField(3, { checking: true }) }),
       ];
-      render(<HolderList t={tFrom(id)} showChoice={false} holders={list} />);
+      render(<HolderList t={tFrom(id)} holders={list} />);
       const alerts = screen.getAllByRole('alert');
       expect(alerts[0]).toHaveTextContent(
         'NIK ini sudah dipakai di Tiket 1. Setiap tiket butuh NIK orang yang berbeda.',
@@ -368,7 +308,7 @@ describe('HolderList', () => {
         }),
         holder(3, { nik: nikField(3, { valid: en.order_nik_valid }) }),
       ];
-      render(<HolderList t={tFrom(en)} showChoice={false} holders={list} />);
+      render(<HolderList t={tFrom(en)} holders={list} />);
       const alerts = screen.getAllByRole('alert');
       expect(alerts[0]).toHaveTextContent(
         "This NIK is already on Ticket 1. Each ticket needs a different person's NIK.",

@@ -1,5 +1,9 @@
 # Design Document
 
+> **Updated 13 Nov 2026 (spec 79):** the "Saya sendiri / Orang lain" choice is removed. The account holds no NIK (D17),
+> so every holder's name and NIK are typed in. The profile query (`getMe`), `showHolderChoice`, `choose`, `selfDisabled`,
+> the read-only name and Requirement 3 no longer apply; see `docs/specs/79-order-holders-without-choice`.
+
 ## Overview
 
 `OrderController` (`src/controllers/order.controller.ts`) is extended, not replaced. It adds:

@@ -22,7 +22,7 @@ const CATEGORIES: readonly SelectableCategory[] = Object.freeze<SelectableCatego
 const freeze = (quantities: Record<string, number>): TicketQuantities => Object.freeze({ ...quantities });
 
 const entry = (slotKey: string, overrides: Partial<HolderEntry> = {}): HolderEntry =>
-  Object.freeze({ slotKey, holderType: 'other' as const, fullName: '', nik: '', ...overrides });
+  Object.freeze({ slotKey, fullName: '', nik: '', ...overrides });
 
 const slotsOf = (quantities: TicketQuantities, limit = 3) => useCase.summarize(CATEGORIES, quantities, limit).slots;
 
@@ -239,8 +239,8 @@ describe('OrderTicketSelectionUseCase', () => {
       ]);
       const result = useCase.reconcileHolders(holders, slotsOf(freeze({ A: 1, B: 1 })));
       expect(result).toEqual([
-        { slotKey: 'A-1', holderType: 'other', fullName: '', nik: '' },
-        { slotKey: 'B-1', holderType: 'other', fullName: 'Budi', nik: '3201' },
+        { slotKey: 'A-1', fullName: '', nik: '' },
+        { slotKey: 'B-1', fullName: 'Budi', nik: '3201' },
       ]);
       expect(holders).toHaveLength(3);
     });
@@ -251,7 +251,7 @@ describe('OrderTicketSelectionUseCase', () => {
 
     it('keeps earlier categories when a ticket is removed from a later one', () => {
       const before = Object.freeze([
-        entry('B-1', { holderType: 'self', fullName: 'Nadia Saputri', nik: '3171' }),
+        entry('B-1', { fullName: 'Nadia Saputri', nik: '3171' }),
         entry('B-2', { fullName: 'Sari', nik: '3202' }),
         entry('D-1', { fullName: 'Dewi', nik: '3203' }),
       ]);
@@ -285,106 +285,6 @@ describe('OrderTicketSelectionUseCase', () => {
         ['B-1', '1'],
         ['D-1', '3'],
       ]);
-    });
-
-    it('frees "Saya sendiri" when the self slot is removed', () => {
-      const before = Object.freeze([
-        entry('B-1', { fullName: 'Budi' }),
-        entry('B-2', { holderType: 'self', fullName: 'Nadia Saputri' }),
-      ]);
-      const result = useCase.reconcileHolders(before, slotsOf(freeze({ B: 1, D: 1 })));
-      expect(result.some((h) => h.holderType === 'self')).toBe(false);
-      expect(result.every((h) => useCase.canChooseSelf(result, h.slotKey))).toBe(true);
-    });
-  });
-
-  describe('canChooseSelf', () => {
-    const holders = Object.freeze([entry('A-1', { holderType: 'self', fullName: 'Nadia' }), entry('B-1')]);
-
-    it('is true on the slot that already is self', () => {
-      expect(useCase.canChooseSelf(holders, 'A-1')).toBe(true);
-    });
-
-    it('is false on any other slot while one slot is self', () => {
-      expect(useCase.canChooseSelf(holders, 'B-1')).toBe(false);
-    });
-
-    it('is true when no slot is self', () => {
-      expect(useCase.canChooseSelf([entry('A-1'), entry('B-1')], 'B-1')).toBe(true);
-    });
-  });
-
-  describe('setHolderType', () => {
-    const PROFILE = 'Nadia Saputri';
-
-    it('other → self: fills the trimmed profile name and keeps the nik', () => {
-      const holders = Object.freeze([entry('A-1', { fullName: 'Typed', nik: '3171' }), entry('B-1', { nik: '3202' })]);
-      const result = useCase.setHolderType(holders, 'A-1', 'self', '  Nadia Saputri ');
-      expect(result).toEqual({
-        kind: 'changed',
-        holders: [
-          { slotKey: 'A-1', holderType: 'self', fullName: 'Nadia Saputri', nik: '3171' },
-          { slotKey: 'B-1', holderType: 'other', fullName: '', nik: '3202' },
-        ],
-      });
-      expect(holders[0]).toEqual({ slotKey: 'A-1', holderType: 'other', fullName: 'Typed', nik: '3171' });
-    });
-
-    it('other → self while another slot is self: SELF_TAKEN (block, not move)', () => {
-      const holders = Object.freeze([entry('A-1', { holderType: 'self', fullName: PROFILE }), entry('B-1')]);
-      expect(useCase.setHolderType(holders, 'B-1', 'self', PROFILE)).toEqual({
-        kind: 'unchanged',
-        reason: 'SELF_TAKEN',
-      });
-    });
-
-    it.each(['', '   '])('other → self with profile name %j: NO_PROFILE_NAME', (profileName) => {
-      expect(useCase.setHolderType([entry('A-1')], 'A-1', 'self', profileName)).toEqual({
-        kind: 'unchanged',
-        reason: 'NO_PROFILE_NAME',
-      });
-    });
-
-    it('self → other: clears the name and keeps the nik', () => {
-      const holders = Object.freeze([entry('A-1', { holderType: 'self', fullName: PROFILE, nik: '3171' })]);
-      expect(useCase.setHolderType(holders, 'A-1', 'other', PROFILE)).toEqual({
-        kind: 'changed',
-        holders: [{ slotKey: 'A-1', holderType: 'other', fullName: '', nik: '3171' }],
-      });
-    });
-
-    it('self → other works even when the profile name is empty', () => {
-      const holders = [entry('A-1', { holderType: 'self', fullName: PROFILE })];
-      expect(useCase.setHolderType(holders, 'A-1', 'other', '').kind).toBe('changed');
-    });
-
-    it.each(['self', 'other'] as const)('%s → %s: SAME_TYPE', (type) => {
-      expect(useCase.setHolderType([entry('A-1', { holderType: type })], 'A-1', type, PROFILE)).toEqual({
-        kind: 'unchanged',
-        reason: 'SAME_TYPE',
-      });
-    });
-
-    it('unknown slot key: UNKNOWN_SLOT', () => {
-      expect(useCase.setHolderType([entry('A-1')], 'Z-9', 'self', PROFILE)).toEqual({
-        kind: 'unchanged',
-        reason: 'UNKNOWN_SLOT',
-      });
-    });
-
-    it('switching self from one slot to another takes two steps and never yields two self entries', () => {
-      let holders: HolderEntry[] = [entry('A-1'), entry('B-1'), entry('D-1')];
-      const apply = (slotKey: string, type: 'self' | 'other') => {
-        const result = useCase.setHolderType(holders, slotKey, type, PROFILE);
-        if (result.kind === 'changed') holders = result.holders;
-        expect(holders.filter((h) => h.holderType === 'self').length).toBeLessThanOrEqual(1);
-        return result.kind;
-      };
-      expect(apply('A-1', 'self')).toBe('changed');
-      expect(apply('B-1', 'self')).toBe('unchanged');
-      expect(apply('A-1', 'other')).toBe('changed');
-      expect(apply('B-1', 'self')).toBe('changed');
-      expect(holders.map((h) => h.holderType)).toEqual(['other', 'self', 'other']);
     });
   });
 

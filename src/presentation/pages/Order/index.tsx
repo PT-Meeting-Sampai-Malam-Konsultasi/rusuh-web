@@ -25,7 +25,6 @@ export default function OrderScreen() {
     increment,
     decrement,
     showHolders,
-    showHolderChoice,
     holders,
     limitNotice,
     categoryNote,
@@ -91,7 +90,7 @@ export default function OrderScreen() {
               limitNotice={limitNotice}
             />
           )}
-          {status === 'ready' && showHolders && <HolderList t={t} showChoice={showHolderChoice} holders={holders} />}
+          {status === 'ready' && showHolders && <HolderList t={t} holders={holders} />}
         </div>
         {summary && checkout && <OrderSummary summary={summary} checkout={checkout} />}
       </main>

@@ -1,5 +1,9 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026 (spec 79):** the "Saya sendiri / Orang lain" choice is removed. The account holds no NIK (D17),
+> so every holder's name and NIK are typed in. `HolderType`, `canChooseSelf`, `setHolderType` and Requirement 5 no
+> longer apply; see `docs/specs/79-order-holders-without-choice`.
+
 ## Introduction
 
 The business rules behind FR-13-W1 (rusuh-web#13, parent FR-13 "Customer dapat membeli tiket maksimal 3 (gabungan

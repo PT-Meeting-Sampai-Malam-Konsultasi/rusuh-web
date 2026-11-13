@@ -20,7 +20,6 @@ Use cases are the business logic of the app. They are pure TypeScript and fully 
   - queue position and ETA from the frontier (`seq − served`, rate, rounded range — `08-eta-estimation`)
   - remaining time from `expiresAt − serverNow`
   - order limits: total tickets ≤ `min(maxTicketsPerOrder, reservedUnits)`; one NIK per ticket, all different
-  - "Myself" may be used on one ticket only (1 NIK = 1 seat per event)
   - mapping booking/payment status to the next screen
 - Transforming API responses into domain models
 - Classifying expected API errors into business outcomes
