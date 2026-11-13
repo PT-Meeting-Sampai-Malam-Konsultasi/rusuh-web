@@ -28,7 +28,10 @@ shows the banner and there is no hydration mismatch. The footer link is a plain 
 the provider opens the settings on that hash and clears it on close; it is hidden by CSS unless the provider has marked
 `<html data-consent>`, so no page passes the flag down.
 
-Part 3 (GA4 sink) will read `useConsent().analytics` / the store and load GA4 only after `granted`.
+Part 3: `createGa4Sink({ measurementId, consent: consentStore, scrubUrl })`, combined with the Sentry sink
+(`combineSinks`) in DI. It asks the store on every call and loads gtag.js on the first one after `granted`
+(`send_page_view: false`, signals and ad storage off). `ConsentStoreProtocol.subscribe` tells it about a change: a yes
+sends the current screen's page view, a no sets `consent update denied` and `ga-disable-<id>` and deletes `_ga*`.
 
 ## Layer Constraints
 

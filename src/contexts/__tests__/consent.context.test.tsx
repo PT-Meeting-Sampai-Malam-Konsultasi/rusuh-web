@@ -13,6 +13,7 @@ const store = (saved: AnalyticsConsent | null = null) => {
     set: vi.fn((choice: AnalyticsConsent) => {
       value = choice;
     }),
+    subscribe: vi.fn(() => () => undefined),
   };
 };
 

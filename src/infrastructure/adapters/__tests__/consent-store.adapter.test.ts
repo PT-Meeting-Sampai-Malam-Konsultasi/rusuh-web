@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { CONSENT_MAX_AGE_MS, createConsentStore } from '../consent-store.adapter';
 
@@ -25,6 +25,16 @@ describe('createConsentStore', () => {
     expect(store.get()).toBe('granted');
     store.set('denied');
     expect(store.get()).toBe('denied');
+  });
+
+  it('tells subscribers about every choice until they unsubscribe', () => {
+    const store = createConsentStore({ storage: memory() });
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+    store.set('granted');
+    unsubscribe();
+    store.set('denied');
+    expect(listener.mock.calls).toEqual([['granted']]);
   });
 
   it('asks again after a year', () => {

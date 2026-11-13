@@ -19,6 +19,7 @@ const env: RawEnv = {
   sentryReplayOnErrorRate: undefined,
   requestIdHeader: undefined,
   analyticsEnabled: undefined,
+  gaMeasurementId: undefined,
 };
 
 describe('config', () => {
@@ -80,6 +81,11 @@ describe('config', () => {
     expect(createConfig(env).analyticsEnabled).toBe(false);
     expect(createConfig({ ...env, analyticsEnabled: 'true' }).analyticsEnabled).toBe(true);
     expect(createConfig({ ...env, analyticsEnabled: 'false' }).analyticsEnabled).toBe(false);
+  });
+
+  it('reads the GA4 measurement ID, empty when unset', () => {
+    expect(createConfig(env).gaMeasurementId).toBe('');
+    expect(createConfig({ ...env, gaMeasurementId: 'G-TEST' }).gaMeasurementId).toBe('G-TEST');
   });
 
   it('accepts sample rates between 0 and 1 only', () => {

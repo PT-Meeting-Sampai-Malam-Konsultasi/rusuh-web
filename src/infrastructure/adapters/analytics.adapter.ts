@@ -12,6 +12,15 @@ export interface AnalyticsAdapterOptions {
   getLanguage?: () => string;
 }
 
+/** Several sinks as one (Sentry breadcrumbs and GA4); each gets every call it handles. */
+export function combineSinks(...sinks: AnalyticsSink[]): AnalyticsSink {
+  return {
+    page: (page) => sinks.forEach((sink) => sink.page?.(page)),
+    event: (name, params) => sinks.forEach((sink) => sink.event?.(name, params)),
+    error: (error, context) => sinks.forEach((sink) => sink.error?.(error, context)),
+  };
+}
+
 /** Analytics with a pluggable sink. Without a provider configured, calls are dropped. */
 export function createAnalyticsAdapter(
   sink: AnalyticsSink = {},
