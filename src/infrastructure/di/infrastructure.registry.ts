@@ -82,6 +82,7 @@ export function registerInfrastructure() {
         getAccessToken: () => d.tokenStore.getAccessToken(),
         refreshSession,
         onError,
+        sendRequestId: d.config.requestIdHeader,
       }),
     ).singleton(),
     coreHttp: asFunction((d: Deps) =>
@@ -92,6 +93,7 @@ export function registerInfrastructure() {
         getAccessToken: () => d.tokenStore.getAccessToken(),
         refreshSession,
         onError,
+        sendRequestId: d.config.requestIdHeader,
       }),
     ).singleton(),
     queueStream: asFunction((d: Deps) => createQueueStreamAdapter({ baseUrl: d.config.queueApiUrl })).singleton(),

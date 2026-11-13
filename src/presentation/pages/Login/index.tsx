@@ -6,6 +6,7 @@ import '@infrastructure/di/controllers/login';
 import AppFooter from '@presentation/components/AppFooter';
 import AppHeader from '@presentation/components/AppHeader';
 import EventAside from '@presentation/components/EventAside';
+import { TURNSTILE_SLOT_ID } from '@utils/constants/turnstile';
 
 import LoginCode from './components/LoginCode';
 import LoginEmail from './components/LoginEmail';
@@ -31,6 +32,8 @@ export default function LoginScreen() {
             {step === 'email' && <LoginEmail t={t} form={emailForm} />}
             {step === 'code' && <LoginCode t={t} code={code} />}
             {step === 'profile' && <LoginProfile t={t} form={profileForm} />}
+            {/* Turnstile's checkbox, when Cloudflare asks for one before a code is sent (NFR-07-W5). */}
+            {step !== 'profile' && <div id={TURNSTILE_SLOT_ID} className={styles.slot} />}
           </div>
           {event && (
             <div className={styles.aside}>

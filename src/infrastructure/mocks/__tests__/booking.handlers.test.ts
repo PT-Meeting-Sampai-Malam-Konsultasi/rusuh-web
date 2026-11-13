@@ -8,6 +8,7 @@ import { BookingService } from '@core/services/booking.service';
 import { createHttpAdapter } from '@infrastructure/adapters/http.adapter';
 
 import { MOCK_RETRY_AFTER_S } from '../handlers/booking.handlers';
+import { MOCK_SHORT_ORDER_WINDOW_MS } from '../handlers/mock-queue-state';
 import { createHandlers } from '../handlers/handlers';
 import type { MockScenario } from '../scenario';
 
@@ -88,6 +89,18 @@ describe('booking mock', () => {
     scenario = 'sold_out';
     const { data } = await booking.getCategories('evt_samudra', 'adm-1');
     expect(data.categories.every((c) => c.availability === 'sold_out')).toBe(true);
+  });
+
+  it('shortens the order window to 75 seconds under short_window, everything else as ok', async () => {
+    const ok = (await booking.getCategories('evt_samudra', 'adm-1')).data;
+    scenario = 'short_window';
+    const { data, status } = await booking.getCategories('evt_samudra', 'adm-1');
+    expect(status).toBe(200);
+    expect(MOCK_SHORT_ORDER_WINDOW_MS).toBe(75_000);
+    expect(data.serverNow).toBe(NOW.toISOString());
+    expect(Date.parse(data.expiresAt) - Date.parse(data.serverNow)).toBe(75_000);
+    expect({ ...data, expiresAt: ok.expiresAt }).toEqual(ok);
+    expect(Date.parse(ok.expiresAt) - Date.parse(ok.serverNow)).toBe(300_000);
   });
 
   it('fails with the API problem code', async () => {

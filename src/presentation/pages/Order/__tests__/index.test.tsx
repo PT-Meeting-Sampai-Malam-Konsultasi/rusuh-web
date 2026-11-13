@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,6 +73,9 @@ const base = (): OrderControllerInterface => ({
   locale: 'id',
   setLocale: vi.fn(),
   allHoldersVerified: false,
+  timer: null,
+  timeUp: false,
+  timeUpSheet: null,
 });
 
 const holder: OrderControllerInterface['holders'][number] = {
@@ -231,5 +234,132 @@ describe('OrderScreen', () => {
     expect(screen.getByText('order_not_found_body')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'action_retry' })).toBeNull();
     expect(screen.getByRole('link', { name: 'action_back_home' })).toBeInTheDocument();
+  });
+
+  it('shows the countdown in both bars of the flow header, compact (FR-17-W1)', () => {
+    controller = { ...base(), timer: { seconds: 252, label: 'order_timer_label' } };
+    render(<OrderScreen />);
+    const timers = screen.getAllByRole('timer');
+    // jsdom applies no CSS: the flow bar and the app bar instances are both there.
+    expect(timers).toHaveLength(2);
+    expect(within(screen.getByRole('banner')).getAllByRole('timer')).toEqual(timers);
+    for (const timer of timers) {
+      expect(timer).toHaveTextContent('4:12');
+      expect(within(timer).getByText('order_timer_label')).toBeInTheDocument();
+      expect(timer).toHaveAttribute('data-compact');
+      expect(timer).toHaveAttribute('aria-live', 'off');
+    }
+  });
+
+  it.each([
+    { seconds: 61, live: 'off', text: '1:01' },
+    { seconds: 60, live: 'polite', text: '1:00' },
+    { seconds: 0, live: 'polite', text: '0:00' },
+  ])('puts both timers in the warning state from 60 seconds: $seconds s is $live', ({ seconds, live, text }) => {
+    controller = { ...base(), timer: { seconds, label: 'order_timer_label' } };
+    render(<OrderScreen />);
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    for (const timer of timers) {
+      expect(timer).toHaveAttribute('aria-live', live);
+      expect(timer).toHaveTextContent(text);
+    }
+  });
+
+  it.each([
+    { status: 'loading' as const, extra: { categories: [], categoryNote: '' } },
+    { status: 'error' as const, extra: { categories: [], errorMessage: 'error_network_error' } },
+    { status: 'not-found' as const, extra: { categories: [] } },
+  ])('renders no timer when the controller gives none: $status', ({ status, extra }) => {
+    controller = { ...base(), status, event: null, ...extra, timer: null };
+    render(<OrderScreen />);
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.queryByRole('timer')).toBeNull();
+  });
+
+  it('renders no dialog while the controller gives no time-up sheet', () => {
+    controller = { ...base(), timer: { seconds: 0, label: 'order_timer_label' }, timeUp: true, timeUpSheet: null };
+    render(<OrderScreen />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("shows the time's-up sheet over the page, timers at 0:00 underneath (FR-18-W1)", async () => {
+    const queueAgain = vi.fn();
+    controller = {
+      ...base(),
+      timer: { seconds: 0, label: 'order_timer_label' },
+      timeUp: true,
+      timeUpSheet: {
+        stamp: 'order_time_up_stamp',
+        title: 'order_time_up_title',
+        body: 'order_time_up_body',
+        queueAgainLabel: 'order_time_up_queue_again',
+        homeLabel: 'action_back_home',
+        homeHref: '/',
+        queueAgain,
+      },
+    };
+    render(<OrderScreen />);
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0]).toHaveAccessibleName('order_time_up_title');
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'order_category_heading' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tambah Festival A' })).toBeInTheDocument();
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    for (const timer of timers) expect(timer).toHaveTextContent('0:00');
+    await userEvent.click(within(dialogs[0]).getByRole('button', { name: 'order_time_up_queue_again' }));
+    expect(queueAgain).toHaveBeenCalledTimes(1);
+  });
+
+  describe("time's-up sheet after a reload (FR-19-W1)", () => {
+    const sheet = (): NonNullable<OrderControllerInterface['timeUpSheet']> => ({
+      stamp: 'order_time_up_stamp',
+      title: 'order_time_up_title',
+      body: 'order_time_up_body',
+      queueAgainLabel: 'order_time_up_queue_again',
+      homeLabel: 'action_back_home',
+      homeHref: '/',
+      queueAgain: vi.fn(),
+    });
+
+    it('shows the sheet over the loading state: skeleton under it, no timer', () => {
+      controller = {
+        ...base(),
+        status: 'loading',
+        event: null,
+        categories: [],
+        categoryNote: '',
+        timer: null,
+        timeUp: true,
+        timeUpSheet: sheet(),
+      };
+      render(<OrderScreen />);
+      const dialogs = screen.getAllByRole('dialog');
+      expect(dialogs).toHaveLength(1);
+      expect(dialogs[0]).toHaveAccessibleName('order_time_up_title');
+      expect(screen.getByRole('status')).toHaveTextContent('state_loading');
+      expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.queryByRole('timer')).toBeNull();
+    });
+
+    it('shows the sheet over the error message', () => {
+      controller = {
+        ...base(),
+        status: 'error',
+        event: null,
+        categories: [],
+        errorMessage: 'error_network_error',
+        timer: null,
+        timeUp: true,
+        timeUpSheet: sheet(),
+      };
+      render(<OrderScreen />);
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(screen.getByRole('heading', { level: 1, name: 'order_error_title' })).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('error_network_error');
+      expect(screen.queryByRole('timer')).toBeNull();
+    });
   });
 });

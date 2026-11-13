@@ -31,6 +31,11 @@
   grid-area: main;
 }
 
+/* Turnstile's widget: empty unless Cloudflare asks for a click. */
+.slot {
+  @apply mt-5 empty:hidden;
+}
+
 .aside {
   @apply -order-1 pt-3.5;
   grid-area: aside;

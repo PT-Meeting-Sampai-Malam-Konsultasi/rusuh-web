@@ -1,6 +1,7 @@
 import { delay, HttpResponse } from 'msw';
 
 import type { MockScenario } from '../scenario';
+import type { MockQueueState } from './mock-queue-state';
 
 export interface MockContext {
   coreApiUrl: string;
@@ -8,6 +9,11 @@ export interface MockContext {
   getScenario: () => MockScenario;
   /** The mock is the server, so its clock is the server clock. */
   now: () => Date;
+}
+
+/** What each handler factory receives: the caller's context plus the state the queue and booking mocks share. */
+export interface MockHandlerContext extends MockContext {
+  queueState: MockQueueState;
 }
 
 /** RFC 9457 problem, as the real API sends it. */

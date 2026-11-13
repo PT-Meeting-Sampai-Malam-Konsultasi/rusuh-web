@@ -16,6 +16,7 @@ const env: RawEnv = {
   sentryEnvironment: undefined,
   sentryTracesSampleRate: undefined,
   sentryReplayOnErrorRate: undefined,
+  requestIdHeader: undefined,
   analyticsEnabled: undefined,
 };
 
@@ -53,6 +54,11 @@ describe('config', () => {
         sentryReplayOnErrorRate: '0',
       }),
     ).toMatchObject({ sentryEnvironment: 'staging', sentryTracesSampleRate: 1, sentryReplayOnErrorRate: 0 });
+  });
+
+  it('sends no request ID header unless switched on', () => {
+    expect(createConfig(env).requestIdHeader).toBe(false);
+    expect(createConfig({ ...env, requestIdHeader: 'true' }).requestIdHeader).toBe(true);
   });
 
   it('keeps product analytics off unless switched on', () => {

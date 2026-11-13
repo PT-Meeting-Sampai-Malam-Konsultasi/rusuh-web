@@ -4,7 +4,8 @@ import type { EventSummary } from '@core/entities/catalog/catalog.entity';
 import type { Admission, DeviceRegistration, Frontier, QueuePlace, QueueTurn } from '@core/entities/queue/queue.entity';
 
 import { eventsFixture } from '../fixtures/events.fixture';
-import { failure, problem, type MockContext } from './shared';
+import { ADMISSION_MS, orderWindowMs, type MockPlace } from './mock-queue-state';
+import { failure, problem, type MockHandlerContext } from './shared';
 
 const DAY_MS = 86_400_000;
 /** Pre-queue: numbers are drawn this long after the first join, so the countdown can be watched end to end. */
@@ -20,73 +21,22 @@ const ADMIT_PER_SECOND = 5;
 const STREAM_FROM = 2000;
 /** The turn window (FR-08). */
 const TURN_MS = 60_000;
-/** Admission TTL: 60 s claim + 5 min order + 10 min payment (ADR-0021). */
-const ADMISSION_MS = 16 * 60_000;
 /** The stream sends a frontier every controller tick. */
 const TICK_MS = 1000;
-/**
- * The mock is the server: its queue outlives a reload and is shared by the tabs, as a server would be (FR-10), so it is
- * kept in localStorage. Switching the placement scenario starts an event's queue over.
- */
-const STATE_KEY = 'rusuh.mock.queue';
 
 const base64url = (value: object) =>
   btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-interface MockPlace {
-  seq: number | null;
-  joinedAt: number;
-  opensAt: number | null;
-  /** Set by the first claim; a repeat returns the same admission. */
-  admittedAt?: number;
-}
-
-/** One clock per event: `served` moves from the opening (or the first join) for every device alike. */
-interface MockQueue {
-  opensAt: number | null;
-  startedAt: number | null;
-  /** The placement scenario this queue was started under (see `placementOf`). */
-  placement?: string;
-}
-
-interface MockQueueState {
-  places: [string, MockPlace][];
-  nextSeq: [string, number][];
-  queues?: [string, MockQueue][];
-  devices: number;
-}
-
-const loadState = (): MockQueueState | null => {
-  try {
-    const saved = globalThis.localStorage?.getItem(STATE_KEY);
-    return saved ? (JSON.parse(saved) as MockQueueState) : null;
-  } catch {
-    return null; // Storage blocked or unreadable: start an empty queue.
-  }
-};
-
-const saveState = (state: MockQueueState) => {
-  try {
-    globalThis.localStorage?.setItem(STATE_KEY, JSON.stringify(state));
-  } catch {
-    // Storage blocked: the queue lives until the next reload.
-  }
-};
 
 const sse = (event: string, data: object, id?: number) =>
   `event: ${event}\n${id === undefined ? '' : `id: ${id}\n`}data: ${JSON.stringify(data)}\n\n`;
 
 /**
  * The queue service as the waiting room sees it: device registration, an idempotent join per device and event, the
- * public frontier and the stream near the front. Kept across reloads and tabs (see STATE_KEY), so the number stays.
+ * public frontier and the stream near the front. Kept across reloads and tabs (see `createMockQueueState`), so the number
+ * stays. An admitted place ends with its order window, as on the server.
  */
-export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): HttpHandler[] {
-  const saved = loadState();
-  const places = new Map<string, MockPlace>(saved?.places);
-  const nextSeq = new Map<string, number>(saved?.nextSeq);
-  const queues = new Map<string, MockQueue>(saved?.queues);
-  let devices = saved?.devices ?? 0;
-  const persist = () => saveState({ places: [...places], nextSeq: [...nextSeq], queues: [...queues], devices });
+export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: MockHandlerContext): HttpHandler[] {
+  const { places, nextSeq, queues, persist } = queueState;
 
   /** Where new numbers land: `no_queue` nobody ahead, `near_front` 20 places back, `far_back` 12.000, `ok` 1.248;
    *  null for scenarios that don't say (`stream_off`, `slow`…), which keep the running queue's placement. */
@@ -154,6 +104,16 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
   const missed = (eventId: string, place: MockPlace, time: number) =>
     place.seq !== null && place.admittedAt === undefined && time > turnOf(eventId, place.seq).expiresAt;
 
+  /** An admitted place whose order window is over: its turn is used up (410 EXPIRED; rejoin at the back). */
+  const ended = (place: MockPlace, time: number) =>
+    place.admittedAt !== undefined && time >= place.admittedAt + orderWindowMs(getScenario());
+
+  const expired = (key: string) => {
+    places.delete(key);
+    persist();
+    return problem(410, 'EXPIRED', 'Waktu Anda sudah habis');
+  };
+
   /** The place of the device and queue tokens on a request, or a problem response. */
   const placeFor = (request: Request, eventId: string) => {
     const device = request.headers.get('X-Device-Token');
@@ -200,7 +160,8 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       const failed = await failure(getScenario());
       if (failed) return failed;
       if (!request.headers.get('X-Turnstile-Token')) return problem(400, 'VALIDATION_FAILED', 'Turnstile wajib');
-      devices += 1;
+      queueState.devices += 1;
+      const devices = queueState.devices;
       persist();
       const issued = now().getTime();
       const expiresAt = new Date(issued + 30 * DAY_MS).toISOString();
@@ -235,8 +196,8 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       const time = today.getTime();
       restartOnNewPlacement(eventId);
       let place = places.get(key);
-      // After a missed turn, joining again gives a new number at the back.
-      if (place && missed(eventId, place, time)) place = undefined;
+      // After a missed turn or a used-up order window, joining again gives a new number at the back.
+      if (place && (missed(eventId, place, time) || ended(place, time))) place = undefined;
       if (!place) {
         const queue = queueOf(eventId);
         const preopen = event.state === 'waiting_room_open' && (queue.opensAt === null || time < queue.opensAt);
@@ -339,6 +300,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       if (found.error) return found.error;
       const { key, place } = found;
       const time = now().getTime();
+      if (ended(place, time)) return expired(key);
       if (missed(eventId, place, time)) {
         places.delete(key);
         persist();
@@ -388,6 +350,7 @@ export function queueHandlers({ queueApiUrl, getScenario, now }: MockContext): H
       const { key, place } = found;
       const time = now().getTime();
       if (place.seq === null) return problem(409, 'NOT_YET', 'Belum giliran Anda');
+      if (ended(place, time)) return expired(key);
       if (missed(eventId, place, time)) {
         places.delete(key);
         persist();

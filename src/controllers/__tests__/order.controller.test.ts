@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Category } from '@core/entities/booking/booking.entity';
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
@@ -9,6 +9,7 @@ import {
   ValidateAttendeeUseCase,
   type ValidateAttendeeResult,
 } from '@core/use_case/booking/validate-attendee.use-case';
+import { ERROR_CODE_MAP } from '@utils/constants/error-codes';
 import { retryTransientOnce } from '@utils/query/retry';
 
 import OrderController from '../order.controller';
@@ -50,6 +51,7 @@ const okResult: OrderCategoriesResult = {
   adminFee: { amount: 5000, currency: 'IDR' },
   expiresAt: '2026-11-09T03:05:00Z',
   serverNow: '2026-11-09T03:00:00Z',
+  resumed: false,
 };
 
 /** Tribun with stock left: the stepper and holder tests pick from two open categories. */
@@ -67,6 +69,8 @@ interface QueryState {
   data?: unknown;
   isError?: boolean;
   error?: Err | null;
+  dataUpdatedAt?: number;
+  isPlaceholderData?: boolean;
 }
 
 const err = (status: number, code: string): QueryState => ({ isError: true, error: { status, code, message: 'raw' } });
@@ -79,6 +83,8 @@ describe('OrderController', () => {
   let categoriesState: QueryState;
   let meState: QueryState;
   let search: Record<string, string>;
+  /** When the categories answer "arrived" by default: one number per test (a fresh one per render would re-anchor). */
+  let answeredAt: number;
   const eventRefetch = vi.fn();
   const categoriesRefetch = vi.fn();
   const replace = vi.fn();
@@ -101,6 +107,7 @@ describe('OrderController', () => {
     getOrderCategoriesUseCase: { execute: vi.fn().mockResolvedValue(okResult) },
     orderTicketSelectionUseCase: OrderTicketSelectionUseCase(),
     validateAttendeeUseCase: { checkNik, execute: vi.fn() },
+    endOrderWindowUseCase: { execute: vi.fn(() => ({ kind: 'ended' })) },
     admissionStore: { get: vi.fn().mockReturnValue('adm_token'), set: vi.fn(), clear: vi.fn() },
     analyticsAdapter: { trackPageView: vi.fn(), trackEvent: vi.fn(), reportError: vi.fn() },
     storage: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
@@ -127,7 +134,15 @@ describe('OrderController', () => {
         return { data: undefined, isError: false, error: null, refetch: vi.fn(), ...meState };
       }
       categoriesOptions = options;
-      return { data: undefined, isError: false, error: null, refetch: categoriesRefetch, ...categoriesState };
+      return {
+        data: undefined,
+        isError: false,
+        error: null,
+        refetch: categoriesRefetch,
+        dataUpdatedAt: answeredAt,
+        isPlaceholderData: false,
+        ...categoriesState,
+      };
     },
   });
 
@@ -140,6 +155,7 @@ describe('OrderController', () => {
     meState = {};
     search = { event: 'evt_samudra' };
     i18n.language = 'id';
+    answeredAt = Date.now();
   });
 
   describe('queries', () => {
@@ -1359,6 +1375,555 @@ describe('OrderController', () => {
         expect(calls).not.toContain(secret);
       }
       expect(d.analyticsAdapter.trackEvent.mock.calls).toEqual([['order_nik_checked', { outcome: 'valid' }]]);
+    });
+  });
+
+  describe('order countdown (FR-17-W1)', () => {
+    const SERVER_NOW = '2026-11-09T03:00:00Z';
+    const label = 'order_timer_label';
+    /** Fakes the device clock and has the 300 s answer arrive `agoMs` before it. */
+    const arrange = (deviceNow: string = SERVER_NOW, agoMs = 0, data: unknown = okResult) => {
+      vi.useFakeTimers({ now: new Date(deviceNow) });
+      eventState = { data: event };
+      categoriesState = { data, dataUpdatedAt: Date.now() - agoMs };
+    };
+    const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it.each(['2026-11-09T03:00:00Z', '2026-11-08T17:00:00Z', '2031-06-01T00:00:00Z'])(
+      'starts from the server window whatever the device clock says (%s)',
+      (deviceNow) => {
+        arrange(deviceNow);
+        const { result } = render();
+        expect(result.current.timer).toEqual({ seconds: 300, label });
+        expect(result.current.timeUp).toBe(false);
+        expect(vi.getTimerCount()).toBe(1);
+      },
+    );
+
+    it('ticks down in whole seconds, never up, and stores no deadline', () => {
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      let previous = result.current.timer?.seconds ?? -1;
+      for (let i = 0; i < 48; i += 1) {
+        advance(1000);
+        const seconds = result.current.timer?.seconds ?? -1;
+        expect(Number.isInteger(seconds)).toBe(true);
+        expect(seconds).toBeGreaterThanOrEqual(0);
+        expect(seconds).toBeLessThanOrEqual(previous);
+        previous = seconds;
+      }
+      expect(result.current.timer).toEqual({ seconds: 252, label });
+      expect(result.current.timeUp).toBe(false);
+      result.current.setLocale('en');
+      expect(JSON.stringify(d.storage.set.mock.calls)).not.toContain('2026-11-09T03:05:00Z');
+      expect(d.storage.set).toHaveBeenCalledTimes(1);
+    });
+
+    it('catches up after throttled timers: each tick reads the clock', () => {
+      arrange();
+      const { result } = render();
+      act(() => {
+        vi.setSystemTime(Date.now() + 99_000);
+        vi.advanceTimersByTime(1000);
+      });
+      expect(result.current.timer?.seconds).toBe(200);
+    });
+
+    it.each([
+      [30_000, 270],
+      [30_400, 269],
+    ])('counts the time since the answer arrived, not since mount (%i ms → %i)', (agoMs, seconds) => {
+      arrange(SERVER_NOW, agoMs);
+      expect(render().result.current.timer?.seconds).toBe(seconds);
+    });
+
+    it('stops at 0 with timeUp and does not navigate (the sheet is FR-18-W1)', () => {
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      advance(299_000);
+      expect(result.current.timer?.seconds).toBe(1);
+      expect(result.current.timeUp).toBe(false);
+      expect(vi.getTimerCount()).toBe(1);
+      advance(1000);
+      expect(result.current.timer).toEqual({ seconds: 0, label });
+      expect(result.current.timeUp).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      advance(10_000);
+      expect(result.current.timer).toEqual({ seconds: 0, label });
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.status).toBe('ready');
+      expect(replace).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+      expect(mutate).not.toHaveBeenCalled();
+      expect(d.analyticsAdapter.trackEvent.mock.calls.map(([name]) => name)).toEqual(['order_time_up']);
+      expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
+    });
+
+    it.each([
+      ['equal to', '2026-11-09T03:00:00Z'],
+      ['before', '2026-11-09T02:59:00Z'],
+    ])('is up at once, without an interval, when expiresAt is %s serverNow', (_label, expiresAt) => {
+      arrange(SERVER_NOW, 0, { ...okResult, expiresAt });
+      const { result } = render();
+      expect(result.current.timer).toEqual({ seconds: 0, label });
+      expect(result.current.timeUp).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('carries on through a language switch (placeholder), then re-anchors to each new answer', () => {
+      arrange();
+      let current = { t: (key: string) => `id:${key}`, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      advance(100_000);
+      expect(result.current.timer).toEqual({ seconds: 200, label: 'id:order_timer_label' });
+
+      // The new key has never answered: previous data, dataUpdatedAt 0.
+      current = { t: (key: string) => `en:${key}`, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: okResult, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      expect(categoriesOptions.queryKey).toEqual(['categories', 'evt_samudra', 'en']);
+      expect(result.current.timer).toEqual({ seconds: 200, label: 'en:order_timer_label' });
+      expect(result.current.timeUp).toBe(false);
+      advance(10_000);
+      expect(result.current.timer?.seconds).toBe(190);
+      expect(result.current.timeUp).toBe(false);
+
+      // The EN answer arrives 112 s after the first one.
+      advance(2000);
+      categoriesState = {
+        data: { ...okResult, serverNow: '2026-11-09T03:01:52Z' },
+        dataUpdatedAt: Date.now(),
+        isPlaceholderData: false,
+      };
+      rerender();
+      expect(result.current.timer?.seconds).toBe(188);
+      advance(8000);
+      expect(result.current.timer?.seconds).toBe(180);
+
+      // A refetch with a later expiresAt moves the seconds up to the server's number.
+      categoriesState = {
+        data: { ...okResult, serverNow: '2026-11-09T03:02:00Z', expiresAt: '2026-11-09T03:10:00Z' },
+        dataUpdatedAt: Date.now(),
+      };
+      rerender();
+      expect(result.current.timer?.seconds).toBe(480);
+      expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it('re-anchors an identical answer by its new dataUpdatedAt', () => {
+      arrange();
+      const { result, rerender } = render();
+      advance(60_000);
+      expect(result.current.timer?.seconds).toBe(240);
+      categoriesState = { data: okResult, dataUpdatedAt: Date.now() };
+      rerender();
+      expect(result.current.timer?.seconds).toBe(300);
+    });
+
+    it.each<[string, () => void]>([
+      ['loading', () => (categoriesState = {})],
+      ['a categories error', () => (categoriesState = err(500, 'INTERNAL_ERROR'))],
+      ['no event id', () => (search = {})],
+      ['event not found', () => (eventState = err(404, 'NOT_FOUND'))],
+      ['an event error with categories ok', () => (eventState = err(0, 'NETWORK_ERROR'))],
+      ['the event still loading with categories ok', () => (eventState = {})],
+    ])('has no timer on %s', (_label, change) => {
+      arrange();
+      change();
+      const { result } = render();
+      expect(result.current.status).not.toBe('ready');
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(false);
+    });
+
+    it('has no timer and no interval before an answer', () => {
+      arrange();
+      categoriesState = {};
+      render();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('has no timer for admission-invalid, which still redirects once', () => {
+      arrange(SERVER_NOW, 0, { kind: 'admission-invalid' });
+      const { result, rerender } = render();
+      rerender();
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the clock running while the event failed, so the value is right once ready', () => {
+      arrange();
+      eventState = err(0, 'NETWORK_ERROR');
+      const { result, rerender } = render();
+      expect(vi.getTimerCount()).toBe(1);
+      advance(20_000);
+      expect(result.current.timer).toBeNull();
+      eventState = { data: event };
+      rerender();
+      expect(result.current.timer?.seconds).toBe(280);
+    });
+
+    it.each([
+      ['expiresAt does not parse', { expiresAt: 'soon' }],
+      ['serverNow is empty', { serverNow: '' }],
+      ['expiresAt is missing', { expiresAt: undefined }],
+      ['serverNow is missing', { serverNow: undefined }],
+    ])('has no timer and no interval when %s, and the page stays usable', (_label, patch) => {
+      arrange(SERVER_NOW, 0, { ...okResult, ...patch } as never);
+      const { result } = render();
+      expect(result.current.status).toBe('ready');
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      advance(5000);
+      expect(result.current.timer).toBeNull();
+    });
+
+    it('clears the interval on unmount', () => {
+      arrange();
+      const { unmount } = render();
+      advance(3000);
+      expect(vi.getTimerCount()).toBe(1);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('order time up (FR-18-W1)', () => {
+    const SERVER_NOW = '2026-11-09T03:00:00Z';
+    const sheet = {
+      stamp: 'order_time_up_stamp',
+      title: 'order_time_up_title',
+      body: 'order_time_up_body',
+      queueAgainLabel: 'order_time_up_queue_again',
+      homeLabel: 'action_back_home',
+      homeHref: '/',
+      queueAgain: expect.any(Function),
+    };
+    const arrange = (data: unknown = okResult) => {
+      vi.useFakeTimers({ now: new Date(SERVER_NOW) });
+      eventState = { data: event };
+      categoriesState = { data, dataUpdatedAt: Date.now() };
+    };
+    const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+    const timeUpCalls = (d: ReturnType<typeof deps>) =>
+      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === 'order_time_up');
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('shows no sheet and ends nothing before zero', () => {
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      for (const step of [0, 150_000, 149_000]) {
+        advance(step);
+        expect(result.current.timeUp).toBe(false);
+        expect(result.current.timeUpSheet).toBeNull();
+      }
+      expect(result.current.timer?.seconds).toBe(1);
+      expect(d.endOrderWindowUseCase.execute).not.toHaveBeenCalled();
+      expect(timeUpCalls(d)).toHaveLength(0);
+    });
+
+    it('shows the translated sheet at zero', () => {
+      arrange();
+      const { result } = render();
+      advance(300_000);
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+    });
+
+    it('shows the sheet at once for an answer already expired', () => {
+      arrange({ ...okResult, expiresAt: okResult.serverNow });
+      const d = deps();
+      const { result } = render(d);
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends the window and tracks order_time_up exactly once, with the tickets at expiry', () => {
+      arrange(openResult);
+      const d = deps();
+      const { result, rerender } = render(d);
+      act(() => result.current.increment('cat_festival'));
+      act(() => result.current.increment('cat_tribune'));
+      expect(result.current.totalTickets).toBe(2);
+      advance(300_000);
+      act(() => result.current.decrement('cat_tribune'));
+      expect(result.current.totalTickets).toBe(1);
+      for (let i = 0; i < 6; i += 1) {
+        advance(10_000);
+        rerender();
+      }
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledWith('evt_samudra');
+      expect(timeUpCalls(d)).toEqual([['order_time_up', { eventId: 'evt_samudra', tickets: 2 }]]);
+    });
+
+    it('latches: the sheet stays when the event refetch fails afterwards', () => {
+      arrange();
+      const d = deps();
+      const { result, rerender } = render(d);
+      advance(300_000);
+      eventState = { isError: true, error: { status: 500, code: 'INTERNAL_ERROR', message: 'raw' } };
+      rerender();
+      expect(result.current.status).toBe('error');
+      expect(result.current.timer).toBeNull();
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).not.toBeNull();
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the categories query after expiry, also after a language switch', () => {
+      arrange();
+      let current = { t, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { rerender } = renderHook(() => OrderController(d as never));
+      expect(categoriesOptions.enabled).toBe(true);
+      advance(300_000);
+      expect(categoriesOptions.enabled).toBe(false);
+      rerender();
+      expect(categoriesOptions.enabled).toBe(false);
+      current = { t, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: okResult, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      expect(categoriesOptions.queryKey).toEqual(['categories', 'evt_samudra', 'en']);
+      expect(categoriesOptions.enabled).toBe(false);
+    });
+
+    it('does not redirect for admission-invalid after expiry (categories or NIK check)', () => {
+      arrange();
+      const { rerender } = render();
+      advance(300_000);
+      categoriesState = { data: { kind: 'admission-invalid' } };
+      rerender();
+      rerender();
+      act(() => {
+        mutationOptions.onSuccess(
+          { kind: 'admission-invalid' } as never,
+          { slotKey: 's', fieldIndex: 0, fullName: 'Nadia', nik: '3174' } as never,
+        );
+      });
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('queueAgain tracks queue_rejoin and replaces the page with the waiting room', () => {
+      arrange();
+      const d = deps();
+      const { result } = render(d);
+      advance(300_000);
+      act(() => result.current.timeUpSheet?.queueAgain());
+      expect(d.analyticsAdapter.trackEvent).toHaveBeenCalledWith('queue_rejoin', {
+        eventId: 'evt_samudra',
+        from: 'order',
+      });
+      expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it('retranslates the sheet on a language switch while the timer stays at 0', () => {
+      arrange();
+      let current = { t: (key: string) => `id:${key}`, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      advance(300_000);
+      expect(result.current.timeUpSheet?.title).toBe('id:order_time_up_title');
+      current = { t: (key: string) => `en:${key}`, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: okResult, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      expect(result.current.timeUpSheet).toMatchObject({
+        stamp: 'en:order_time_up_stamp',
+        title: 'en:order_time_up_title',
+        body: 'en:order_time_up_body',
+        queueAgainLabel: 'en:order_time_up_queue_again',
+        homeLabel: 'en:action_back_home',
+      });
+      expect(result.current.timer?.seconds).toBe(0);
+    });
+
+    it('calls no service because of the expiry', () => {
+      arrange();
+      const d = deps();
+      const { rerender } = render(d);
+      advance(299_000);
+      const before = [
+        d.catalogService.getEvent.mock.calls.length,
+        d.accountService.getMe.mock.calls.length,
+        d.getOrderCategoriesUseCase.execute.mock.calls.length,
+      ];
+      advance(1000);
+      rerender();
+      expect([
+        d.catalogService.getEvent.mock.calls.length,
+        d.accountService.getMe.mock.calls.length,
+        d.getOrderCategoriesUseCase.execute.mock.calls.length,
+      ]).toEqual(before);
+      expect(mutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('order resume after reload (FR-19-W1)', () => {
+    const SERVER_NOW = '2026-11-09T03:00:00Z';
+    const resumed: OrderCategoriesResult = { ...okResult, resumed: true, expiresAt: '2026-11-09T03:02:12Z' };
+    const windowEnded = { kind: 'window-ended' };
+    const sheet = {
+      stamp: 'order_time_up_stamp',
+      title: 'order_time_up_title',
+      body: 'order_time_up_body',
+      queueAgainLabel: 'order_time_up_queue_again',
+      homeLabel: 'action_back_home',
+      homeHref: '/',
+      queueAgain: expect.any(Function),
+    };
+    const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+    const callsOf = (d: ReturnType<typeof deps>, event: string) =>
+      d.analyticsAdapter.trackEvent.mock.calls.filter(([name]) => name === event);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ now: new Date(SERVER_NOW) });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('window-ended shows the time-up sheet at once over the loading page', () => {
+      eventState = { data: event };
+      categoriesState = { data: windowEnded };
+      const { result } = render();
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+      expect(result.current.status).toBe('loading');
+      expect(result.current.timer).toBeNull();
+    });
+
+    it('window-ended ends the window and tracks order_time_up once, never redirects, disables the query', () => {
+      eventState = { data: event };
+      categoriesState = { data: windowEnded };
+      const d = deps();
+      const { rerender } = render(d);
+      rerender();
+      rerender();
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledWith('evt_samudra');
+      expect(callsOf(d, 'order_time_up')).toEqual([['order_time_up', { eventId: 'evt_samudra', tickets: 0 }]]);
+      expect(replace).not.toHaveBeenCalled();
+      expect(categoriesOptions.enabled).toBe(false);
+    });
+
+    it('window-ended before the event loads latches, and the sheet stays when the event then fails', () => {
+      categoriesState = { data: windowEnded };
+      const d = deps();
+      const { result, rerender } = render(d);
+      expect(result.current.timeUp).toBe(true);
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      eventState = { isError: true, error: { status: 500, code: 'INTERNAL_ERROR', message: 'raw' } };
+      rerender();
+      expect(result.current.status).toBe('error');
+      expect(result.current.timeUpSheet).not.toBeNull();
+      expect(d.endOrderWindowUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('admission-invalid still redirects once; a thrown error still shows the error state', () => {
+      eventState = { data: event };
+      categoriesState = { data: { kind: 'admission-invalid' } };
+      const { result, rerender } = render();
+      rerender();
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith('/queue?event=evt_samudra');
+      expect(result.current.timeUp).toBe(false);
+
+      categoriesState = err(503, 'INTERNAL_ERROR');
+      const second = render();
+      expect(second.result.current.status).toBe('error');
+      expect(second.result.current.errorMessage).toBe('error_internal_error');
+      expect(second.result.current.timeUp).toBe(false);
+    });
+
+    it('a resumed 132 s answer counts down from 2:12', () => {
+      eventState = { data: event };
+      categoriesState = { data: resumed, dataUpdatedAt: Date.now() };
+      const { result } = render();
+      expect(result.current.status).toBe('ready');
+      expect(result.current.timer?.seconds).toBe(132);
+      advance(1000);
+      expect(result.current.timer?.seconds).toBe(131);
+      expect(result.current.timeUp).toBe(false);
+    });
+
+    it('a resumed answer already at its end shows the sheet in the first ready render', () => {
+      eventState = { data: event };
+      categoriesState = { data: { ...resumed, expiresAt: resumed.serverNow }, dataUpdatedAt: Date.now() };
+      const { result } = render();
+      expect(result.current.status).toBe('ready');
+      expect(result.current.timeUp).toBe(true);
+      expect(result.current.timeUpSheet).toEqual(sheet);
+    });
+
+    it('tracks order_resumed once per visit, through tickets and a language switch', () => {
+      eventState = { data: event };
+      categoriesState = { data: resumed, dataUpdatedAt: Date.now() };
+      let current = { t, i18n: { language: 'id', changeLanguage } };
+      const d = { ...deps(), useTranslation: () => current };
+      const { result, rerender } = renderHook(() => OrderController(d as never));
+      rerender();
+      act(() => result.current.increment('cat_festival'));
+      current = { t, i18n: { language: 'en', changeLanguage } };
+      categoriesState = { data: resumed, dataUpdatedAt: 0, isPlaceholderData: true };
+      rerender();
+      categoriesState = { data: okResult, dataUpdatedAt: Date.now() + 5000, isPlaceholderData: false };
+      rerender();
+      expect(callsOf(d, 'order_resumed')).toEqual([['order_resumed', { eventId: 'evt_samudra' }]]);
+    });
+
+    it('never tracks order_resumed for a non-resumed answer', () => {
+      eventState = { data: event };
+      categoriesState = { data: okResult, dataUpdatedAt: Date.now() };
+      const d = deps();
+      const { rerender } = render(d);
+      rerender();
+      expect(callsOf(d, 'order_resumed')).toHaveLength(0);
+    });
+
+    it('maps ADMISSION_UNAVAILABLE to its message with the real error map', () => {
+      expect(ERROR_CODE_MAP.ADMISSION_UNAVAILABLE).toBe('error_admission_unavailable');
+      eventState = { data: event };
+      categoriesState = err(503, 'ADMISSION_UNAVAILABLE');
+      const { result } = renderHook(() => OrderController({ ...deps(), ERROR_CODE_MAP } as never));
+      expect(result.current.status).toBe('error');
+      expect(result.current.errorMessage).toBe('error_admission_unavailable');
+      act(() => result.current.retry());
+      expect(categoriesRefetch).toHaveBeenCalled();
+    });
+
+    it('keeps the categories query options and reads the token at fetch time, null included', async () => {
+      const d = deps();
+      d.admissionStore.get.mockReturnValue(null);
+      render(d);
+      expect(categoriesOptions).toMatchObject({
+        queryKey: ['categories', 'evt_samudra', 'id'],
+        gcTime: 0,
+        retry: retryTransientOnce,
+      });
+      expect(categoriesOptions.placeholderData).toEqual(expect.any(Function));
+      await (categoriesOptions.queryFn as () => Promise<unknown>)();
+      expect(d.getOrderCategoriesUseCase.execute).toHaveBeenCalledWith({
+        eventId: 'evt_samudra',
+        admissionToken: null,
+      });
     });
   });
 });

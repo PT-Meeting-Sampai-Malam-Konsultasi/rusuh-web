@@ -103,6 +103,32 @@ export interface OrderLimitNotice {
   message: string;
 }
 
+/** The order-window countdown for the flow header (FR-17-W1): what the shared Timer component takes. */
+export interface OrderTimerView {
+  /** Whole seconds left, rounded down, never negative. From server time plus elapsed client time. */
+  seconds: number;
+  /** "sisa waktu memilih" / "left to choose". */
+  label: string;
+}
+
+/** The time's-up sheet (FR-18-W1): what OrderTimeUpSheet shows. Texts are translated. */
+export interface OrderTimeUpView {
+  /** "Waktu habis" / "Time's up". */
+  stamp: string;
+  /** "5 menit sudah lewat." / "Your 5 minutes are up." */
+  title: string;
+  /** "Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi." */
+  body: string;
+  /** "Antre lagi" / "Queue again" (the arrow is drawn by the sheet, aria-hidden). */
+  queueAgainLabel: string;
+  /** "Ke beranda" / "Go home". */
+  homeLabel: string;
+  /** ROUTES.HOME. */
+  homeHref: string;
+  /** Tracks queue_rejoin and replaces the page with /queue?event=<id>: the waiting room joins at the back. */
+  queueAgain: () => void;
+}
+
 export interface OrderControllerInterface {
   t: TFunction;
   status: OrderStatus;
@@ -137,6 +163,15 @@ export interface OrderControllerInterface {
   setLocale: (locale: FormatLocale) => void;
   /** Every ticket holder passed the Dukcapil check (≥ 1 holder). For the payment button (FR-16+). */
   allHoldersVerified: boolean;
+  /** Null unless status is 'ready' and the answer's expiresAt / serverNow are valid dates. */
+  timer: OrderTimerView | null;
+  /**
+   * The order window has run out on this page visit: true from the first render at zero, or from a reload whose
+   * re-claim found the window ended (FR-19-W1); then latched (stays true whatever status does later). Drives timeUpSheet.
+   */
+  timeUp: boolean;
+  /** Non-null exactly when timeUp. */
+  timeUpSheet: OrderTimeUpView | null;
 }
 
 type OrderControllerDeps = Pick<
@@ -146,6 +181,7 @@ type OrderControllerDeps = Pick<
   | 'getOrderCategoriesUseCase'
   | 'orderTicketSelectionUseCase'
   | 'validateAttendeeUseCase'
+  | 'endOrderWindowUseCase'
   | 'admissionStore'
   | 'analyticsAdapter'
   | 'storage'
@@ -191,6 +227,13 @@ type NikCheckRun =
 
 type NikCheckState = 'idle' | 'checking' | 'valid' | 'error';
 
+/** The answer the countdown runs from: its server times and when it arrived (the query's dataUpdatedAt). */
+interface TimerAnchor {
+  expiresAt: string;
+  serverNow: string;
+  receivedAt: number;
+}
+
 /** Stable empty list for summarize before the categories load (constant, not mutable state). */
 const NO_CATEGORIES: readonly [] = [];
 /** No-op handler for a holder view whose form entry is missing (not expected after reconcileHolders). */
@@ -202,6 +245,7 @@ const OrderController = ({
   getOrderCategoriesUseCase,
   orderTicketSelectionUseCase,
   validateAttendeeUseCase,
+  endOrderWindowUseCase,
   admissionStore,
   analyticsAdapter,
   storage,
@@ -231,11 +275,15 @@ const OrderController = ({
     retry: retryTransientOnce,
   });
 
+  // Latched the first render the order window is at zero (FR-18-W1); never reset while mounted.
+  const [expired, setExpired] = useState(false);
+
   // The token is read at fetch time and never put in the key; gcTime 0: the snapshot belongs to one admission.
   const categoriesQuery = useQueryTanstack<OrderCategoriesResult, HttpError>({
     queryKey: [QUERY_KEYS.CATEGORIES, eventId, locale],
     queryFn: () => getOrderCategoriesUseCase.execute({ eventId, admissionToken: admissionStore.get(eventId) }),
-    enabled: hasEventId,
+    // Off after expiry: a language switch then keeps the placeholder instead of fetching with a cleared token.
+    enabled: hasEventId && !expired,
     gcTime: 0,
     retry: retryTransientOnce,
     placeholderData: (previous) => previous,
@@ -257,6 +305,21 @@ const OrderController = ({
   }, [shouldRedirect, router, eventId]);
 
   const ok = categoriesData?.kind === 'ok' ? categoriesData : null;
+
+  // The countdown's anchor is written only from a real answer: on a language switch TanStack shows the previous
+  // answer as placeholder data with the new query's dataUpdatedAt of 0, which must not move the countdown (FR-17-W1).
+  const [anchor, setAnchor] = useState<TimerAnchor | null>(null);
+  if (ok && !categoriesQuery.isPlaceholderData && categoriesQuery.dataUpdatedAt !== anchor?.receivedAt) {
+    setAnchor({ expiresAt: ok.expiresAt, serverNow: ok.serverNow, receivedAt: categoriesQuery.dataUpdatedAt });
+  }
+
+  // FR-19-W1: a reload claimed the turn again (spec 64); once per page visit (a placeholder or refetch never repeats it).
+  const resumedTracked = useRef(false);
+  useEffect(() => {
+    if (!ok?.resumed || resumedTracked.current) return;
+    resumedTracked.current = true;
+    analyticsAdapter.trackEvent('order_resumed', { eventId });
+  }, [ok, analyticsAdapter, eventId]);
 
   let status: OrderStatus = 'loading';
   if (!hasEventId || eventNotFound) status = 'not-found';
@@ -564,6 +627,38 @@ const OrderController = ({
     [status, selection, limit, t],
   );
 
+  // The 5-minute order window: server times give its length, the device clock only measures the time since the
+  // answer arrived (elapsed time, never a deadline against the device clock).
+  const [now, setNow] = useState(() => Date.now());
+  const windowSeconds = anchor ? (Date.parse(anchor.expiresAt) - Date.parse(anchor.serverNow)) / 1000 : NaN;
+  const secondsLeft =
+    ok && anchor && Number.isFinite(windowSeconds)
+      ? Math.max(0, windowSeconds - Math.max(0, now - anchor.receivedAt) / 1000)
+      : null;
+  const ticking = secondsLeft !== null && secondsLeft > 0;
+  useEffect(() => {
+    if (!ticking) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [ticking]);
+
+  // A render-time update (as the anchor above), so the sheet shows in the same frame as "0:00"; the guard stops a loop.
+  const windowOver = status === 'ready' && secondsLeft === 0;
+  // FR-19-W1: a reload's re-claim found the turn over: the same time's-up state, without a ready page under it.
+  const windowEnded = categoriesData?.kind === 'window-ended';
+  if ((windowOver || windowEnded) && !expired) setExpired(true);
+
+  // Once per visit: end the window on this device and block every later admission-invalid redirect (the buyer leaves
+  // through the sheet). The use case is synchronous and local (spec 61), not async work for TanStack.
+  const ended = useRef(false);
+  useEffect(() => {
+    if (!expired || ended.current) return;
+    ended.current = true;
+    redirected.current = true;
+    endOrderWindowUseCase.execute(eventId);
+    analyticsAdapter.trackEvent('order_time_up', { eventId, tickets: selection.total });
+  }, [expired, endOrderWindowUseCase, analyticsAdapter, eventId, selection.total]);
+
   const errorCode = (eventError ?? categoriesError)?.code;
   const errorMessage =
     status === 'error' && errorCode ? t(ERROR_CODE_MAP[errorCode] ?? ERROR_CODE_MAP.UNKNOWN_ERROR) : '';
@@ -608,6 +703,25 @@ const OrderController = ({
       void i18n.changeLanguage(next);
     },
     allHoldersVerified,
+    timer:
+      status === 'ready' && secondsLeft !== null
+        ? { seconds: Math.floor(secondsLeft), label: t('order_timer_label') }
+        : null,
+    timeUp: expired,
+    timeUpSheet: expired
+      ? {
+          stamp: t('order_time_up_stamp'),
+          title: t('order_time_up_title'),
+          body: t('order_time_up_body'),
+          queueAgainLabel: t('order_time_up_queue_again'),
+          homeLabel: t('action_back_home'),
+          homeHref: ROUTES.HOME,
+          queueAgain: () => {
+            analyticsAdapter.trackEvent('queue_rejoin', { eventId, from: 'order' });
+            router.replace(withQuery(ROUTES.QUEUE, { event: eventId }));
+          },
+        }
+      : null,
   };
 };
 

@@ -13,6 +13,8 @@ export interface HttpAdapterOptions {
   refreshSession?: () => Promise<boolean>;
   /** Test seam: replaces the network transport. */
   transport?: AxiosAdapter;
+  /** Send `X-Request-ID` (default true); off while an API's CORS does not allow the header. */
+  sendRequestId?: boolean;
   /** Test seam: the `X-Request-ID` generator (a UUID v4 by default). */
   newRequestId?: () => string;
   /** Told about every failed call, after any refresh: monitoring keeps a trail with the request ID (NFR-09-W1). */
@@ -122,7 +124,8 @@ export function createHttpAdapter(options: HttpAdapterOptions): HttpProtocol {
   const newRequestId = options.newRequestId ?? randomRequestId;
   client.interceptors.request.use((config) => {
     // A replay after a session refresh keeps its ID: it is the same request.
-    if (!(config as RetryConfig).cacheable && !config.headers.has(REQUEST_ID_HEADER)) {
+    const send = options.sendRequestId ?? true;
+    if (send && !(config as RetryConfig).cacheable && !config.headers.has(REQUEST_ID_HEADER)) {
       config.headers.set(REQUEST_ID_HEADER, newRequestId());
     }
     const locale = options.getLocale?.();

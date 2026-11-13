@@ -15,6 +15,7 @@ const API_ERROR_CODES = [
   'VERIFICATION_UNAVAILABLE',
   'UNAUTHORIZED',
   'ADMISSION_INVALID',
+  'ADMISSION_UNAVAILABLE',
   'NOT_FOUND',
   'RATE_LIMITED',
   'QUEUE_CLOSED',
@@ -76,6 +77,20 @@ describe('translations', () => {
     ];
     expect(keys.filter((k) => !(k in id))).toEqual([]);
     expect(keys.filter((k) => !(k in en))).toEqual([]);
+  });
+
+  it('has the order timer label in both locales (FR-17-W1)', () => {
+    expect(id.order_timer_label).toBe('sisa waktu memilih');
+    expect(en.order_timer_label).toBe('left to choose');
+  });
+
+  it('has the admission unavailable message in both locales (FR-19-W1)', () => {
+    expect(id.error_admission_unavailable).toBe(
+      'Pesanan Anda sedang disiapkan. Giliran Anda tetap aman, coba lagi sebentar lagi.',
+    );
+    expect(en.error_admission_unavailable).toBe(
+      "We're getting your order ready. Your turn is safe; please try again in a moment.",
+    );
   });
 
   it('uses a NIK hint example that passes the structure rule in both locales', () => {
@@ -140,6 +155,25 @@ describe('i18n instance', () => {
     expect(i18n.t('order_nik_rate_limited', { count: 60 })).toBe(
       'Too many tries for this ticket. Try again in 60 seconds.',
     );
+    await i18n.changeLanguage('id');
+  });
+
+  it("has the time's-up sheet copy in both locales (FR-18-W1)", async () => {
+    expect(i18n.t('order_time_up_stamp')).toBe('Waktu habis');
+    expect(i18n.t('order_time_up_title')).toBe('5 menit sudah lewat.');
+    expect(i18n.t('order_time_up_body')).toBe(
+      'Pilihan Anda belum disimpan dan tempat Anda kami berikan ke nomor berikutnya. Antre lagi untuk mencoba lagi.',
+    );
+    expect(i18n.t('order_time_up_queue_again')).toBe('Antre lagi');
+    expect(i18n.t('action_back_home')).toBe('Ke beranda');
+    await i18n.changeLanguage('en');
+    expect(i18n.t('order_time_up_stamp')).toBe("Time's up");
+    expect(i18n.t('order_time_up_title')).toBe('Your 5 minutes are up.');
+    expect(i18n.t('order_time_up_body')).toBe(
+      "Your picks weren't saved and your place went to the next number. Queue again to try once more.",
+    );
+    expect(i18n.t('order_time_up_queue_again')).toBe('Queue again');
+    expect(i18n.t('action_back_home')).toBe('Go home');
     await i18n.changeLanguage('id');
   });
 });

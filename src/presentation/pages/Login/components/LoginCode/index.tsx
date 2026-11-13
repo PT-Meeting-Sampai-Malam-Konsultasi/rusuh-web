@@ -58,7 +58,13 @@ export default function LoginCode({ t, code }: LoginCodeProps) {
         </div>
 
         {spent ? (
-          <Button fullWidth className={styles.submit} onClick={code.onResend} disabled={code.resendIn !== null}>
+          <Button
+            fullWidth
+            className={styles.submit}
+            onClick={code.onResend}
+            disabled={code.resendIn !== null}
+            busy={code.resending}
+          >
             {t('login_send_new_code')}{' '}
             <span className={step.arrow} aria-hidden="true">
               →
@@ -90,7 +96,13 @@ export default function LoginCode({ t, code }: LoginCodeProps) {
             </p>
           ) : (
             !spent && (
-              <button type="button" className={step.textButton} onClick={code.onResend}>
+              <button
+                type="button"
+                className={step.textButton}
+                onClick={code.onResend}
+                disabled={code.resending}
+                aria-busy={code.resending || undefined}
+              >
                 {t('login_resend')}
               </button>
             )

@@ -64,6 +64,8 @@ jobs:
           NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${{ env.SENTRY_ENV }}
           NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_TRACES_SAMPLE_RATE }}
           NEXT_PUBLIC_SENTRY_REPLAY_ON_ERROR_RATE: ${{ vars.SENTRY_REPLAY_ON_ERROR_RATE }}
+          # X-Request-ID on API calls; off unless the variable is "true" (needs the API's CORS to allow it).
+          NEXT_PUBLIC_REQUEST_ID_HEADER: ${{ vars.REQUEST_ID_HEADER }}
           SOURCE_MAPS: ${{ env.SENTRY_AUTH_TOKEN != '' }}
           # Product analytics and its consent banner; off unless the variable is "true".
           NEXT_PUBLIC_ANALYTICS_ENABLED: ${{ vars.ANALYTICS_ENABLED }}

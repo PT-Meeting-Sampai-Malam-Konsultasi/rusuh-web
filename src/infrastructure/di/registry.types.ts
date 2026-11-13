@@ -25,6 +25,7 @@ import type { SignOutUseCaseInterface } from '@core/use_case/auth/sign-out.use-c
 import type { RefreshSessionUseCaseInterface } from '@core/use_case/auth/refresh-session.use-case';
 import type { RequestSignInCodeUseCaseInterface } from '@core/use_case/auth/request-sign-in-code.use-case';
 import type { VerifySignInCodeUseCaseInterface } from '@core/use_case/auth/verify-sign-in-code.use-case';
+import type { EndOrderWindowUseCaseInterface } from '@core/use_case/booking/end-order-window.use-case';
 import type { GetOrderCategoriesUseCaseInterface } from '@core/use_case/booking/get-order-categories.use-case';
 import type { OrderTicketSelectionUseCaseInterface } from '@core/use_case/booking/order-ticket-selection.use-case';
 import type { ValidateAttendeeUseCaseInterface } from '@core/use_case/booking/validate-attendee.use-case';
@@ -133,6 +134,7 @@ export interface AwilixRegistry {
   getOrderCategoriesUseCase: GetOrderCategoriesUseCaseInterface;
   orderTicketSelectionUseCase: OrderTicketSelectionUseCaseInterface;
   validateAttendeeUseCase: ValidateAttendeeUseCaseInterface;
+  endOrderWindowUseCase: EndOrderWindowUseCaseInterface;
   joinQueueUseCase: JoinQueueUseCaseInterface;
   followQueueUseCase: FollowQueueUseCaseInterface;
   claimTurnUseCase: ClaimTurnUseCaseInterface;

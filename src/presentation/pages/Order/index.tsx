@@ -4,12 +4,14 @@ import type { OrderControllerInterface } from '@controllers/order.controller';
 import container from '@infrastructure/di/container';
 import '@infrastructure/di/controllers/order';
 import FlowHeader from '@presentation/components/FlowHeader';
+import Timer from '@presentation/components/Timer';
 
 import CategoryList from './components/CategoryList';
 import HolderList from './components/HolderList';
 import OrderEventHeader from './components/OrderEventHeader';
 import OrderMessage from './components/OrderMessage';
 import OrderSkeleton from './components/OrderSkeleton';
+import OrderTimeUpSheet from './components/OrderTimeUpSheet';
 import styles from './order.module.css';
 
 export default function OrderScreen() {
@@ -32,6 +34,8 @@ export default function OrderScreen() {
     homeHref,
     locale,
     setLocale,
+    timer,
+    timeUpSheet,
   } = container.resolve<OrderControllerInterface>('orderController');
 
   return (
@@ -49,6 +53,7 @@ export default function OrderScreen() {
           language: t('language_switch_label'),
           back: t('order_back_label'),
         }}
+        timer={timer && <Timer seconds={timer.seconds} label={timer.label} compact />}
       />
       <main className={styles.main} aria-busy={status === 'loading'}>
         <div className={styles.flowMain}>
@@ -86,6 +91,7 @@ export default function OrderScreen() {
         </div>
         {/* Summary aside: deferred (FR-14-W1 and the hold) */}
       </main>
+      {timeUpSheet && <OrderTimeUpSheet sheet={timeUpSheet} />}
     </div>
   );
 }
