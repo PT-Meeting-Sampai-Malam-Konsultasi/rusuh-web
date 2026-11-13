@@ -1564,7 +1564,7 @@ describe('OrderController', () => {
       expect(replace).not.toHaveBeenCalled();
       expect(router.push).not.toHaveBeenCalled();
       expect(mutate).not.toHaveBeenCalled();
-      expect(d.analyticsAdapter.trackEvent.mock.calls.map(([name]) => name)).toEqual(['order_time_up']);
+      expect(sent(d)).toEqual(['view_item', 'order_time_up']);
       expect(d.analyticsAdapter.trackPageView.mock.calls).toEqual([['order']]);
     });
 
