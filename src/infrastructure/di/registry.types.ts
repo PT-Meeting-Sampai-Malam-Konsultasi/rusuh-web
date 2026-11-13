@@ -12,6 +12,7 @@ import type { HttpProtocol } from '@core/protocols/http.protocol';
 import type { QrEncoderProtocol } from '@core/protocols/qr-encoder.protocol';
 import type { QueuePlaceStoreProtocol } from '@core/protocols/queue-place-store.protocol';
 import type { QueueStreamProtocol } from '@core/protocols/queue-stream.protocol';
+import type { SnapProtocol } from '@core/protocols/snap.protocol';
 import type { StorageProtocol } from '@core/protocols/storage.protocol';
 import type { TokenStoreProtocol } from '@core/protocols/token-store.protocol';
 import type { TurnstileProtocol } from '@core/protocols/turnstile.protocol';
@@ -20,6 +21,7 @@ import type { AuthServiceInterface } from '@core/services/auth.service';
 import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { DeviceServiceInterface } from '@core/services/device.service';
+import type { PaymentServiceInterface } from '@core/services/payment.service';
 import type { QueueServiceInterface } from '@core/services/queue.service';
 import type { SignOutUseCaseInterface } from '@core/use_case/auth/sign-out.use-case';
 import type { RefreshSessionUseCaseInterface } from '@core/use_case/auth/refresh-session.use-case';
@@ -31,6 +33,7 @@ import type { HoldBookingUseCaseInterface } from '@core/use_case/booking/hold-bo
 import type { OrderTicketSelectionUseCaseInterface } from '@core/use_case/booking/order-ticket-selection.use-case';
 import type { ValidateAttendeeUseCaseInterface } from '@core/use_case/booking/validate-attendee.use-case';
 import type { GetHomeEventsUseCaseInterface } from '@core/use_case/catalog/get-home-events.use-case';
+import type { PayBookingUseCaseInterface } from '@core/use_case/payment/pay-booking.use-case';
 import type { ClaimTurnUseCaseInterface } from '@core/use_case/queue/claim-turn.use-case';
 import type { FollowQueueUseCaseInterface } from '@core/use_case/queue/follow-queue.use-case';
 import type { JoinQueueUseCaseInterface } from '@core/use_case/queue/join-queue.use-case';
@@ -103,6 +106,8 @@ export interface AwilixRegistry {
   printer: PrinterProtocol;
   /** Registered by the e-ticket page only (di/controllers/ticket-detail.ts): the QR library loads with that page. */
   qrEncoder: QrEncoderProtocol;
+  /** Registered by the payment page only (di/controllers/payment.ts): snap.js loads with that page. */
+  snap: SnapProtocol;
 
   // infrastructure: framework hooks (controllers never import these directly)
   useTranslation: typeof useTranslation;
@@ -129,6 +134,7 @@ export interface AwilixRegistry {
   bookingService: BookingServiceInterface;
   deviceService: DeviceServiceInterface;
   queueService: QueueServiceInterface;
+  paymentService: PaymentServiceInterface;
 
   // use cases
   getHomeEventsUseCase: GetHomeEventsUseCaseInterface;
@@ -147,6 +153,7 @@ export interface AwilixRegistry {
   verifySignInCodeUseCase: VerifySignInCodeUseCaseInterface;
   getMyOrdersUseCase: GetMyOrdersUseCaseInterface;
   getETicketUseCase: GetETicketUseCaseInterface;
+  payBookingUseCase: PayBookingUseCaseInterface;
 
   // helpers
   ERROR_CODE_MAP: Readonly<Record<string, string>>;

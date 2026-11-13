@@ -41,6 +41,8 @@ const CODES = [
   'BAD_REQUEST',
   'TOO_MANY_REQUESTS',
   'NETWORK_ERROR',
+  // Client code: snap.js could not load or open (blocked, offline, timeout).
+  'SNAP_UNAVAILABLE',
   'TIMEOUT',
   'UNKNOWN_ERROR',
 ] as const;

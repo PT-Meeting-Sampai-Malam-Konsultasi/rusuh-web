@@ -1,10 +1,24 @@
 import type { Booking } from '@core/entities/booking/booking.entity';
+import type { PaymentStatus } from '@core/entities/payment/payment.entity';
 
 /** What a validation token stands for in the mock: never the full NIK. */
 export interface MockAttendee {
   fullName: string;
   /** "3174 •••• •••• 0004" (first 4 + last 4, ADR-0024), as in Booking.attendees. */
   nikMasked: string;
+}
+
+/** One mocked Snap attempt (FR-20-W1). */
+export interface MockSnapAttempt {
+  attemptId: number;
+  /** null for attempt 1, created by the FR-16 payment entry. */
+  idempotencyKey: string | null;
+  /** `mock-snap-<bookingId>-<attemptId>`. */
+  snapToken: string;
+  /** 'none' until its first status poll. */
+  status: PaymentStatus;
+  /** Server time (ms) of the first status poll of this attempt; it settles MOCK_SETTLE_MS later. */
+  firstPolledAt: number | null;
 }
 
 export interface StoredBooking {
@@ -14,6 +28,8 @@ export interface StoredBooking {
   snapToken: string | null;
   /** Payment-entry calls so far (payment_busy fails only the first). */
   paymentEntries: number;
+  /** Snap attempts, oldest first: attempt 1 from the payment entry, the next ones from startSnapPayment. */
+  attempts: MockSnapAttempt[];
 }
 
 export interface MockBookingStore {

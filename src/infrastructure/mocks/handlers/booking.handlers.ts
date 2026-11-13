@@ -317,7 +317,7 @@ export function bookingHandlers({
         return problem(409, 'ACCOUNT_HAS_ACTIVE_BOOKING', 'Anda masih punya pesanan aktif');
       }
       const booking = newBooking(body, today);
-      bookingStore.save({ booking, idempotencyKey: key, snapToken: null, paymentEntries: 0 });
+      bookingStore.save({ booking, idempotencyKey: key, snapToken: null, paymentEntries: 0, attempts: [] });
       return HttpResponse.json<Booking>(booking, { status: 201 });
     }),
     // FR-16-W1: the stock + NIK hold, SELECTION → PAYMENT_PENDING (10 min), and the Snap token.
@@ -354,6 +354,16 @@ export function bookingHandlers({
         });
       }
       entry.snapToken = `mock-snap-${booking.bookingId}-1`;
+      // FR-20-W1: the payment entry's token is Snap attempt 1 (the payment page's currentSnap).
+      if (entry.attempts.length === 0) {
+        entry.attempts.push({
+          attemptId: 1,
+          idempotencyKey: null,
+          snapToken: entry.snapToken,
+          status: 'none',
+          firstPolledAt: null,
+        });
+      }
       entry.booking = {
         ...booking,
         status: 'PAYMENT_PENDING',

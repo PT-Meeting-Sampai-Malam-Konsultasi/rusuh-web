@@ -155,6 +155,7 @@
   "error_code_invalid": "Kode tidak valid.",
   "error_payment_provider_busy": "Pembayaran sedang padat. Coba lagi sebentar lagi.",
   "error_network_error": "Koneksi terputus. Periksa internet Anda lalu coba lagi.",
+  "error_snap_unavailable": "Halaman pembayaran Midtrans tidak bisa dibuka. Periksa koneksi Anda lalu coba lagi.",
   "error_timeout": "Respons terlalu lama. Coba lagi.",
   "error_unknown_error": "Terjadi kesalahan. Coba lagi.",
   "account_title": "Akun",

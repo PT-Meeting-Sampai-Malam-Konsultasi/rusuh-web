@@ -27,6 +27,16 @@ export const MOCK_SCENARIOS = [
   'category_sold_out',
   /** FR-16: the first payment entry of each booking answers 503 PAYMENT_PROVIDER_BUSY; a retry succeeds. */
   'payment_busy',
+  /** FR-20: the view has no live Snap attempt and the first Snap start answers 503 PAYMENT_PROVIDER_BUSY; a retry works. */
+  'snap_busy',
+  /** FR-20: the customer closes the Snap popup without paying. */
+  'snap_closed',
+  /** FR-20: attempt 1 is denied (Snap onError, status denied); "Bayar lagi" opens attempt 2, which settles. */
+  'payment_denied',
+  /** FR-20: a VA / QRIS that is never paid: Snap onPending, the status stays pending. */
+  'payment_pending',
+  /** FR-20 / ADR-0009: the payment settles after expiry: EXPIRED, paid_after_expiry, refundRequired. */
+  'payment_late',
 ] as const;
 
 export type MockScenario = (typeof MOCK_SCENARIOS)[number];
@@ -41,4 +51,35 @@ export function resolveScenario(search: string, saved: string | null): MockScena
   const fromUrl = new URLSearchParams(search).get('mock');
   if (isScenario(fromUrl)) return fromUrl;
   return isScenario(saved) ? saved : 'ok';
+}
+
+/** The scenario of this tab: URL `?mock=` first, then sessionStorage; saved back. Browser only. */
+export function readMockScenario(): MockScenario {
+  let saved: string | null = null;
+  try {
+    saved = sessionStorage.getItem(MOCK_SCENARIO_KEY);
+  } catch {
+    // Storage blocked (private mode): fall back to the URL only.
+  }
+  const scenario = resolveScenario(window.location.search, saved);
+  try {
+    sessionStorage.setItem(MOCK_SCENARIO_KEY, scenario);
+  } catch {
+    // Same as above.
+  }
+  return scenario;
+}
+
+/** What the mock Snap popup "does": snap_closed → closed · payment_pending → pending · payment_denied → error · else success. */
+export function mockSnapOutcome(scenario: MockScenario): 'success' | 'pending' | 'error' | 'closed' {
+  switch (scenario) {
+    case 'snap_closed':
+      return 'closed';
+    case 'payment_pending':
+      return 'pending';
+    case 'payment_denied':
+      return 'error';
+    default:
+      return 'success';
+  }
 }
