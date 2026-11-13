@@ -21,7 +21,6 @@ const KEYS = {
   analyticsAdapter: true,
   queueHttp: true,
   coreHttp: true,
-  queueStream: true,
   fileSaver: true,
   printer: true,
   qrEncoder: true,
@@ -102,7 +101,6 @@ describe('DI registries', () => {
   it('resolves the adapters as singletons', () => {
     expect(container.resolve('coreHttp')).toBe(container.resolve('coreHttp'));
     expect(container.resolve('config').coreApiUrl).toBe('https://core.test/v1');
-    expect(typeof container.resolve('queueStream').open).toBe('function');
     expect(container.resolve('admissionStore')).toBe(container.resolve('admissionStore'));
     expect(container.resolve('bookingService')).toBe(container.resolve('bookingService'));
     expect(container.resolve('deviceTokenStore')).toBe(container.resolve('deviceTokenStore'));

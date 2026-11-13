@@ -56,7 +56,7 @@ src/
 ├── presentation/     Client screens: page shells + section components, each with a CSS module
 ├── controllers/      Page logic: factories that receive hooks and services from the DI container
 ├── core/             Pure TypeScript: protocols, entities, services, use cases
-├── infrastructure/   Config, adapters (HTTP, storage, analytics, queue stream), DI container, i18n
+├── infrastructure/   Config, adapters (HTTP, storage, analytics), DI container, i18n
 ├── contexts/         Loading, error popup, network status, session
 ├── translation/      id.json, en.json
 ├── styles/app.css    Tailwind entry and Poster Sablon design tokens

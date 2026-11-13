@@ -13,7 +13,7 @@ paths:
 ## Protocols (`src/core/protocols/`)
 
 - Pure interfaces with zero imports: `HttpProtocol`, `HttpResponse<T>`, `HttpError`, `StorageProtocol`,
-  `AnalyticsProtocol`, `QueueStreamProtocol` (SSE, ADR-0015).
+  `AnalyticsProtocol` (no queue stream: SSE dropped on 13 Nov 2026, the queue is polled only).
 - `HttpError` shape: `{ status, code, message, data, traceId }` — `code` is the API's stable error code
   (RFC 9457 `Problem.code` in `openapi.yaml`).
 - Generic types only (`data: T`), never library types.
@@ -39,7 +39,7 @@ paths:
 
 ## Adapters (`src/infrastructure/adapters/`)
 
-- The only place external libraries are imported (Axios, the SSE client, storage, analytics SDK).
+- The only place external libraries are imported (Axios, storage, analytics SDK).
 - Receive config and other deps through the factory parameters; never import `config.ts` or another adapter directly.
 - HTTP adapter duties:
   - base URL from config; `Accept: application/json`; `Accept-Language` from the current locale, read at request time

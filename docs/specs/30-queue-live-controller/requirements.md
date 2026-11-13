@@ -1,5 +1,8 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. The stream
+> effect, `queue_stream` analytics and the `fellBack` state were removed; the frontier query polls at every position.
+
 ## Introduction
 
 `queueController` follows the queue after the join (FR-07-W1, rusuh-web#7): polls the frontier, switches to the stream

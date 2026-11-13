@@ -1,5 +1,9 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. `stream`,
+> `canStream`, `streamRetryDelayMs` and the 2 s fallback cap in `pollDelayMs` were removed; polling by tier, ±20% jitter
+> and the backoff stay.
+
 ## Introduction
 
 The business rules of FR-07-W1 (rusuh-web#7): how often to poll the frontier, when to stream, how a frontier moves

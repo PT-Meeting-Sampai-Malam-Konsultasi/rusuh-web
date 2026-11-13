@@ -1,5 +1,9 @@
 # Design Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. `stream`,
+> `canStream`, `streamRetryDelayMs` and the 2 s fallback cap in `pollDelayMs` were removed; polling by tier, ±20% jitter
+> and the backoff stay.
+
 ## Overview
 
 One use case, `followQueueUseCase` (`src/core/use_case/queue/follow-queue.use-case.ts`), with `poll` and `stream`,

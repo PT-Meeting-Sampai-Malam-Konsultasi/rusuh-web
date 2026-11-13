@@ -1,5 +1,8 @@
 # Design Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only.
+> `QueueStreamProtocol` and the queue-stream adapter were removed.
+
 ## Overview
 
 Contracts in core, implementations in infrastructure; only adapters import libraries (Axios, fetch streams).

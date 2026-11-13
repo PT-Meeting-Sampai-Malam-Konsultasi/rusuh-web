@@ -1,5 +1,8 @@
 # Design Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. Nothing on
+> the page depended on the stream; only the wording about live updates no longer applies.
+
 ## Overview
 
 One `<p>` in `QueueWaiting`, styled in `queue-waiting.module.css`.

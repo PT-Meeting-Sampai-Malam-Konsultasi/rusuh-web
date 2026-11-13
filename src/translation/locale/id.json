@@ -171,8 +171,6 @@
   "error_missed": "Giliran Anda terlewat. Silakan antre lagi.",
   "error_expired": "Waktunya sudah habis.",
   "error_no_stock": "Tiket sudah habis.",
-  "error_too_far": "Pembaruan langsung aktif saat Anda mendekati giliran.",
-  "error_stream_full": "Pembaruan langsung sedang penuh; posisi tetap diperbarui berkala.",
   "error_account_has_place_elsewhere": "Akun Anda sudah punya posisi antrian di perangkat lain.",
   "error_wrong_code": "Kode salah.",
   "error_challenge_expired": "Kode sudah kedaluwarsa. Minta kode baru.",

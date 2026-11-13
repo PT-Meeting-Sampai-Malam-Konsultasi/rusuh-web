@@ -1,5 +1,8 @@
 # Requirements Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only.
+> `pollDelayMs` lost its `fellBack` argument; the backoff itself is unchanged.
+
 ## Introduction
 
 NFR-01-W1 (rusuh-web#24): graceful states. The offline banner, the error boundaries and the paused queue exist since

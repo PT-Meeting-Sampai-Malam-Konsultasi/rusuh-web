@@ -1,5 +1,8 @@
 # Design Document
 
+> **Updated 13 Nov 2026:** SSE is dropped; the waiting room follows the queue by polling the frontier only. The
+> queue-stream adapter, its protocol and the stream mock (`stream_off`, `TOO_FAR`, `STREAM_FULL`) were removed.
+
 ## Overview
 
 Types plus one GET, and the mock endpoints. The stream itself is read by the existing `queueStream` adapter

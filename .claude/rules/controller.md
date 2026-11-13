@@ -27,7 +27,7 @@ the top of its render**, so the hooks inside the factory keep a stable order.
 - Reading search params (`useSearchParamsNext`) — the route file must wrap the screen in `<Suspense>`
 - Translation of codes into text (`t` from `useTranslation`)
 - Analytics (`trackPageView` once on mount, `trackEvent` on actions)
-- Timers derived from server time, polling intervals (`refetchInterval`), SSE subscriptions through a DI adapter
+- Timers derived from server time, polling intervals (`refetchInterval`); no SSE (the queue is polled only, 13 Nov 2026)
 
 ## Does not belong
 

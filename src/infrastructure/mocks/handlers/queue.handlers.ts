@@ -1,7 +1,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 
 import type { EventSummary } from '@core/entities/catalog/catalog.entity';
-import type { Admission, DeviceRegistration, Frontier, QueuePlace, QueueTurn } from '@core/entities/queue/queue.entity';
+import type { Admission, DeviceRegistration, Frontier, QueuePlace } from '@core/entities/queue/queue.entity';
 
 import { eventsFixture } from '../fixtures/events.fixture';
 import { ADMISSION_MS, orderWindowMs, type MockPlace } from './mock-queue-state';
@@ -17,29 +17,22 @@ const SERVED_AT_JOIN = 18_452;
 const AHEAD_AT_JOIN = FIRST_SEQ - SERVED_AT_JOIN;
 /** People let in per second while a sale runs: 300 a minute, so the first number's turn comes after about 4 minutes. */
 const ADMIT_PER_SECOND = 5;
-/** Devices this close to the front may stream (ADR-0015 default). */
-const STREAM_FROM = 2000;
 /** The turn window (FR-08). */
 const TURN_MS = 60_000;
-/** The stream sends a frontier every controller tick. */
-const TICK_MS = 1000;
 
 const base64url = (value: object) =>
   btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-const sse = (event: string, data: object, id?: number) =>
-  `event: ${event}\n${id === undefined ? '' : `id: ${id}\n`}data: ${JSON.stringify(data)}\n\n`;
-
 /**
  * The queue service as the waiting room sees it: device registration, an idempotent join per device and event, the
- * public frontier and the stream near the front. Kept across reloads and tabs (see `createMockQueueState`), so the number
+ * public frontier (polled; no stream). Kept across reloads and tabs (see `createMockQueueState`), so the number
  * stays. An admitted place ends with its order window, as on the server.
  */
 export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: MockHandlerContext): HttpHandler[] {
   const { places, nextSeq, queues, persist } = queueState;
 
   /** Where new numbers land: `no_queue` nobody ahead, `near_front` 20 places back, `far_back` 12.000, `ok` 1.248;
-   *  null for scenarios that don't say (`stream_off`, `slow`…), which keep the running queue's placement. */
+   *  null for scenarios that don't say (`slow`…), which keep the running queue's placement. */
   const placementOf = () => {
     const scenario = getScenario();
     return ['ok', 'near_front', 'far_back', 'no_queue'].includes(scenario) ? scenario : null;
@@ -141,7 +134,6 @@ export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: Moc
       rateLow: paused ? 0 : ADMIT_PER_SECOND * 48,
       rateHigh: paused ? 0 : ADMIT_PER_SECOND * 72,
       rateSource: 'measured',
-      streamFrom: getScenario() === 'stream_off' ? 0 : STREAM_FROM,
       ts: Math.floor(time / 1000),
     };
     if (paused) Object.assign(frontier, { state: 'paused', reason: 'stock' });
@@ -237,58 +229,6 @@ export function queueHandlers({ queueApiUrl, getScenario, now, queueState }: Moc
       if (!event || event.state === 'coming_soon') return problem(404, 'NOT_FOUND', 'Antrian tidak ditemukan');
       return HttpResponse.json(frontierOf(event, now().getTime()), {
         headers: { 'Cache-Control': 'public, max-age=1' },
-      });
-    }),
-
-    http.get(`${queueApiUrl}/queue/:eventId/stream`, async ({ request, params }) => {
-      const failed = await failure(getScenario());
-      if (failed) return failed;
-      const device = request.headers.get('X-Device-Token');
-      if (!device || !request.headers.get('X-Queue-Token')) {
-        return problem(401, 'UNAUTHORIZED', 'Token antrian tidak ada');
-      }
-      const eventId = String(params.eventId);
-      const event = findEvent(eventId);
-      const place = places.get(`${device}|${eventId}`);
-      if (!event || !place || place.seq === null) return problem(404, 'NOT_FOUND', 'Antrian tidak ditemukan');
-      const { seq } = place;
-      const first = frontierOf(event, now().getTime());
-      if (first.state === 'closed') return problem(410, 'QUEUE_CLOSED', 'Antrian ditutup');
-      if (!first.streamFrom || seq - first.served > first.streamFrom) {
-        return problem(409, 'TOO_FAR', 'Posisi masih jauh dari depan');
-      }
-
-      const encoder = new TextEncoder();
-      let timer: ReturnType<typeof setInterval> | undefined;
-      let turnSent = false;
-      const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          const tick = () => {
-            const time = now().getTime();
-            const frontier = frontierOf(event, time);
-            controller.enqueue(encoder.encode(sse('frontier', frontier, frontier.ts)));
-            if (!turnSent && frontier.served >= seq) {
-              turnSent = true;
-              const turn: QueueTurn = {
-                event: eventId,
-                seq,
-                served: frontier.served,
-                turnExpiresAt: new Date(turnOf(eventId, seq).expiresAt).toISOString(),
-                serverNow: new Date(time).toISOString(),
-              };
-              controller.enqueue(encoder.encode(sse('turn', turn)));
-            }
-          };
-          controller.enqueue(encoder.encode('retry: 3000\n\n'));
-          tick();
-          timer = setInterval(tick, TICK_MS);
-        },
-        cancel() {
-          clearInterval(timer);
-        },
-      });
-      return new HttpResponse(body, {
-        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store, no-transform' },
       });
     }),
 
