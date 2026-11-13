@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BookingStatus } from '@core/entities/booking/booking.entity';
+import type { Booking, BookingStatus } from '@core/entities/booking/booking.entity';
 import type { PaymentStatus, PaymentView, SnapTransaction } from '@core/entities/payment/payment.entity';
 
-import type { PaymentStep, PayResult, SnapHint } from '../pay-booking.use-case';
+import type { InactiveOutcome, PaymentStep, PayResult, SnapHint } from '../pay-booking.use-case';
 import { PayBookingUseCase } from '../pay-booking.use-case';
 
 const idr = (amount: number) => ({ amount, currency: 'IDR' as const });
@@ -57,6 +57,27 @@ const statusOk = (bookingStatus: BookingStatus, paymentStatus?: PaymentStatus) =
   data: { bookingStatus, ...(paymentStatus ? { paymentStatus } : {}), serverNow: '2026-11-13T03:01:00Z' },
 });
 
+/** The Booking read failed (the default in the older tests): Status alone. */
+const ended = (refund: boolean, reason: InactiveOutcome['reason']): InactiveOutcome => ({
+  kind: 'inactive',
+  refund,
+  reason,
+  eventId: null,
+  ticketCount: null,
+});
+
+const booking = (overrides: Partial<Booking> = {}): Booking => ({
+  bookingId: 'bk1',
+  eventId: 'evt_1',
+  status: 'EXPIRED',
+  price: VIEW.price,
+  createdAt: '2026-11-13T02:55:00Z',
+  serverNow: '2026-11-13T03:11:00Z',
+  attendees: VIEW.attendees,
+  expiresAt: null,
+  ...overrides,
+});
+
 const noSecrets = (value: unknown) => {
   const json = JSON.stringify(value);
   for (const name of NAMES) expect(json).not.toContain(name);
@@ -65,11 +86,14 @@ const noSecrets = (value: unknown) => {
 
 describe('PayBookingUseCase', () => {
   const paymentService = { getPaymentPage: vi.fn(), startSnap: vi.fn(), getPaymentStatus: vi.fn() };
+  const bookingService = { getBooking: vi.fn() };
   const snap = { load: vi.fn(), pay: vi.fn() };
-  const useCase = PayBookingUseCase({ paymentService, snap } as never);
+  const useCase = PayBookingUseCase({ paymentService, bookingService, snap } as never);
 
   beforeEach(() => {
     vi.resetAllMocks();
+    // Older tests predate the Booking read: it fails, so the outcome comes from the Status alone.
+    bookingService.getBooking.mockRejectedValue(problem(503, 'SERVICE_UNAVAILABLE'));
   });
 
   describe('load', () => {
@@ -114,9 +138,9 @@ describe('PayBookingUseCase', () => {
 
     it.each([
       ['PAID / settled', statusOk('PAID', 'settled'), { kind: 'paid' }],
-      ['EXPIRED / expired', statusOk('EXPIRED', 'expired'), { kind: 'inactive', refund: false }],
-      ['EXPIRED / paid_after_expiry', statusOk('EXPIRED', 'paid_after_expiry'), { kind: 'inactive', refund: true }],
-      ['CANCELLED', statusOk('CANCELLED'), { kind: 'inactive', refund: false }],
+      ['EXPIRED / expired', statusOk('EXPIRED', 'expired'), ended(false, 'expired')],
+      ['EXPIRED / paid_after_expiry', statusOk('EXPIRED', 'paid_after_expiry'), ended(true, 'expired')],
+      ['CANCELLED', statusOk('CANCELLED'), ended(false, 'other')],
     ])('on 409 BOOKING_NOT_HELD checks the status once: %s', async (_, status, expected) => {
       paymentService.getPaymentPage.mockRejectedValueOnce(problem(409, 'BOOKING_NOT_HELD'));
       paymentService.getPaymentStatus.mockResolvedValueOnce(status);
@@ -224,8 +248,8 @@ describe('PayBookingUseCase', () => {
 
     it.each([
       ['PAID', statusOk('PAID', 'settled'), { kind: 'paid' }],
-      ['EXPIRED / paid_after_expiry', statusOk('EXPIRED', 'paid_after_expiry'), { kind: 'inactive', refund: true }],
-      ['CANCELLED', statusOk('CANCELLED', 'cancelled'), { kind: 'inactive', refund: false }],
+      ['EXPIRED / paid_after_expiry', statusOk('EXPIRED', 'paid_after_expiry'), ended(true, 'expired')],
+      ['CANCELLED', statusOk('CANCELLED', 'cancelled'), ended(false, 'other')],
     ])('on start 409 checks the status: %s', async (_, status, expected) => {
       paymentService.startSnap.mockRejectedValueOnce(problem(409, 'BOOKING_NOT_HELD'));
       paymentService.getPaymentStatus.mockResolvedValueOnce(status);
@@ -287,17 +311,11 @@ describe('PayBookingUseCase', () => {
     it.each<[string, BookingStatus, PaymentStatus | undefined, SnapHint[], PaymentStep]>([
       ['PAID / settled', 'PAID', 'settled', HINTS, { kind: 'paid' }],
       ['PAID / none', 'PAID', 'none', HINTS, { kind: 'paid' }],
-      ['EXPIRED / paid_after_expiry', 'EXPIRED', 'paid_after_expiry', HINTS, { kind: 'inactive', refund: true }],
-      [
-        'PAYMENT_PENDING / paid_after_expiry',
-        'PAYMENT_PENDING',
-        'paid_after_expiry',
-        HINTS,
-        { kind: 'inactive', refund: true },
-      ],
-      ['EXPIRED / expired', 'EXPIRED', 'expired', HINTS, { kind: 'inactive', refund: false }],
-      ['CANCELLED', 'CANCELLED', undefined, HINTS, { kind: 'inactive', refund: false }],
-      ['SELECTION', 'SELECTION', 'none', HINTS, { kind: 'inactive', refund: false }],
+      ['EXPIRED / paid_after_expiry', 'EXPIRED', 'paid_after_expiry', HINTS, ended(true, 'expired')],
+      ['PAYMENT_PENDING / paid_after_expiry', 'PAYMENT_PENDING', 'paid_after_expiry', HINTS, ended(true, 'expired')],
+      ['EXPIRED / expired', 'EXPIRED', 'expired', HINTS, ended(false, 'expired')],
+      ['CANCELLED', 'CANCELLED', undefined, HINTS, ended(false, 'other')],
+      ['SELECTION', 'SELECTION', 'none', HINTS, ended(false, 'other')],
       ['PAYMENT_PENDING / denied', 'PAYMENT_PENDING', 'denied', HINTS, { kind: 'failed', paymentStatus: 'denied' }],
       ['PAYMENT_PENDING / failed', 'PAYMENT_PENDING', 'failed', HINTS, { kind: 'failed', paymentStatus: 'failed' }],
       [
@@ -355,6 +373,279 @@ describe('PayBookingUseCase', () => {
     ])('rethrows %s as the same object', async (_, error) => {
       paymentService.getPaymentStatus.mockRejectedValueOnce(error);
       await expect(useCase.checkStatus('bk1', 'success')).rejects.toBe(error);
+    });
+  });
+
+  describe('inactive outcome (FR-23-W1)', () => {
+    type Row = [string, ReturnType<typeof statusOk>, Booking, InactiveOutcome];
+    const ROWS: Row[] = [
+      [
+        'EXPIRED / expired, 3 attendees',
+        statusOk('EXPIRED', 'expired'),
+        booking(),
+        { kind: 'inactive', refund: false, reason: 'expired', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'EXPIRED / paid_after_expiry, refundRequired, 2 attendees',
+        statusOk('EXPIRED', 'paid_after_expiry'),
+        booking({ refundRequired: true, attendees: VIEW.attendees.slice(0, 2) }),
+        { kind: 'inactive', refund: true, reason: 'expired', eventId: 'evt_1', ticketCount: 2 },
+      ],
+      [
+        'PAYMENT_PENDING / pending, expiresAt = serverNow (sweeper race)',
+        statusOk('PAYMENT_PENDING', 'pending'),
+        booking({ status: 'PAYMENT_PENDING', expiresAt: '2026-11-13T03:11:00Z' }),
+        { kind: 'inactive', refund: false, reason: 'expired', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'HELD, expiresAt before serverNow',
+        statusOk('HELD', 'none'),
+        booking({ status: 'HELD', expiresAt: '2026-11-13T03:10:00Z' }),
+        { kind: 'inactive', refund: false, reason: 'expired', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'PAYMENT_PENDING / none, expiresAt after serverNow',
+        statusOk('PAYMENT_PENDING', 'none'),
+        booking({ status: 'PAYMENT_PENDING', expiresAt: '2026-11-13T03:20:00Z' }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'PAYMENT_PENDING / none, no expiresAt',
+        statusOk('PAYMENT_PENDING', 'none'),
+        booking({ status: 'PAYMENT_PENDING', expiresAt: null }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'PAYMENT_PENDING / none, unparsable expiresAt',
+        statusOk('PAYMENT_PENDING', 'none'),
+        booking({ status: 'PAYMENT_PENDING', expiresAt: 'not-a-date' }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'CANCELLED',
+        statusOk('CANCELLED'),
+        booking({ status: 'CANCELLED' }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'CANCELLED status, booking already EXPIRED',
+        statusOk('CANCELLED'),
+        booking({ status: 'EXPIRED' }),
+        { kind: 'inactive', refund: false, reason: 'expired', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'CANCELLED status, refundRequired on the booking',
+        statusOk('CANCELLED'),
+        booking({ status: 'CANCELLED', refundRequired: true }),
+        { kind: 'inactive', refund: true, reason: 'expired', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'SELECTION, no attendees, lines 1 + 1',
+        statusOk('SELECTION', 'none'),
+        booking({
+          status: 'SELECTION',
+          expiresAt: '2026-11-13T03:20:00Z',
+          attendees: [],
+          price: {
+            ...VIEW.price,
+            lines: VIEW.price.lines.map((line) => ({ ...line, quantity: 1 })),
+          },
+        }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: 2 },
+      ],
+      [
+        'SELECTION past its deadline is not expired by time',
+        statusOk('SELECTION', 'none'),
+        booking({ status: 'SELECTION', expiresAt: '2026-11-13T03:00:00Z' }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: 3 },
+      ],
+      [
+        'CANCELLED, no attendees and no lines',
+        statusOk('CANCELLED'),
+        booking({ status: 'CANCELLED', attendees: undefined, price: { ...VIEW.price, lines: [] } }),
+        { kind: 'inactive', refund: false, reason: 'other', eventId: 'evt_1', ticketCount: null },
+      ],
+    ];
+
+    /** Rows whose Status is dead on its own, so checkStatus reaches the inactive path too. */
+    const DEAD_ROWS = ROWS.filter(([, status]) =>
+      ['EXPIRED', 'CANCELLED', 'SELECTION'].includes(status.data.bookingStatus),
+    );
+
+    const notHeld = () => problem(409, 'BOOKING_NOT_HELD');
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it.each(ROWS)('load, 409: %s', async (_, status, read, expected) => {
+      paymentService.getPaymentPage.mockRejectedValueOnce(notHeld());
+      paymentService.getPaymentStatus.mockResolvedValueOnce(status);
+      bookingService.getBooking.mockReset();
+      bookingService.getBooking.mockResolvedValueOnce({ status: 200, data: read });
+      const result = await useCase.load('bk1');
+      expect(result).toEqual(expected);
+      noSecrets(result);
+      expect(paymentService.getPaymentPage).toHaveBeenCalledTimes(1);
+      expect(paymentService.getPaymentStatus).toHaveBeenCalledTimes(1);
+      expect(bookingService.getBooking).toHaveBeenCalledTimes(1);
+      expect(bookingService.getBooking).toHaveBeenNthCalledWith(1, 'bk1');
+    });
+
+    it.each(ROWS)('pay, start 409: %s (never opens Snap)', async (_, status, read, expected) => {
+      paymentService.startSnap.mockRejectedValueOnce(notHeld());
+      paymentService.getPaymentStatus.mockResolvedValueOnce(status);
+      bookingService.getBooking.mockReset();
+      bookingService.getBooking.mockResolvedValueOnce({ status: 200, data: read });
+      const result = await useCase.pay({ bookingId: 'bk1', idempotencyKey: 'K1', reusable: null });
+      expect(result).toEqual(expected);
+      expect(paymentService.startSnap).toHaveBeenCalledTimes(1);
+      expect(paymentService.getPaymentStatus).toHaveBeenCalledTimes(1);
+      expect(bookingService.getBooking).toHaveBeenCalledTimes(1);
+      expect(bookingService.getBooking).toHaveBeenNthCalledWith(1, 'bk1');
+      expect(snap.pay).not.toHaveBeenCalled();
+    });
+
+    it.each(DEAD_ROWS)('checkStatus, success hint: %s', async (_, status, read, expected) => {
+      paymentService.getPaymentStatus.mockResolvedValueOnce(status);
+      bookingService.getBooking.mockReset();
+      bookingService.getBooking.mockResolvedValueOnce({ status: 200, data: read });
+      await expect(useCase.checkStatus('bk1', 'success')).resolves.toEqual(expected);
+      expect(paymentService.getPaymentStatus).toHaveBeenCalledTimes(1);
+      expect(bookingService.getBooking).toHaveBeenCalledTimes(1);
+      expect(bookingService.getBooking).toHaveBeenNthCalledWith(1, 'bk1');
+    });
+
+    it('checkStatus enriches paid_after_expiry on a still PAYMENT_PENDING status', async () => {
+      paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('PAYMENT_PENDING', 'paid_after_expiry'));
+      bookingService.getBooking.mockReset();
+      bookingService.getBooking.mockResolvedValueOnce({ status: 200, data: booking({ status: 'PAYMENT_PENDING' }) });
+      await expect(useCase.checkStatus('bk1', 'pending')).resolves.toEqual({
+        kind: 'inactive',
+        refund: true,
+        reason: 'expired',
+        eventId: 'evt_1',
+        ticketCount: 3,
+      });
+    });
+
+    it('classifies on the booking serverNow only, not the device clock (2031)', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2031-01-01T00:00:00Z'));
+      const live = booking({ status: 'PAYMENT_PENDING', expiresAt: '2026-11-13T03:20:00Z' });
+      const late = booking({ status: 'PAYMENT_PENDING', expiresAt: '2026-11-13T03:11:00Z' });
+      for (const [read, reason] of [
+        [live, 'other'],
+        [late, 'expired'],
+      ] as const) {
+        paymentService.getPaymentPage.mockRejectedValueOnce(notHeld());
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('PAYMENT_PENDING', 'pending'));
+        bookingService.getBooking.mockResolvedValueOnce({ status: 200, data: read });
+        await expect(useCase.load('bk1')).resolves.toMatchObject({ kind: 'inactive', reason });
+      }
+    });
+
+    describe('a failed Booking read', () => {
+      it.each([
+        ['401', problem(401, 'UNAUTHORIZED')],
+        ['UNAUTHORIZED without status', { code: 'UNAUTHORIZED' }],
+      ])('%s: load and pay return unauthorized, checkStatus rejects with it', async (_, error) => {
+        bookingService.getBooking.mockReset();
+        bookingService.getBooking.mockRejectedValue(error);
+
+        paymentService.getPaymentPage.mockRejectedValueOnce(notHeld());
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('EXPIRED', 'expired'));
+        await expect(useCase.load('bk1')).resolves.toEqual({ kind: 'unauthorized' });
+
+        paymentService.startSnap.mockRejectedValueOnce(notHeld());
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('EXPIRED', 'expired'));
+        await expect(useCase.pay({ bookingId: 'bk1', idempotencyKey: 'K1', reusable: null })).resolves.toEqual({
+          kind: 'unauthorized',
+        });
+
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('EXPIRED', 'expired'));
+        await expect(useCase.checkStatus('bk1', 'success')).rejects.toBe(error);
+
+        expect(bookingService.getBooking).toHaveBeenCalledTimes(3);
+        expect(snap.pay).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['404 NOT_FOUND', problem(404, 'NOT_FOUND'), statusOk('EXPIRED', 'expired'), ended(false, 'expired')],
+        ['503', problem(503, 'SERVICE_UNAVAILABLE'), statusOk('EXPIRED', 'expired'), ended(false, 'expired')],
+        ['NETWORK_ERROR', problem(0, 'NETWORK_ERROR'), statusOk('EXPIRED', 'expired'), ended(false, 'expired')],
+        ['TIMEOUT', problem(0, 'TIMEOUT'), statusOk('CANCELLED'), ended(false, 'other')],
+        [
+          '500, late payment',
+          problem(500, 'INTERNAL_ERROR'),
+          statusOk('EXPIRED', 'paid_after_expiry'),
+          ended(true, 'expired'),
+        ],
+        ['unknown', new Error('boom'), statusOk('PAYMENT_PENDING', 'none'), ended(false, 'other')],
+      ])('%s: keeps the outcome from the Status, with nulls, no retry', async (_, error, status, expected) => {
+        paymentService.getPaymentPage.mockRejectedValueOnce(notHeld());
+        paymentService.getPaymentStatus.mockResolvedValueOnce(status);
+        bookingService.getBooking.mockReset();
+        bookingService.getBooking.mockRejectedValue(error);
+        await expect(useCase.load('bk1')).resolves.toEqual(expected);
+        expect(bookingService.getBooking).toHaveBeenCalledTimes(1);
+      });
+
+      it('checkStatus keeps the outcome on a 503 read', async () => {
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('EXPIRED', 'expired'));
+        await expect(useCase.checkStatus('bk1', 'success')).resolves.toEqual(ended(false, 'expired'));
+        expect(bookingService.getBooking).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('call budget: no Booking read off the inactive path', () => {
+      it('load ready, load paid, load not-found', async () => {
+        paymentService.getPaymentPage.mockResolvedValueOnce({ status: 200, data: VIEW });
+        await useCase.load('bk1');
+        paymentService.getPaymentPage.mockRejectedValueOnce(notHeld());
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('PAID', 'settled'));
+        await expect(useCase.load('bk1')).resolves.toEqual({ kind: 'paid' });
+        paymentService.getPaymentPage.mockRejectedValueOnce(problem(404, 'NOT_FOUND'));
+        await useCase.load('bk1');
+        expect(paymentService.getPaymentStatus).toHaveBeenCalledTimes(1);
+        expect(bookingService.getBooking).not.toHaveBeenCalled();
+      });
+
+      it('pay snap, retryable, paid', async () => {
+        snap.pay.mockResolvedValueOnce({ kind: 'success' });
+        await useCase.pay({ bookingId: 'bk1', idempotencyKey: 'K1', reusable: S1 });
+        paymentService.startSnap.mockRejectedValueOnce(problem(503, 'PAYMENT_PROVIDER_BUSY'));
+        await useCase.pay({ bookingId: 'bk1', idempotencyKey: 'K1', reusable: null });
+        paymentService.startSnap.mockRejectedValueOnce(notHeld());
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk('PAID', 'settled'));
+        await expect(useCase.pay({ bookingId: 'bk1', idempotencyKey: 'K1', reusable: null })).resolves.toEqual({
+          kind: 'paid',
+        });
+        expect(bookingService.getBooking).not.toHaveBeenCalled();
+      });
+
+      it.each<[BookingStatus, PaymentStatus, SnapHint]>([
+        ['PAID', 'settled', 'success'],
+        ['PAYMENT_PENDING', 'denied', 'error'],
+        ['PAYMENT_PENDING', 'pending', 'pending'],
+        ['PAYMENT_PENDING', 'settled', 'success'],
+      ])('checkStatus %s / %s (%s)', async (bookingStatus, paymentStatus, hint) => {
+        paymentService.getPaymentStatus.mockResolvedValueOnce(statusOk(bookingStatus, paymentStatus));
+        await useCase.checkStatus('bk1', hint);
+        expect(paymentService.getPaymentStatus).toHaveBeenCalledTimes(1);
+        expect(bookingService.getBooking).not.toHaveBeenCalled();
+      });
+    });
+
+    it('a 500 from getPaymentStatus propagates from load, pay and checkStatus without a Booking read', async () => {
+      const error = problem(500, 'INTERNAL_ERROR');
+      paymentService.getPaymentStatus.mockRejectedValue(error);
+      paymentService.getPaymentPage.mockRejectedValueOnce(notHeld());
+      await expect(useCase.load('bk1')).rejects.toBe(error);
+      paymentService.startSnap.mockRejectedValueOnce(notHeld());
+      await expect(useCase.pay({ bookingId: 'bk1', idempotencyKey: 'K1', reusable: null })).rejects.toBe(error);
+      await expect(useCase.checkStatus('bk1', 'success')).rejects.toBe(error);
+      expect(bookingService.getBooking).not.toHaveBeenCalled();
     });
   });
 });

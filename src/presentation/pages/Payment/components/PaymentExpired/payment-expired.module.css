@@ -1,0 +1,75 @@
+@reference "../../../../../styles/app.css";
+
+/* HiFi .mid.left (flow.css 133–134, 165): left-aligned column; 24px top on phones, 20px from md. */
+.expired {
+  @apply flex max-w-[640px] flex-col items-start gap-[18px] pt-6;
+
+  @variant md {
+    @apply pt-5;
+  }
+}
+
+/* HiFi .d-xl + .exp-h (rusuh.css 36, flow.css 137, 168): 58px on phones, clamp(64px, 9vw, 128px) from 720px. */
+.title {
+  @apply mt-1.5 font-display text-[58px] leading-[0.84] font-extrabold;
+  font-stretch: 75%;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+
+  /* Focused on mount (programmatic): no ring unless the keyboard put it there. */
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  @variant md {
+    font-size: clamp(64px, 9vw, 128px);
+  }
+}
+
+/* HiFi .mid-p (flow.css 135, 167): 16px on phones, 18px from md. */
+.body {
+  @apply text-base leading-[1.55];
+
+  @variant md {
+    @apply text-lg;
+  }
+}
+
+/* HiFi .note (flow.css 138): quiet trust zone, the refund promise (H-4). */
+.note {
+  @apply max-w-[600px] border-[2.5px] border-ink bg-card px-[18px] py-4 text-sm leading-normal;
+
+  @variant md {
+    @apply text-[15px];
+  }
+}
+
+.noteLead {
+  @apply font-bold;
+}
+
+/* HiFi .turn-act (flow.css 139): gap 24px, 10px top, wraps. */
+.actions {
+  @apply mt-2.5 flex flex-wrap items-center gap-6;
+}
+
+/* HiFi .link (rusuh.css 78): 44px target. */
+.link {
+  @apply inline-flex min-h-11 items-center font-semibold text-ink underline decoration-2 underline-offset-4;
+
+  &:hover {
+    @apply text-pink-ink;
+  }
+
+  &:focus-visible {
+    @apply outline-3 outline-offset-3 outline-blue;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}

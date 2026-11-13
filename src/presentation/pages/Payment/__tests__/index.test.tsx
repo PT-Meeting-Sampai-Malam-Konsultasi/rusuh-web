@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaymentControllerInterface } from '@controllers/payment.controller';
 
 import PaymentScreen from '../index';
-import { introView, messageView, payView, progressView, summaryView, timerView } from './fixtures';
+import { expiredView, introView, messageView, payView, progressView, summaryView, timerView } from './fixtures';
 
 let controller: PaymentControllerInterface;
 
@@ -36,6 +36,7 @@ const base = (): PaymentControllerInterface => ({
   setLocale: vi.fn(),
   timer: null,
   timeUp: false,
+  expired: null,
 });
 
 const failedNotice = { text: 'payment_failed', tone: 'error' as const };
@@ -131,6 +132,14 @@ const states: { name: string; view: () => Partial<PaymentControllerInterface> }[
       }),
     }),
   },
+  {
+    name: 'expired, order seen this visit',
+    view: () => ({ state: 'expired', intro: null, pay: null, expired: expiredView() }),
+  },
+  {
+    name: 'expired, first load',
+    view: () => ({ state: 'expired', intro: null, summary: null, pay: null, expired: expiredView() }),
+  },
 ];
 
 describe('PaymentScreen', () => {
@@ -179,6 +188,13 @@ describe('PaymentScreen', () => {
         expect(within(main).getByRole('button', { name: c.message.actionLabel })).toBeInTheDocument();
       }
     }
+    if (c.expired) {
+      const section = within(main).getByRole('region', { name: c.expired.title });
+      expect(within(section).getByRole('heading', { level: 1, name: c.expired.title })).toBeInTheDocument();
+      expect(within(section).getByRole('button', { name: c.expired.queueAgainLabel })).toBeInTheDocument();
+    } else {
+      expect(screen.queryByRole('heading', { name: 'payment_expired_title' })).toBeNull();
+    }
     expect(within(main).queryAllByRole('heading', { level: 1 })).toHaveLength(c.state === 'loading' ? 0 : 1);
 
     // Aside inside main, after the panel column
@@ -213,6 +229,31 @@ describe('PaymentScreen', () => {
 
     // Timer: flow bar and app bar (jsdom applies no CSS), only in the timer states
     expect(screen.queryAllByRole('timer')).toHaveLength(c.timer ? 2 : 0);
+  });
+
+  it('expired: the section in the main column, no timer, no pay button, no dock (FR-23-W1)', async () => {
+    const expired = expiredView();
+    controller = { ...base(), state: 'expired', intro: null, summary: null, pay: null, timer: null, expired };
+    render(<PaymentScreen />);
+    const main = screen.getByRole('main');
+    const section = within(main).getByRole('region', { name: 'payment_expired_title' });
+    expect(within(section).getByText('payment_expired_stamp')).toBeInTheDocument();
+    expect(within(section).getByRole('heading', { level: 1 })).toHaveFocus();
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'payment_pay_label' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'payment_dock_label' })).toBeNull();
+    expect(screen.queryByRole('complementary')).toBeNull();
+    await userEvent.click(within(section).getByRole('button', { name: 'payment_expired_queue_again' }));
+    expect(expired.onQueueAgain).toHaveBeenCalledTimes(1);
+  });
+
+  it('expired with the order seen: the aside stays, without a pay button (FR-23-W1)', () => {
+    controller = { ...base(), state: 'expired', intro: null, pay: null, timer: null, expired: expiredView() };
+    render(<PaymentScreen />);
+    const aside = screen.getByRole('complementary');
+    expect(within(aside).getByText('RSH-26-084731')).toBeInTheDocument();
+    expect(within(aside).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'payment_dock_label' })).toBeNull();
   });
 
   it('shows the payment countdown in both bars of the header, compact, with its label (FR-21-W1)', () => {
