@@ -6,6 +6,7 @@ import type {
   PaymentMessageView,
   PaymentProgressView,
   PaymentSummaryView,
+  PaymentTimerView,
 } from '@controllers/payment.controller';
 
 export const summaryView = (): PaymentSummaryView => ({
@@ -57,5 +58,11 @@ export const messageView = (over: Partial<PaymentMessageView> = {}): PaymentMess
   onAction: null,
   homeHref: '/',
   homeLabel: 'action_back_home',
+  ...over,
+});
+
+export const timerView = (over: Partial<PaymentTimerView> = {}): PaymentTimerView => ({
+  seconds: 552,
+  label: 'payment_timer_label',
   ...over,
 });

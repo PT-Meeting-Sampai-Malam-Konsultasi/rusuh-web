@@ -46,6 +46,8 @@ export const MOCK_ADMIN_FEE = 10000;
 const SELECTION_MS = 5 * 60_000;
 /** PAYMENT_PENDING lasts 10 minutes from payment entry (ADR-0005). */
 const PAYMENT_MS = 10 * 60_000;
+/** `?mock=short_payment`: 30 s of the ink timer, pink from 2:00, then 0:00 and EXPIRED on the next read. */
+export const MOCK_SHORT_PAYMENT_WINDOW_MS = 150_000;
 /** The categories answer's reservedUnits. */
 const MOCK_RESERVED_UNITS = 3;
 const MAX_TICKETS_PER_ORDER = 3;
@@ -367,7 +369,9 @@ export function bookingHandlers({
       entry.booking = {
         ...booking,
         status: 'PAYMENT_PENDING',
-        expiresAt: new Date(today.getTime() + PAYMENT_MS).toISOString(),
+        expiresAt: new Date(
+          today.getTime() + (scenario === 'short_payment' ? MOCK_SHORT_PAYMENT_WINDOW_MS : PAYMENT_MS),
+        ).toISOString(),
       };
       bookingStore.save(entry);
       return HttpResponse.json<EnterPaymentResponse>(answer());

@@ -110,6 +110,14 @@ export interface PaymentIntroView {
   note: string;
 }
 
+/** The payment-window countdown for the flow header (FR-21-W1): what the shared Timer component takes. */
+export interface PaymentTimerView {
+  /** Whole seconds left, rounded down, never negative. From server time plus elapsed client time. */
+  seconds: number;
+  /** "untuk membayar" / "left to pay". */
+  label: string;
+}
+
 export interface PaymentControllerInterface {
   t: TFunction;
   state: PaymentScreenState;
@@ -127,6 +135,10 @@ export interface PaymentControllerInterface {
   backHref: string;
   locale: FormatLocale;
   setLocale: (locale: FormatLocale) => void;
+  /** Null unless state is ready / opening / verifying / failed / busy and expiresAt / serverNow are valid dates. */
+  timer: PaymentTimerView | null;
+  /** Seconds left reached 0 in a timer state: "Bayar" is off and the page has asked the server again. */
+  timeUp: boolean;
 }
 
 type PaymentControllerDeps = Pick<
@@ -160,7 +172,17 @@ interface Attempt {
   reusable: SnapTransaction | null | undefined;
 }
 
+/** The answer the countdown runs from: its server times and when it arrived (the query's dataUpdatedAt). */
+interface TimerAnchor {
+  expiresAt: string;
+  serverNow: string;
+  receivedAt: number;
+}
+
 const POLL_MS = 4000;
+
+/** The states that show the order, so the payment countdown (HiFi: select, va, qris, verifying). */
+const TIMER_STATES: ReadonlySet<PaymentScreenState> = new Set(['ready', 'opening', 'verifying', 'failed', 'busy']);
 
 const PaymentController = ({
   payBookingUseCase,
@@ -199,6 +221,12 @@ const PaymentController = ({
   });
   const loaded = pageQuery.data?.kind === 'ready' ? pageQuery.data : null;
   const view = loaded?.view ?? null;
+
+  // The countdown's anchor (FR-21-W1): written only from a real answer, once per answer (render-time update, guarded).
+  const [anchor, setAnchor] = useState<TimerAnchor | null>(null);
+  if (view && !pageQuery.isPlaceholderData && pageQuery.dataUpdatedAt !== anchor?.receivedAt) {
+    setAnchor({ expiresAt: view.expiresAt, serverNow: view.serverNow, receivedAt: pageQuery.dataUpdatedAt });
+  }
 
   // Preload snap.js so the tap opens Snap at once; a failure changes nothing (snap.pay loads it again on the tap).
   useQueryTanstack<boolean>({
@@ -349,18 +377,6 @@ const PaymentController = ({
     router.replace(signInHref);
   }, [signInNeeded, router, signInHref]);
 
-  const onPay = useCallback(() => {
-    if (!view || payGuard.current || paying) return;
-    payGuard.current = true;
-    attemptRef.current.key ??= randomUuid();
-    const { key, reusable } = attemptRef.current;
-    mutatePay({
-      bookingId,
-      idempotencyKey: key,
-      reusable: reusable === undefined ? (view.currentSnap ?? null) : reusable,
-    });
-  }, [view, paying, mutatePay, bookingId]);
-
   const pageResult = pageQuery.data?.kind;
   let state: PaymentScreenState;
   if (!hasBookingId) state = 'not-found';
@@ -371,6 +387,46 @@ const PaymentController = ({
   else if (leaving) state = 'leaving';
   else if (paying) state = 'opening';
   else state = phase.kind as 'ready' | 'verifying' | 'failed' | 'busy';
+
+  // Seconds left from server times only (expiresAt − serverNow) minus the client time elapsed since the answer.
+  const [now, setNow] = useState(() => Date.now());
+  const windowSeconds = anchor ? (Date.parse(anchor.expiresAt) - Date.parse(anchor.serverNow)) / 1000 : NaN;
+  const secondsLeft =
+    view && anchor && Number.isFinite(windowSeconds)
+      ? Math.max(0, windowSeconds - Math.max(0, now - anchor.receivedAt) / 1000)
+      : null;
+  const showsTimer = secondsLeft !== null && TIMER_STATES.has(state);
+  const timeUp = showsTimer && secondsLeft === 0;
+  const ticking = secondsLeft !== null && secondsLeft > 0 && TIMER_STATES.has(state);
+  useEffect(() => {
+    if (!ticking) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [ticking]);
+
+  // The server decides expiry (ADR-0026): at the client's zero, ask again once per zero. 409 BOOKING_NOT_HELD →
+  // inactive / paid through the use case; 200 with time left → re-anchor. payment_expired once per page visit.
+  const { refetch: refetchPage } = pageQuery;
+  const expiredTracked = useRef(false);
+  useEffect(() => {
+    if (!timeUp) return;
+    void refetchPage();
+    if (expiredTracked.current) return;
+    expiredTracked.current = true;
+    analyticsAdapter.trackEvent(ANALYTICS_EVENTS.PAYMENT_EXPIRED, { booking_id: bookingId });
+  }, [timeUp, refetchPage, analyticsAdapter, bookingId]);
+
+  const onPay = useCallback(() => {
+    if (!view || timeUp || payGuard.current || paying) return;
+    payGuard.current = true;
+    attemptRef.current.key ??= randomUuid();
+    const { key, reusable } = attemptRef.current;
+    mutatePay({
+      bookingId,
+      idempotencyKey: key,
+      reusable: reusable === undefined ? (view.currentSnap ?? null) : reusable,
+    });
+  }, [view, timeUp, paying, mutatePay, bookingId]);
 
   const refund =
     (pageQuery.data?.kind === 'inactive' && pageQuery.data.refund) || (phase.kind === 'inactive' && phase.refund);
@@ -428,7 +484,7 @@ const PaymentController = ({
         dockRegionLabel: t('payment_dock_label'),
         busyLabel: t('payment_pay_busy'),
         busy: paying,
-        enabled: !paying,
+        enabled: !paying && !timeUp,
         onPay,
       }
     : null;
@@ -457,6 +513,10 @@ const PaymentController = ({
       held: t('payment_verifying_held'),
     };
   }
+
+  const timer: PaymentTimerView | null = showsTimer
+    ? { seconds: Math.floor(secondsLeft), label: t('payment_timer_label') }
+    : null;
 
   const home = { homeHref: ROUTES.HOME, homeLabel: t('action_back_home') };
   let message: PaymentMessageView | null = null;
@@ -508,6 +568,8 @@ const PaymentController = ({
       storage.set(STORAGE_KEYS.LANGUAGE, next);
       void i18n.changeLanguage(next);
     },
+    timer,
+    timeUp,
   };
 };
 

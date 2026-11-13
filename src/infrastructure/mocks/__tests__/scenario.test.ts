@@ -36,6 +36,12 @@ describe('resolveScenario', () => {
     expect(resolveScenario('', 'payment_busy')).toBe('payment_busy');
   });
 
+  it('knows the short_payment scenario (FR-21-W1)', () => {
+    expect(resolveScenario('?mock=short_payment', null)).toBe('short_payment');
+    expect(resolveScenario('', 'short_payment')).toBe('short_payment');
+    expect(resolveScenario('?mock=ok', 'short_payment')).toBe('ok');
+  });
+
   it('knows the payment scenarios (FR-20-W1)', () => {
     for (const name of ['snap_busy', 'snap_closed', 'payment_denied', 'payment_pending', 'payment_late']) {
       expect(resolveScenario(`?mock=${name}`, null)).toBe(name);

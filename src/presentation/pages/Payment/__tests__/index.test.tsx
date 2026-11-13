@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaymentControllerInterface } from '@controllers/payment.controller';
 
 import PaymentScreen from '../index';
-import { introView, messageView, payView, progressView, summaryView } from './fixtures';
+import { introView, messageView, payView, progressView, summaryView, timerView } from './fixtures';
 
 let controller: PaymentControllerInterface;
 
@@ -34,6 +34,8 @@ const base = (): PaymentControllerInterface => ({
   backHref: '/',
   locale: 'id',
   setLocale: vi.fn(),
+  timer: null,
+  timeUp: false,
 });
 
 const failedNotice = { text: 'payment_failed', tone: 'error' as const };
@@ -44,19 +46,20 @@ const states: { name: string; view: () => Partial<PaymentControllerInterface> }[
     name: 'loading',
     view: () => ({ state: 'loading', intro: null, summary: null, pay: null }),
   },
-  { name: 'ready', view: () => ({}) },
+  { name: 'ready', view: () => ({ timer: timerView() }) },
   {
     name: 'opening',
-    view: () => ({ state: 'opening', pay: payView({ busy: true, enabled: false }) }),
+    view: () => ({ state: 'opening', pay: payView({ busy: true, enabled: false }), timer: timerView() }),
   },
   {
     name: 'verifying, confirming',
-    view: () => ({ state: 'verifying', intro: null, pay: null, progress: progressView() }),
+    view: () => ({ state: 'verifying', intro: null, pay: null, progress: progressView(), timer: timerView() }),
   },
   {
     name: 'verifying, waiting',
     view: () => ({
       state: 'verifying',
+      timer: timerView(),
       intro: null,
       pay: payView({ label: 'payment_pay_reopen', dockLabel: 'payment_pay_reopen' }),
       progress: progressView({ reason: 'waiting', title: 'payment_waiting_title', body: 'payment_waiting_body' }),
@@ -66,6 +69,7 @@ const states: { name: string; view: () => Partial<PaymentControllerInterface> }[
     name: 'failed',
     view: () => ({
       state: 'failed',
+      timer: timerView(),
       notice: failedNotice,
       pay: payView({ label: 'payment_pay_again', dockLabel: 'payment_pay_again' }),
     }),
@@ -74,6 +78,7 @@ const states: { name: string; view: () => Partial<PaymentControllerInterface> }[
     name: 'busy',
     view: () => ({
       state: 'busy',
+      timer: timerView(),
       notice: { text: 'error_payment_provider_busy', tone: 'error' },
       pay: payView({ label: 'action_retry', dockLabel: 'action_retry' }),
     }),
@@ -133,7 +138,7 @@ describe('PaymentScreen', () => {
     controller = base();
   });
 
-  it('renders the flow header with a done step 1, the current step 2, the title and no timer', () => {
+  it('renders the flow header with a done step 1, the current step 2 and the title', () => {
     render(<PaymentScreen />);
     const items = within(screen.getByRole('list', { name: 'order_steps_label' })).getAllByRole('listitem');
     expect(items[0]).toHaveTextContent('order_step_choose (payment_step_done)');
@@ -206,7 +211,51 @@ describe('PaymentScreen', () => {
     // Notice in aside and dock, as alerts
     if (c.notice) expect(screen.getAllByRole('alert')).toHaveLength(2);
 
-    expect(screen.queryByRole('timer')).toBeNull();
+    // Timer: flow bar and app bar (jsdom applies no CSS), only in the timer states
+    expect(screen.queryAllByRole('timer')).toHaveLength(c.timer ? 2 : 0);
+  });
+
+  it('shows the payment countdown in both bars of the header, compact, with its label (FR-21-W1)', () => {
+    controller = { ...base(), timer: timerView() };
+    render(<PaymentScreen />);
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    expect(within(screen.getByRole('banner')).getAllByRole('timer')).toEqual(timers);
+    for (const timer of timers) {
+      expect(timer).toHaveTextContent('9:12');
+      expect(within(timer).getByText('payment_timer_label')).toBeInTheDocument();
+      expect(timer).toHaveAttribute('data-compact');
+      expect(timer).toHaveAttribute('aria-live', 'off');
+    }
+  });
+
+  it.each([
+    { seconds: 121, live: 'off', text: '2:01' },
+    { seconds: 120, live: 'polite', text: '2:00' },
+  ])('puts both timers in the warning state from 120 seconds: $seconds s is $live', ({ seconds, live, text }) => {
+    controller = { ...base(), timer: timerView({ seconds }) };
+    render(<PaymentScreen />);
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    for (const timer of timers) {
+      expect(timer).toHaveAttribute('aria-live', live);
+      expect(timer).toHaveTextContent(text);
+    }
+  });
+
+  it('at zero: both timers read 0:00 in the warning state and both pay buttons are off', () => {
+    controller = { ...base(), timer: timerView({ seconds: 0 }), timeUp: true, pay: payView({ enabled: false }) };
+    render(<PaymentScreen />);
+    const timers = screen.getAllByRole('timer');
+    expect(timers).toHaveLength(2);
+    for (const timer of timers) {
+      expect(timer).toHaveTextContent('0:00');
+      expect(timer).toHaveAttribute('aria-live', 'polite');
+    }
+    expect(screen.getByRole('button', { name: 'payment_pay_label' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'payment_pay_amount' })).toBeDisabled();
+    expect(screen.getByRole('heading', { level: 1, name: 'payment_heading' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
   });
 
   it('pays from the aside and the dock through pay.onPay', async () => {

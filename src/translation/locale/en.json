@@ -120,6 +120,7 @@
   "payment_title": "Payment",
   "payment_back_label": "Back to home",
   "payment_step_done": "done",
+  "payment_timer_label": "left to pay",
   "payment_heading": "Pay with Midtrans",
   "payment_intro": "Tap Pay, then choose how to pay on the Midtrans page that opens over this one.",
   "payment_intro_note": "Keep this page open until the payment is done.",
