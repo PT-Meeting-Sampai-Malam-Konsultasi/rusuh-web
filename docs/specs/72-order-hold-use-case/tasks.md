@@ -10,11 +10,11 @@ it.
 
 ## Tasks
 
-- [ ] 1. Create `src/core/use_case/booking/hold-booking.use-case.ts` with the exported types (`HoldTicket`, `HoldBookingInput`, `HoldBookingResult`, `PriceQuote`, `PriceQuoteLine`, `QuotableCategory`, `HoldBookingUseCaseInterface`), the private helpers and `quote` per the design [Requirement 1]
-- [ ] 2. Implement `execute`: the pre-checks, create → enter, `bookingId` resume, the `ACCOUNT_HAS_ACTIVE_BOOKING` recovery with the same-order match, and `classify` in the design's order (rethrow the rest) [Requirement 2, Requirement 3, Requirement 4, Requirement 5]
-- [ ] 3. Register `holdBookingUseCase: asFunction(HoldBookingUseCase).singleton()` in `src/infrastructure/di/services.registry.ts`, add the key to `AwilixRegistry` in `src/infrastructure/di/registry.types.ts` and to `KEYS` in `src/infrastructure/di/__tests__/registry.test.ts` [Requirement 6]
-- [ ] 4. Tests in `src/core/use_case/booking/__tests__/hold-booking.use-case.test.ts`: the `quote` table and fee loop, every row of the `execute` table with exact call lists, the body shape, rethrow identity, no token / NIK digits / snap token in any result [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6]
-- [ ] 5. Run the gate check [ALL]
+- [x] 1. Create `src/core/use_case/booking/hold-booking.use-case.ts` with the exported types (`HoldTicket`, `HoldBookingInput`, `HoldBookingResult`, `PriceQuote`, `PriceQuoteLine`, `QuotableCategory`, `HoldBookingUseCaseInterface`), the private helpers and `quote` per the design [Requirement 1]
+- [x] 2. Implement `execute`: the pre-checks, create → enter, `bookingId` resume, the `ACCOUNT_HAS_ACTIVE_BOOKING` recovery with the same-order match, and `classify` in the design's order (rethrow the rest) [Requirement 2, Requirement 3, Requirement 4, Requirement 5]
+- [x] 3. Register `holdBookingUseCase: asFunction(HoldBookingUseCase).singleton()` in `src/infrastructure/di/services.registry.ts`, add the key to `AwilixRegistry` in `src/infrastructure/di/registry.types.ts` and to `KEYS` in `src/infrastructure/di/__tests__/registry.test.ts` [Requirement 6]
+- [x] 4. Tests in `src/core/use_case/booking/__tests__/hold-booking.use-case.test.ts`: the `quote` table and fee loop, every row of the `execute` table with exact call lists, the body shape, rethrow identity, no token / NIK digits / snap token in any result [Requirement 1, Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6]
+- [x] 5. Run the gate check [ALL]
 
 ## Task Dependency Graph
 
