@@ -20,7 +20,6 @@ import type { AuthServiceInterface } from '@core/services/auth.service';
 import type { BookingServiceInterface } from '@core/services/booking.service';
 import type { CatalogServiceInterface } from '@core/services/catalog.service';
 import type { DeviceServiceInterface } from '@core/services/device.service';
-import type { PaymentServiceInterface } from '@core/services/payment.service';
 import type { QueueServiceInterface } from '@core/services/queue.service';
 import type { SignOutUseCaseInterface } from '@core/use_case/auth/sign-out.use-case';
 import type { RefreshSessionUseCaseInterface } from '@core/use_case/auth/refresh-session.use-case';
@@ -133,7 +132,6 @@ export interface AwilixRegistry {
   bookingService: BookingServiceInterface;
   deviceService: DeviceServiceInterface;
   queueService: QueueServiceInterface;
-  paymentService: PaymentServiceInterface;
 
   // use cases
   getHomeEventsUseCase: GetHomeEventsUseCaseInterface;

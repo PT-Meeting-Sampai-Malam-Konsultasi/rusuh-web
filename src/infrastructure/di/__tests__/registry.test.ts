@@ -44,7 +44,6 @@ const KEYS = {
   bookingService: true,
   deviceService: true,
   queueService: true,
-  paymentService: true,
   getHomeEventsUseCase: true,
   getOrderCategoriesUseCase: true,
   orderTicketSelectionUseCase: true,
@@ -147,9 +146,8 @@ describe('DI registries', () => {
     expect(typeof container.resolve('endOrderWindowUseCase').execute).toBe('function');
   });
 
-  it('wires the payment service and the page-scoped Snap adapter (FR-20-W1)', () => {
-    expect(container.resolve('paymentService')).toBe(container.resolve('paymentService'));
-    expect(typeof container.resolve('paymentService').startSnap).toBe('function');
+  it('wires the page-scoped Snap adapter (FR-20-W1); payment goes through the booking service', () => {
+    expect(container.resolve('bookingService').checkPaymentStatus).toBeTypeOf('function');
     expect(container.resolve('snap')).toBe(container.resolve('snap'));
     expect(typeof container.resolve('snap').pay).toBe('function');
     expect(typeof container.resolve('snap').load).toBe('function');

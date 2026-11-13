@@ -1,27 +1,26 @@
-// Payment module types, matching rusuh-documentation/api/openapi.yaml (PaymentView, SnapTransaction, PaymentStatus).
-import type { Attendee, BookingStatus, PaymentMethod, PriceBreakdown } from '@core/entities/booking/booking.entity';
+// Payment page models (FR-20-W1). The web pays through core.booking (Apidog): enterPayment gives the Snap token,
+// getBooking / checkPaymentStatus the status. The payment module's /payment/payments/* is the mobile hand-off page.
+import type { Attendee, BookingStatus, PriceBreakdown } from '@core/entities/booking/booking.entity';
 
 /** The latest attempt as Midtrans confirmed it. Only `bookingStatus: PAID` means paid. */
 export type PaymentStatus =
   'none' | 'pending' | 'settled' | 'denied' | 'expired' | 'cancelled' | 'failed' | 'paid_after_expiry';
 
-/** One Midtrans attempt (`order_id = {bookingId}-{attempt}`, ADR-0008). */
+/** The live Snap attempt, from enterPayment (idempotent while PAYMENT_PENDING: the live token again). */
 export interface SnapTransaction {
-  attemptId: number;
-  orderId: string;
-  /** The method this attempt was opened on; null when the customer picks on Snap (always, on the web). */
-  method?: PaymentMethod | null;
   /** For `window.snap.pay(token)`. Never logged, never in analytics. */
   snapToken: string;
   /** Snap page URL (system tab / WebView; unused on the web). */
-  redirectUrl: string;
-  /** Midtrans expiry: 10 minutes from the payment entry (P + 10, LLD-03 §4). */
+  redirectUrl?: string | null;
+  /** End of the payment window (paymentExpiresAt). */
   gatewayExpiresAt: string;
 }
 
-/** getPaymentPage 200. */
+/** What the payment page shows: the booking (getBooking) plus its event (getEvent). */
 export interface PaymentView {
   bookingId: string;
+  /** The admission token is kept per event (enterPayment needs it). */
+  eventId: string;
   orderCode: string;
   eventName?: string;
   eventStartsAt?: string;
@@ -30,30 +29,20 @@ export interface PaymentView {
   timezone?: string;
   /** One line per ticket (category, masked NIK); the price comes from price.lines. */
   attendees: Attendee[];
-  /** Where a refund notice goes if the payment arrives late (ADR-0009). */
+  /** Where a refund notice goes if the payment arrives late (ADR-0009); the booking does not carry it. */
   customerEmail?: string;
   price: PriceBreakdown;
-  /** The live attempt, or null before the first one. */
+  /** The live attempt, or null before "Bayar" asks for it. */
   currentSnap?: SnapTransaction | null;
-  /** Payment deadline (end of PAYMENT_PENDING). For FR-21-W1; not shown in this ticket. */
+  /** Payment deadline (end of PAYMENT_PENDING). */
   expiresAt: string;
   serverNow: string;
-  /** paySession (mobile) only: the web authenticates with bearer and ignores it. */
-  csrfToken: string;
-  /** Public Midtrans client key; the web loads snap.js with config.midtransClientKey. */
-  snapClientKey: string;
 }
 
-/** startSnapPayment body. The web sends none: the customer picks on Snap (H-3). Kept for the contract. */
-export interface StartSnapPaymentRequest {
-  method?: PaymentMethod;
-}
-
-/** getPaymentStatus 200. */
+/** Where the booking stands, as the payment steps read it (from a Booking, never a separate status API). */
 export interface PaymentStatusResponse {
   bookingStatus: BookingStatus;
+  /** Only paid_after_expiry is known from the booking (refundRequired); the rest comes from the Snap callback. */
   paymentStatus?: PaymentStatus;
-  /** Mobile App Link, set when final; unused on the web. */
-  returnUrl?: string;
   serverNow: string;
 }

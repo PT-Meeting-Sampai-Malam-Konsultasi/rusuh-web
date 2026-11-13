@@ -11,13 +11,11 @@ export interface MockAttendee {
 /** One mocked Snap attempt (FR-20-W1). */
 export interface MockSnapAttempt {
   attemptId: number;
-  /** null for attempt 1, created by the FR-16 payment entry. */
-  idempotencyKey: string | null;
   /** `mock-snap-<bookingId>-<attemptId>`. */
   snapToken: string;
-  /** 'none' until its first status poll. */
+  /** 'none' until its first status check. */
   status: PaymentStatus;
-  /** Server time (ms) of the first status poll of this attempt; it settles MOCK_SETTLE_MS later. */
+  /** Server time (ms) of the first status check of this attempt; it settles MOCK_SETTLE_MS later. */
   firstPolledAt: number | null;
 }
 
@@ -26,7 +24,7 @@ export interface StoredBooking {
   idempotencyKey: string;
   /** Set at the first successful payment entry; repeated entries answer the same one. */
   snapToken: string | null;
-  /** Payment-entry calls so far (payment_busy fails only the first). */
+  /** Payment-entry calls so far (payment_busy fails the first, from the order page; snap_busy the second, from "Bayar"). */
   paymentEntries: number;
   /** Snap attempts, oldest first: attempt 1 from the payment entry, the next ones from startSnapPayment. */
   attempts: MockSnapAttempt[];
