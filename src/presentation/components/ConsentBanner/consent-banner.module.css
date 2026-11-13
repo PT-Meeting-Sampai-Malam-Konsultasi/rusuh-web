@@ -81,7 +81,7 @@
 }
 
 /* Above the tab bar on phones (56px tabs + the 2.5px rule). */
-@media (width < 48rem) {
+@media (width < 45rem) {
   body:has([data-tabbar]) .banner {
     bottom: calc(58.5px + env(safe-area-inset-bottom));
   }
