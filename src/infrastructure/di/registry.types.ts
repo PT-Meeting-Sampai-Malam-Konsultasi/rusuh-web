@@ -40,6 +40,7 @@ import type { GetETicketUseCaseInterface } from '@core/use_case/ticket/get-e-tic
 import type { GetMyOrdersUseCaseInterface } from '@core/use_case/ticket/get-my-orders.use-case';
 import type { AccountControllerInterface } from '@controllers/account.controller';
 import type { HomeControllerInterface } from '@controllers/home.controller';
+import type { InfoControllerInterface } from '@controllers/info.controller';
 import type { LoginControllerInterface } from '@controllers/login.controller';
 import type { NotFoundControllerInterface } from '@controllers/not-found.controller';
 import type { OrderControllerInterface } from '@controllers/order.controller';
@@ -158,6 +159,7 @@ export interface AwilixRegistry {
   // controllers
   accountController: AccountControllerInterface;
   homeController: HomeControllerInterface;
+  infoController: InfoControllerInterface;
   loginController: LoginControllerInterface;
   notFoundController: NotFoundControllerInterface;
   orderController: OrderControllerInterface;

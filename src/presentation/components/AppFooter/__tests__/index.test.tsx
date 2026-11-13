@@ -14,6 +14,10 @@ describe('AppFooter', () => {
       'footer_help',
       'footer_cookies',
     ]);
+    expect(screen.getByRole('link', { name: 'footer_terms' })).toHaveAttribute('href', '/terms');
+    expect(screen.getByRole('link', { name: 'footer_privacy' })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByRole('link', { name: 'footer_refund' })).toHaveAttribute('href', '/refund');
+    expect(screen.getByRole('link', { name: 'footer_help' })).toHaveAttribute('href', '/help');
     expect(screen.getByRole('link', { name: 'footer_cookies' })).toHaveAttribute('href', '#cookie-settings');
   });
 });

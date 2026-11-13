@@ -28,6 +28,7 @@ Presentation is the thinnest layer: props in, JSX out. No business logic.
   | `/tickets` | My tickets | — |
   | `/tickets/detail` | E-ticket | `booking` |
   | `/account` | Account | — |
+  | `/terms`, `/privacy`, `/refund`, `/help` | Info (one screen; the topic comes from the path) | — |
 
   Ids are search params because the static export has no dynamic routes (`/queue?event=…`, `/payment?booking=…`).
   Keep the paths in `src/utils/constants/routes.ts`; never hard-code them in controllers.

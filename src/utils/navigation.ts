@@ -14,7 +14,7 @@ export interface NavItem {
 }
 
 /** The app's main navigation (desktop header and phone tab bar), with `current` marking the open section. */
-export function mainNav(t: TFunction, current: NavIcon): NavItem[] {
+export function mainNav(t: TFunction, current: NavIcon | null): NavItem[] {
   const item = (icon: NavIcon, href: string, label: string, desktop: boolean): NavItem => ({
     href,
     label: t(label),
